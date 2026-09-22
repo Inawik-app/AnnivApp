@@ -20,6 +20,14 @@ body {
   --duree-spectacle: calc(700ms / var(--vitesse, 1));
 }
 
+.scene.scene-plateau {
+  background-color: #071433;
+  background-image: url('/assets/fond-plateau.jpg');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 .scene.animations-reduites {
   --duree-rapide: calc(150ms / var(--vitesse, 1));
   --duree-normale: calc(150ms / var(--vitesse, 1));

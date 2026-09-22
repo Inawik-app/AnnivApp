@@ -619,7 +619,7 @@ function EcranTv() {
   const places = Array.from({ length: Math.max(placesMax, inscrits.length) }, (_, index) => inscrits[index] ?? null);
 
   return (
-    <div class={reduit ? 'scene animations-reduites' : 'scene'} ref={scene}>
+    <div class={`${reduit ? 'scene animations-reduites' : 'scene'}${ecran === 'plateau' ? ' scene-plateau' : ''}`} ref={scene}>
       {ecran === 'accueil' && !reduit ? <Confettis /> : null}
       {ecran === 'plateau' && courseAffichee ? (
         <PlateauTv
