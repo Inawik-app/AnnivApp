@@ -1,0 +1,7 @@
+{
+  "titre": "GP Party",
+  "nbJoueursMax": 4,
+  "codeHote": "change-moi",
+  "port": 3000,
+  "ipForcee": null
+}

@@ -1,0 +1,58 @@
+---
+description: Règles permanentes du jeu d'anniversaire GP Party (architecture, contraintes TV et téléphone, méthode de travail)
+alwaysApply: true
+---
+
+# GP Party — règles permanentes du projet
+
+## Contexte
+Jeu de soirée d'anniversaire façon party game de plateau : 4 joueurs sur leur téléphone, 1 hôte qui pilote depuis son téléphone et ne gagne jamais de GP, 1 télé qui affiche. La partie a lieu le samedi 26 septembre sur le Wi-Fi local, avec le serveur sur le PC Windows de l'hôte.
+- Référence fonctionnelle : `docs/cahier-des-charges.md`.
+- Avancement, décisions, liste des actions et des événements : `docs/avancement.md`. Lis-le avant de commencer, mets-le à jour à la fin de chaque étape.
+- Priorité absolue : la fiabilité le jour J. Chaque étape laisse le projet fonctionnel. Ne code rien hors du périmètre de l'étape demandée ; une idée hors périmètre va dans la section « À discuter » de `docs/avancement.md`.
+
+## Stack
+- Serveur : Node.js LTS, Express, Socket.IO 4, TypeScript exécuté avec tsx. Un seul processus et un seul port, en dev comme en prod.
+- Client : Vite + Preact + TypeScript, multi-pages : `/tv`, `/joueur`, `/hote`, et `/` (page de choix).
+- `shared/` : types et constantes communs au serveur et aux pages (état, actions, messages socket).
+- `config/*.json` : tous les réglages de jeu. Aucune valeur de gameplay en dur dans le code.
+- Vitest pour la logique de jeu pure.
+- Windows : scripts npm compatibles Windows (cross-env si besoin, aucune syntaxe bash), chemins construits avec `path.join`.
+
+## Architecture (non négociable)
+1. Serveur autoritaire : l'état de jeu n'existe que sur le serveur. Les pages envoient des actions et affichent ce qu'elles reçoivent. Aucune règle de jeu n'est calculée côté client.
+2. Toute modification passe par `dispatch(action, origine)` : vérification des droits et des règles, instantané pour l'annulation, application par un réducteur (Immer), sauvegarde JSON, envoi des vues. Aucune mutation de l'état ailleurs.
+3. Les GP sont un journal de transactions. Le solde est toujours recalculé à partir du journal, jamais stocké à part.
+4. Règle d'or : aucune mécanique ne retire de GP à un autre joueur. Une transaction négative n'est possible que pour le joueur qui engage ses propres GP (mise, pari sur soi…) ou comme correction manuelle de l'hôte. L'invariant est vérifié dans le réducteur et couvert par un test.
+5. Vues par rôle : chaque page reçoit une projection de l'état (TV = public ; joueur = public + ses informations privées ; hôte = tout). Les secrets (mises non révélées, transactions masquées, jetons d'identification, code hôte) ne partent jamais vers une page non autorisée, même cachés dans un message.
+6. Hasard uniquement côté serveur (`crypto.randomInt`) ; chaque tirage est enregistré dans l'état.
+7. Fil d'événements : chaque action notable ajoute un événement (id strictement croissant, jamais réutilisé même après une annulation ; type ; visibilité ; libellé lisible ; données). Les pages déclenchent leurs animations sur les nouveaux événements visibles. Au premier état reçu après une (re)connexion, elles affichent l'état sans rejouer d'animation.
+8. Les actions d'arbitrage sont réservées à l'hôte authentifié. Une action joueur n'agit que sur le joueur identifié par son jeton.
+
+## Page TV (navigateur de télé, possiblement ancien et lent)
+- Build compatible via @vitejs/plugin-legacy, CSS passé par autoprefixer.
+- Contraintes CSS provisoires, tant que `docs/avancement.md` n'indique pas qu'elles sont levées par le diagnostic TV : flexbox sans `gap` (marges à la place), pas de CSS grid, pas de `filter` ni `backdrop-filter`, pas d'emoji (SVG ou PNG à la place), variables CSS uniquement pour des valeurs statiques.
+- Animations uniquement sur `transform` et `opacity`, sans librairie d'animation lourde. Le mode « animations réduites », piloté par l'hôte, est toujours respecté.
+- Scène fixe de 1920×1080 mise à l'échelle de l'écran, marges de sécurité de 5 % (overscan).
+- Lisible à 4 mètres : texte ≥ 36 px et chiffres clés ≥ 90 px à l'échelle 1080p, contrastes forts.
+- Aucune interaction requise. Au plus un appui sur OK pour déverrouiller le son, jamais bloquant. Reconnexion silencieuse ; rechargement automatique si le serveur a redémarré.
+
+## Pages téléphone (joueur, hôte)
+- Utilisables d'une main : boutons ≥ 56 px de haut, `touch-action: manipulation`, pas de zoom involontaire.
+- Retour visuel immédiat au `pointerdown`, confirmation du serveur ensuite (ack).
+- Reconnexion immédiate au retour de veille (`visibilitychange`).
+- Identité du joueur en localStorage, clé suffixée par le paramètre `?profil=N` pour simuler plusieurs joueurs dans un même navigateur.
+
+## Réactivité
+- WebSocket en priorité, repli long-polling automatique. Diffusion immédiate après chaque action, jamais de polling applicatif.
+- Messages légers : ni images ni données inutiles dans les messages socket.
+
+## Identité visuelle
+- Réutiliser le design system de `client/commun/` (tokens, composants, animations) ; aucun style ad hoc qui le duplique.
+- Direction artistique originale : aucun personnage, logo ni asset Nintendo.
+- Textes en français, phrases simples, pas de majuscules décoratives. Un bouton dit exactement ce qu'il fait.
+
+## Méthode de travail
+- TypeScript strict, petits modules, pas de `any` injustifié.
+- Vocabulaire métier en français, identique au cahier des charges (joueur, mise, cagnotte, case, GP…).
+- Fin d'étape obligatoire : `npm run build` et `npm test` passent ; le parcours de base (hôte + TV + 2 joueurs) marche toujours ; `docs/avancement.md` est à jour (fait, actions et événements ajoutés, comment tester, limites connues) ; tu listes ce que l'utilisateur doit vérifier à la main.

@@ -1,0 +1,196 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #14171c;
+  color: #f7f4ee;
+  font-family: "Segoe UI", sans-serif;
+  touch-action: manipulation;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #ffc857;
+  color: #14171c;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.secondaire {
+  background: #2c3340;
+  color: #f7f4ee;
+}
+
+button.danger {
+  background: #e15a4a;
+  color: #1a0d0b;
+}
+
+input[type='text'],
+input[type='number'],
+input[type='password'] {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 2px solid #3a4252;
+  border-radius: 12px;
+  background: #1c212b;
+  font-size: 18px;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 16px 220px;
+}
+
+button {
+  scroll-margin-bottom: 160px;
+}
+
+label {
+  display: block;
+  font-size: 18px;
+}
+
+label input {
+  margin-top: 6px;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+
+h2 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+.pile > * + * {
+  margin-top: 12px;
+}
+
+.rangee {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.rangee > * {
+  margin: 0 8px 8px 0;
+}
+
+.carte {
+  background: #232833;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.erreur {
+  background: #3a1c1c;
+  color: #ffd0c8;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0 0 12px;
+}
+
+.lien {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  background: #ffc857;
+  color: #14171c;
+  font-weight: 700;
+  font-size: 28px;
+  border-radius: 16px;
+  padding: 28px 16px;
+  margin-bottom: 16px;
+}
+
+.pastille {
+  display: inline-block;
+  border-radius: 50%;
+  color: #14171c;
+  font-weight: 700;
+  text-align: center;
+  border: 3px solid transparent;
+}
+
+.pastille.choisie {
+  border-color: #f7f4ee;
+}
+
+.gp {
+  font-size: 48px;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.barre-annuler {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px;
+  background: #101319;
+}
+
+.barre-annuler button {
+  width: 100%;
+}
+
+.hors-ligne {
+  color: #ffb4a8;
+}
+
+.case {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
+.case input {
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+}
+
+.journal {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.journal li + li {
+  margin-top: 8px;
+}
+
+.animations-reduites,
+.animations-reduites * {
+  animation: none !important;
+  transition: none !important;
+}

@@ -1,0 +1,97 @@
+html,
+body {
+  background: #000;
+  overflow: hidden;
+}
+
+.scene {
+  position: fixed;
+  width: 1920px;
+  height: 1080px;
+  left: 0;
+  top: 0;
+  background: #14171c;
+  color: #f7f4ee;
+  transform-origin: 0 0;
+}
+
+.contenu {
+  position: absolute;
+  top: 5%;
+  right: 5%;
+  bottom: 5%;
+  left: 5%;
+}
+
+.titre-tv {
+  font-size: 92px;
+  line-height: 1.05;
+  font-weight: 700;
+  margin: 0 0 28px;
+}
+
+.texte-tv {
+  font-size: 42px;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.score-tv {
+  font-size: 110px;
+  line-height: 1;
+  font-weight: 700;
+  margin: 0;
+}
+
+.bloc + .bloc {
+  margin-top: 28px;
+}
+
+.ligne-joueur {
+  display: flex;
+  align-items: center;
+}
+
+.ligne-joueur > * + * {
+  margin-left: 28px;
+}
+
+.qr {
+  width: 420px;
+  height: 420px;
+  background: #f7f4ee;
+}
+
+.bandeau-son {
+  background: #ffc857;
+  color: #14171c;
+  font-size: 40px;
+  font-weight: 700;
+  padding: 16px 24px;
+  margin-bottom: 28px;
+}
+
+.etat-lien {
+  font-size: 36px;
+  margin: 0 0 16px;
+}
+
+.panneau-diag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 700px;
+  background: #101319;
+  border: 4px solid #ffc857;
+  padding: 24px;
+}
+
+.nom-tv {
+  font-size: 64px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.hors {
+  opacity: 0.45;
+}
