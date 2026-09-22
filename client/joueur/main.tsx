@@ -1,41 +1,95 @@
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { AVATARS } from '../../shared/constantes';
+import { AVATARS, COULEURS } from '../../shared/constantes';
 import type { VueJoueur } from '../../shared/types';
+import { avatarsDisponibles } from '../commun/avatars';
+import { Avatar, Bouton, CompteurRouleaux, GainFlottant, Tuile, VoileConnexion } from '../commun/composants';
 import { connecter, type Session } from '../commun/connexion';
+import { attendre, creerFile } from '../commun/file-animations';
+import '../commun/polices';
 import { ecrireJeton, lireJeton, oublierJeton } from '../commun/stockage';
+import { initiale, joueurIdDe, montantDe } from '../commun/spectacle';
 import '../commun/base.css';
 
-const PASTILLES: Record<string, string> = {
-  soleil: '#e0a106',
-  lune: '#8a4bdb',
-  feuille: '#1f9d55',
-  goutte: '#2f6fed',
-  flamme: '#e23d3d',
-  etoile: '#d4537e',
-};
-
-function initiale(pseudo: string): string {
-  const texte = pseudo.trim();
-  return texte ? texte.charAt(0).toLocaleUpperCase('fr-FR') : '?';
+function vibrer(ms: number): void {
+  const navigation = navigator as Navigator & { vibrate?: (motif: number) => boolean };
+  navigation.vibrate?.(ms);
 }
 
 function PageJoueur() {
   const session = useRef<Session | null>(null);
+  const file = useRef(creerFile());
+  const soldeRef = useRef(0);
+  const dernierId = useRef(0);
   const [vue, setVue] = useState<VueJoueur | null>(null);
+  const [solde, setSolde] = useState(0);
+  const [gain, setGain] = useState<{ montant: number; cle: number } | null>(null);
   const [connecte, setConnecte] = useState(false);
   const [pseudo, setPseudo] = useState('');
   const [avatar, setAvatar] = useState<string>(AVATARS[0]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [attenteReprise, setAttenteReprise] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
+  const images = avatarsDisponibles();
+
+  const traiterRef = useRef<(recue: VueJoueur, animer: boolean) => void>(() => undefined);
+  traiterRef.current = (recue, animer) => {
+    const moi = recue.moi;
+    const maxId = recue.evenements.reduce((plus, evenement) => Math.max(plus, evenement.id), 0);
+    if (!moi) {
+      file.current.couper();
+      soldeRef.current = 0;
+      setSolde(0);
+      setGain(null);
+      dernierId.current = maxId;
+      return;
+    }
+    if (!animer) {
+      file.current.couper();
+      soldeRef.current = moi.gpVisibles;
+      setSolde(moi.gpVisibles);
+      setGain(null);
+      dernierId.current = maxId;
+      return;
+    }
+    const frais = recue.evenements.filter((evenement) => evenement.id > dernierId.current).sort((a, b) => a.id - b.id);
+    dernierId.current = Math.max(dernierId.current, maxId);
+    const gains = frais.filter((evenement) => {
+      if (evenement.type !== 'gp.ajoutes' && evenement.type !== 'gp.reveles') return false;
+      return joueurIdDe(evenement) === moi.id && montantDe(evenement) !== null;
+    });
+    if (gains.length === 0) {
+      if (soldeRef.current !== moi.gpVisibles) {
+        soldeRef.current = moi.gpVisibles;
+        setSolde(moi.gpVisibles);
+      }
+      return;
+    }
+    const reduit = recue.partie.animationsReduites;
+    for (const evenement of gains) {
+      const montant = montantDe(evenement) ?? 0;
+      file.current.ajouter(async () => {
+        if (!reduit) {
+          setGain({ montant, cle: evenement.id });
+          await attendre(700);
+          setGain(null);
+        }
+        soldeRef.current += montant;
+        setSolde(soldeRef.current);
+        vibrer(reduit ? 20 : 40);
+        await attendre(reduit ? 150 : 700);
+      });
+    }
+  };
 
   useEffect(() => {
     const actuelle = connecter({
       role: 'joueur',
       obtenirJeton: lireJeton,
-      onVue: (recue) => {
-        if (recue.role === 'joueur') setVue(recue);
+      onVue: (recue, infos) => {
+        if (recue.role !== 'joueur') return;
+        setVue(recue);
+        traiterRef.current(recue, infos.animer);
       },
       onConnecte: setConnecte,
       onBonjour: (reponse) => {
@@ -66,7 +120,20 @@ function PageJoueur() {
     return () => actuelle.fermer();
   }, []);
 
-  const horsLigne = (vue?.joueurs ?? []).filter((joueur) => !joueur.enLigne);
+  const moi = vue?.moi ?? null;
+  useEffect(() => {
+    document.body.style.background = moi ? moi.couleur : '';
+    document.body.style.color = moi ? '#1C1633' : '';
+    return () => {
+      document.body.style.background = '';
+      document.body.style.color = '';
+    };
+  }, [moi]);
+
+  const horsLigne = [...(vue?.joueurs ?? [])]
+    .sort((a, b) => a.rejointA - b.rejointA || a.pseudo.localeCompare(b.pseudo, 'fr'))
+    .filter((joueur) => !joueur.enLigne);
+  const reduit = vue?.partie.animationsReduites === true;
 
   async function rejoindre(event: Event) {
     event.preventDefault();
@@ -95,25 +162,19 @@ function PageJoueur() {
     setAttenteReprise(joueurId);
   }
 
-  const moi = vue?.moi ?? null;
-
   return (
-    <main class={vue?.partie.animationsReduites ? 'page animations-reduites' : 'page'}>
+    <main class={reduit ? 'page animations-reduites' : 'page'}>
       <h1>{vue?.partie.titre ?? 'GP Party'}</h1>
-      <p class={connecte ? '' : 'hors-ligne'}>{connecte ? 'Connecté' : 'Hors ligne'}</p>
+      <p>{connecte ? 'Connecté' : 'Hors ligne'}</p>
       {erreur ? <p class="erreur">{erreur}</p> : null}
       {moi ? (
-        <section class="carte pile">
-          <span
-            class="pastille"
-            style={{ background: moi.couleur, width: '96px', height: '96px', lineHeight: '96px', fontSize: '40px' }}
-          >
-            {initiale(moi.pseudo)}
-          </span>
-          <p class="nom">{moi.pseudo}</p>
-          <p class="gp">{moi.gpVisibles} GP</p>
-          <p>En attente de la suite.</p>
-        </section>
+        <Tuile className="tuile-joueur">
+          <Avatar avatar={moi.avatar} couleur={moi.couleur} pseudo={moi.pseudo} taille={160} />
+          <p class="pseudo-joueur">{moi.pseudo}</p>
+          <CompteurRouleaux valeur={solde} duree={reduit ? 150 : 700} taille={72} />
+          <p style={{ marginTop: '16px' }}>En attente de la suite.</p>
+          {gain ? <GainFlottant key={gain.cle} montant={gain.montant} /> : null}
+        </Tuile>
       ) : (
         <div class="pile">
           {vue?.partie.inscriptionsVerrouillees ? <p>Les inscriptions sont fermées.</p> : null}
@@ -128,37 +189,56 @@ function PageJoueur() {
                 onInput={(event) => setPseudo((event.currentTarget as HTMLInputElement).value)}
               />
             </label>
-            <div class="rangee">
-              {AVATARS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  class={avatar === id ? 'pastille choisie' : 'pastille'}
-                  style={{ background: PASTILLES[id], width: '72px', height: '72px', lineHeight: '66px', fontSize: '28px' }}
-                  aria-pressed={avatar === id}
-                  onClick={() => setAvatar(id)}
-                >
-                  {initiale(pseudo || id)}
-                </button>
-              ))}
-            </div>
-            <button type="submit" disabled={envoi || vue?.partie.inscriptionsVerrouillees === true}>
+            {images.length > 0 ? (
+              <div class="grille-avatars">
+                {images.map((image) => (
+                  <button
+                    key={image.id}
+                    type="button"
+                    class="choix-avatar"
+                    aria-pressed={avatar === image.id}
+                    onClick={() => setAvatar(image.id)}
+                  >
+                    <Avatar avatar={image.id} couleur="#1C1633" pseudo={image.id} taille={88} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div class="grille-avatars">
+                {AVATARS.map((id, index) => (
+                  <button
+                    key={id}
+                    type="button"
+                    class="choix-avatar"
+                    style={{ background: COULEURS[index % COULEURS.length] }}
+                    aria-pressed={avatar === id}
+                    onClick={() => setAvatar(id)}
+                  >
+                    {initiale(pseudo || id)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Bouton type="submit" plein disabled={envoi || vue?.partie.inscriptionsVerrouillees === true}>
               Rejoindre la partie
-            </button>
+            </Bouton>
           </form>
           {attenteReprise ? <p>Demande envoyée. L'hôte doit valider.</p> : null}
           {horsLigne.length > 0 ? (
-            <section class="carte pile">
+            <Tuile taille="petite">
               <h2>Reprendre ma place</h2>
-              {horsLigne.map((joueur) => (
-                <button key={joueur.id} type="button" class="secondaire" disabled={envoi} onClick={() => demanderReprise(joueur.id)}>
-                  Reprendre la place de {joueur.pseudo}
-                </button>
-              ))}
-            </section>
+              <div class="pile">
+                {horsLigne.map((joueur) => (
+                  <Bouton key={joueur.id} variante="secondaire" plein disabled={envoi} onClick={() => demanderReprise(joueur.id)}>
+                    Reprendre la place de {joueur.pseudo}
+                  </Bouton>
+                ))}
+              </div>
+            </Tuile>
           ) : null}
         </div>
       )}
+      <VoileConnexion visible={!connecte && vue !== null} />
     </main>
   );
 }

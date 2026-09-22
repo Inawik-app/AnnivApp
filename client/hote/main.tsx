@@ -1,14 +1,11 @@
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Action, DiagnosticTv, VueHote } from '../../shared/types';
+import { Avatar, Bouton, CompteurRouleaux, Toast, Tuile, VoileConnexion } from '../commun/composants';
 import { connecter, type Session } from '../commun/connexion';
+import '../commun/polices';
 import { cleCodeHote } from '../commun/stockage';
 import '../commun/base.css';
-
-function initiale(pseudo: string): string {
-  const texte = pseudo.trim();
-  return texte ? texte.charAt(0).toLocaleUpperCase('fr-FR') : '?';
-}
 
 function ligneDiagnostic(diagnostic: DiagnosticTv): string[] {
   const lignes = [`Reçu à ${new Date(diagnostic.recuA).toLocaleTimeString('fr-FR')}`];
@@ -45,6 +42,36 @@ function ligneDiagnostic(diagnostic: DiagnosticTv): string[] {
   return lignes;
 }
 
+function messageAction(action: Action, vue: VueHote): string {
+  if (action.type === 'ajouterGP') {
+    const pseudo = vue.joueurs.find((joueur) => joueur.id === action.joueurId)?.pseudo ?? 'ce joueur';
+    if (action.masquee) return `${Math.abs(action.montant)} GP masqués pour ${pseudo}`;
+    if (action.montant > 0) return `${action.montant} GP ajoutés à ${pseudo}`;
+    return `${Math.abs(action.montant)} GP retirés à ${pseudo}`;
+  }
+  if (action.type === 'revelerMasquees') return 'GP masqués révélés';
+  if (action.type === 'renommerJoueur') return 'Joueur renommé';
+  if (action.type === 'retirerJoueur') return 'Joueur retiré';
+  if (action.type === 'validerReprise') return 'Reprise validée';
+  if (action.type === 'refuserReprise') return 'Reprise refusée';
+  if (action.type === 'verrouillerInscriptions') {
+    return vue.partie.inscriptionsVerrouillees ? 'Inscriptions ouvertes' : 'Inscriptions fermées';
+  }
+  if (action.type === 'choisirEcranTv') {
+    return action.ecran === 'scores' ? 'La télé affiche les scores' : "La télé affiche l'accueil";
+  }
+  if (action.type === 'basculerAnimationsReduites') {
+    return vue.partie.animationsReduites ? 'Animations rétablies' : 'Animations réduites';
+  }
+  if (action.type === 'basculerDiagnosticTv') {
+    return vue.partie.diagnosticTvAffiche ? 'Diagnostic masqué' : 'Diagnostic affiché sur la télé';
+  }
+  if (action.type === 'annuler') return 'Dernière action annulée';
+  if (action.type === 'reinitialiserPartie') return 'Partie réinitialisée';
+  if (action.type === 'ajouterJoueursFictifs') return 'Joueurs fictifs ajoutés';
+  return 'Action envoyée';
+}
+
 function PageHote() {
   const session = useRef<Session | null>(null);
   const [code, setCode] = useState(() => localStorage.getItem(cleCodeHote()) ?? '');
@@ -52,13 +79,23 @@ function PageHote() {
   const [vue, setVue] = useState<VueHote | null>(null);
   const [connecte, setConnecte] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [confirmerReset, setConfirmerReset] = useState(false);
   const [pseudos, setPseudos] = useState<Record<string, string>>({});
   const [montants, setMontants] = useState<Record<string, string>>({});
-  const [libelles, setLibelles] = useState<Record<string, string>>({});
   const [masques, setMasques] = useState<Record<string, boolean>>({});
-  const [groupes, setGroupes] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    document.body.classList.add('fond-encre');
+    return () => document.body.classList.remove('fond-encre');
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   useEffect(() => {
     if (!pret) return;
@@ -89,13 +126,16 @@ function PageHote() {
   }, [pret]);
 
   async function agir(action: Action) {
-    if (!session.current || envoi) return null;
+    if (!session.current || envoi || !vue) return;
     setEnvoi(true);
     setErreur(null);
     const reponse = await session.current.envoyer(action);
     setEnvoi(false);
-    if (!reponse.ok) setErreur(reponse.erreur);
-    return reponse;
+    if (!reponse.ok) {
+      setErreur(reponse.erreur);
+      return;
+    }
+    setToast(messageAction(action, vue));
   }
 
   function validerCode(event: Event) {
@@ -111,7 +151,7 @@ function PageHote() {
 
   if (!pret) {
     return (
-      <main class="page">
+      <main class="page fond-encre">
         <h1>GP Party — Hôte</h1>
         {erreur ? <p class="erreur">{erreur}</p> : null}
         <form class="pile" onSubmit={validerCode}>
@@ -119,7 +159,9 @@ function PageHote() {
             Code hôte
             <input type="password" value={code} onInput={(event) => setCode((event.currentTarget as HTMLInputElement).value)} />
           </label>
-          <button type="submit">Entrer dans la partie</button>
+          <Bouton type="submit" plein>
+            Entrer dans la partie
+          </Bouton>
         </form>
       </main>
     );
@@ -127,10 +169,11 @@ function PageHote() {
 
   if (!vue) {
     return (
-      <main class="page">
+      <main class="page fond-encre">
         <h1>GP Party — Hôte</h1>
         {erreur ? <p class="erreur">{erreur}</p> : null}
-        <p class={connecte ? '' : 'hors-ligne'}>{connecte ? 'Connexion…' : 'Hors ligne'}</p>
+        <p>{connecte ? 'Connexion…' : 'Hors ligne'}</p>
+        <VoileConnexion visible={!connecte} />
       </main>
     );
   }
@@ -138,71 +181,79 @@ function PageHote() {
   const journal = [...vue.evenements].reverse();
 
   return (
-    <main class={vue.partie.animationsReduites ? 'page animations-reduites' : 'page'}>
+    <main class="page page-hote fond-encre">
+      <Toast message={toast} />
       <h1>{vue.partie.titre} — Hôte</h1>
-      <p class={connecte ? '' : 'hors-ligne'}>{connecte ? 'Connecté' : 'Hors ligne'}</p>
+      <p>{connecte ? 'Connecté' : 'Hors ligne'}</p>
       {erreur ? <p class="erreur">{erreur}</p> : null}
-      <section class="carte pile">
+      <Tuile taille="petite">
         <p>IP retenue : {vue.reseau.ip}</p>
         <p>Autres : {vue.reseau.autres.length > 0 ? vue.reseau.autres.join(', ') : 'aucune'}</p>
         <p>{vue.reseau.urlJoueur}</p>
-      </section>
+        <label>
+          Volume de la télé
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={Math.round(vue.volume * 100)}
+            onInput={(event) => {
+              const valeur = Number((event.currentTarget as HTMLInputElement).value) / 100;
+              session.current?.reglerVolume(valeur);
+            }}
+          />
+        </label>
+      </Tuile>
       <div class="rangee" style={{ marginTop: '12px' }}>
-        <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'accueil' })}>
+        <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'accueil' })}>
           Afficher l'accueil sur la télé
-        </button>
-        <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'scores' })}>
+        </Bouton>
+        <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'scores' })}>
           Afficher les scores sur la télé
-        </button>
-        <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'verrouillerInscriptions' })}>
+        </Bouton>
+        <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'verrouillerInscriptions' })}>
           {vue.partie.inscriptionsVerrouillees ? 'Ouvrir les inscriptions' : 'Fermer les inscriptions'}
-        </button>
-        <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'basculerAnimationsReduites' })}>
+        </Bouton>
+        <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'basculerAnimationsReduites' })}>
           {vue.partie.animationsReduites ? 'Rétablir les animations' : 'Réduire les animations'}
-        </button>
-        <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'basculerDiagnosticTv' })}>
+        </Bouton>
+        <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'basculerDiagnosticTv' })}>
           {vue.partie.diagnosticTvAffiche ? 'Masquer le diagnostic sur la télé' : 'Afficher le diagnostic sur la télé'}
-        </button>
+        </Bouton>
         {vue.dev ? (
-          <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'ajouterJoueursFictifs' })}>
+          <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'ajouterJoueursFictifs' })}>
             Ajouter 4 joueurs fictifs
-          </button>
+          </Bouton>
         ) : null}
       </div>
-      <h2 style={{ marginTop: '20px' }}>Joueurs</h2>
+      <h2>Joueurs</h2>
       {vue.joueurs.length === 0 ? <p>Aucun joueur.</p> : null}
-      {vue.joueurs.map((joueur) => (
-        <section class="carte pile" key={joueur.id} style={{ marginTop: '12px' }}>
-          <div class="ligne" style={{ display: 'flex', alignItems: 'center' }}>
-            <span
-              class="pastille"
-              style={{ background: joueur.couleur, width: '64px', height: '64px', lineHeight: '64px', fontSize: '28px', marginRight: '12px' }}
-            >
-              {initiale(joueur.pseudo)}
-            </span>
+      {[...vue.joueurs]
+        .sort((a, b) => a.rejointA - b.rejointA || a.pseudo.localeCompare(b.pseudo, 'fr'))
+        .map((joueur) => (
+        <Tuile taille="petite" key={joueur.id} className="pile">
+          <div class="rangee">
+            <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={64} />
             <div>
               <strong>{joueur.pseudo}</strong>
-              <p style={{ margin: '4px 0 0' }}>
+              <p>
                 {joueur.enLigne ? 'En ligne' : 'Hors ligne'}
                 {joueur.latenceMs !== null ? ` · ${joueur.latenceMs} ms` : ''}
               </p>
             </div>
           </div>
-          <p class="gp" style={{ fontSize: '36px' }}>
-            {joueur.gpVisibles} GP
-          </p>
+          <CompteurRouleaux valeur={joueur.gpVisibles} duree={0} taille={40} />
           <p>Masqués : {joueur.gpMasques} GP</p>
           <div class="rangee">
             {[1, 5, 10, -1, -5].map((montant) => (
-              <button
+              <Bouton
                 key={montant}
-                type="button"
-                class={montant < 0 ? 'danger' : ''}
+                variante={montant < 0 ? 'danger' : 'or'}
                 disabled={envoi}
                 onClick={() => agir({ type: 'ajouterGP', joueurId: joueur.id, montant, libelle: 'Ajustement' })}
               >
                 {montant > 0 ? `+${montant}` : montant}
-              </button>
+              </Bouton>
             ))}
           </div>
           <label>
@@ -213,14 +264,6 @@ function PageHote() {
               onInput={(event) => setMontants({ ...montants, [joueur.id]: (event.currentTarget as HTMLInputElement).value })}
             />
           </label>
-          <label>
-            Libellé
-            <input
-              type="text"
-              value={libelles[joueur.id] ?? ''}
-              onInput={(event) => setLibelles({ ...libelles, [joueur.id]: (event.currentTarget as HTMLInputElement).value })}
-            />
-          </label>
           <label class="case">
             <input
               type="checkbox"
@@ -229,16 +272,8 @@ function PageHote() {
             />
             Masqué
           </label>
-          <label>
-            Groupe (optionnel)
-            <input
-              type="text"
-              value={groupes[joueur.id] ?? ''}
-              onInput={(event) => setGroupes({ ...groupes, [joueur.id]: (event.currentTarget as HTMLInputElement).value })}
-            />
-          </label>
-          <button
-            type="button"
+          <Bouton
+            plein
             disabled={envoi}
             onClick={() => {
               const montant = Number(montants[joueur.id]);
@@ -246,14 +281,13 @@ function PageHote() {
                 type: 'ajouterGP',
                 joueurId: joueur.id,
                 montant,
-                libelle: libelles[joueur.id] ?? '',
+                libelle: 'Ajustement',
                 masquee: masques[joueur.id] === true,
-                ...(groupes[joueur.id]?.trim() ? { groupeRevelation: groupes[joueur.id]!.trim() } : {}),
               });
             }}
           >
             Ajouter ces GP
-          </button>
+          </Bouton>
           <label>
             Nouveau pseudo
             <input
@@ -263,31 +297,35 @@ function PageHote() {
               onInput={(event) => setPseudos({ ...pseudos, [joueur.id]: (event.currentTarget as HTMLInputElement).value })}
             />
           </label>
-          <button type="button" class="secondaire" disabled={envoi} onClick={() => agir({ type: 'renommerJoueur', joueurId: joueur.id, pseudo: pseudos[joueur.id] ?? '' })}>
-            Renommer
-          </button>
-          <button type="button" class="danger" disabled={envoi} onClick={() => agir({ type: 'retirerJoueur', joueurId: joueur.id })}>
-            Retirer
-          </button>
-        </section>
+          <div class="rangee">
+            <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'renommerJoueur', joueurId: joueur.id, pseudo: pseudos[joueur.id] ?? '' })}>
+              Renommer
+            </Bouton>
+            <Bouton variante="danger" disabled={envoi} onClick={() => agir({ type: 'retirerJoueur', joueurId: joueur.id })}>
+              Retirer
+            </Bouton>
+          </div>
+        </Tuile>
       ))}
-      <button type="button" style={{ marginTop: '16px', width: '100%' }} disabled={envoi || vue.nbMasquees === 0} onClick={() => agir({ type: 'revelerMasquees' })}>
+      <Bouton plein disabled={envoi || vue.nbMasquees === 0} onClick={() => agir({ type: 'revelerMasquees' })}>
         Révéler les GP masqués ({vue.nbMasquees})
-      </button>
-      <h2 style={{ marginTop: '20px' }}>Demandes de reprise</h2>
+      </Bouton>
+      <h2>Demandes de reprise</h2>
       {vue.demandesReprise.length === 0 ? <p>Aucune demande.</p> : null}
       {vue.demandesReprise.map((demande) => (
-        <div class="carte rangee" key={demande.id} style={{ marginTop: '12px' }}>
-          <p style={{ width: '100%' }}>{demande.pseudo}</p>
-          <button type="button" disabled={envoi} onClick={() => agir({ type: 'validerReprise', demandeId: demande.id })}>
-            Valider la reprise
-          </button>
-          <button type="button" class="danger" disabled={envoi} onClick={() => agir({ type: 'refuserReprise', demandeId: demande.id })}>
-            Refuser la reprise
-          </button>
-        </div>
+        <Tuile taille="petite" key={demande.id}>
+          <p>{demande.pseudo}</p>
+          <div class="rangee">
+            <Bouton disabled={envoi} onClick={() => agir({ type: 'validerReprise', demandeId: demande.id })}>
+              Valider la reprise
+            </Bouton>
+            <Bouton variante="danger" disabled={envoi} onClick={() => agir({ type: 'refuserReprise', demandeId: demande.id })}>
+              Refuser la reprise
+            </Bouton>
+          </div>
+        </Tuile>
       ))}
-      <h2 style={{ marginTop: '20px' }}>Appareils</h2>
+      <h2>Appareils</h2>
       {vue.appareils.length === 0 ? <p>Aucun appareil connecté.</p> : null}
       <ul class="journal">
         {vue.appareils.map((appareil, index) => (
@@ -298,30 +336,29 @@ function PageHote() {
           </li>
         ))}
       </ul>
-      <h2 style={{ marginTop: '20px' }}>Journal</h2>
+      <h2>Journal</h2>
       {journal.length === 0 ? <p>Aucune action.</p> : null}
       <ul class="journal">
         {journal.map((evenement) => (
           <li key={evenement.id}>{evenement.libelle}</li>
         ))}
       </ul>
-      <h2 style={{ marginTop: '20px' }}>Diagnostic télé</h2>
+      <h2>Diagnostic télé</h2>
       <p>{vue.reseau.urlDiag}</p>
       {vue.diagnostic ? (
-        <div class="carte pile">
+        <Tuile taille="petite">
           {ligneDiagnostic(vue.diagnostic).map((ligne) => (
             <p key={ligne}>{ligne}</p>
           ))}
-        </div>
+        </Tuile>
       ) : (
         <p>Aucun diagnostic reçu. Ouvre l'adresse ci-dessus sur la télé.</p>
       )}
       <div style={{ marginTop: '24px' }}>
         {confirmerReset ? (
           <div class="rangee">
-            <button
-              type="button"
-              class="danger"
+            <Bouton
+              variante="danger"
               disabled={envoi}
               onClick={() => {
                 setConfirmerReset(false);
@@ -329,22 +366,23 @@ function PageHote() {
               }}
             >
               Confirmer la réinitialisation
-            </button>
-            <button type="button" class="secondaire" onClick={() => setConfirmerReset(false)}>
+            </Bouton>
+            <Bouton variante="secondaire" onClick={() => setConfirmerReset(false)}>
               Revenir
-            </button>
+            </Bouton>
           </div>
         ) : (
-          <button type="button" class="danger" onClick={() => setConfirmerReset(true)}>
+          <Bouton variante="danger" onClick={() => setConfirmerReset(true)}>
             Réinitialiser la partie
-          </button>
+          </Bouton>
         )}
       </div>
       <div class="barre-annuler">
-        <button type="button" disabled={envoi || !vue.annulation} onClick={() => agir({ type: 'annuler' })}>
+        <Bouton plein disabled={envoi || !vue.annulation} onClick={() => agir({ type: 'annuler' })}>
           {vue.annulation ? `Annuler : ${vue.annulation}` : 'Annuler'}
-        </button>
+        </Bouton>
       </div>
+      <VoileConnexion visible={!connecte} />
     </main>
   );
 }

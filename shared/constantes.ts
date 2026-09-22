@@ -10,16 +10,7 @@ export const LIBELLE_MAX = 80;
 export const AVATARS = ['soleil', 'lune', 'feuille', 'goutte', 'flamme', 'etoile'] as const;
 export type AvatarId = (typeof AVATARS)[number];
 
-export const COULEURS = [
-  '#e23d3d',
-  '#2f6fed',
-  '#1f9d55',
-  '#e0a106',
-  '#8a4bdb',
-  '#0e8a8a',
-  '#d4537e',
-  '#5c6b73',
-] as const;
+export const COULEURS = ['#FF5B4A', '#2D9CFF', '#1FD1A0', '#9B5CFF', '#FF9A2E', '#FF6FB1'] as const;
 
 export const JOUEURS_FICTIFS: Array<{ pseudo: string; avatar: AvatarId }> = [
   { pseudo: 'Mira', avatar: 'soleil' },

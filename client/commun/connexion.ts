@@ -32,6 +32,7 @@ export type OptionsConnexion = {
 
 export type Session = {
   envoyer: (action: Action) => Promise<ReponseAction>;
+  reglerVolume: (volume: number) => void;
   rebonjour: () => void;
   transport: () => string;
   fermer: () => void;
@@ -115,6 +116,9 @@ export function connecter(options: OptionsConnexion): Session {
   });
 
   return {
+    reglerVolume: (volume) => {
+      socket.emit('reglerVolume', { volume });
+    },
     rebonjour: bonjour,
     transport: () => (socket.connected ? nomTransport(socket) : 'hors ligne'),
     fermer: () => {

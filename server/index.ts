@@ -95,6 +95,7 @@ async function main(): Promise<void> {
   const minuteurs = new Map<string, NodeJS.Timeout>();
   let diagnostic = lireDiagnostic(fichierDiagnostic);
   let diffusionPrevue: NodeJS.Timeout | null = null;
+  let volumeSon = 0.8;
 
   const store = creerStore({
     dossierData,
@@ -148,8 +149,11 @@ async function main(): Promise<void> {
     const etat = store.etat();
     const actuel = presence();
     const heure = Date.now();
-    io.to('tv').emit('vue', vueTv(etat, actuel, heure, ID_DEMARRAGE, reseau.urlJoueur));
-    io.to('hote').emit('vue', vueHote(etat, actuel, heure, ID_DEMARRAGE, DEV, reseau, diagnostic, store.libelleAnnulation()));
+    io.to('tv').emit('vue', vueTv(etat, actuel, heure, ID_DEMARRAGE, reseau.urlJoueur, config.nbJoueursMax, volumeSon));
+    io.to('hote').emit(
+      'vue',
+      vueHote(etat, actuel, heure, ID_DEMARRAGE, DEV, reseau, diagnostic, store.libelleAnnulation(), volumeSon),
+    );
     io.to('joueur:anonyme').emit('vue', vueJoueur(etat, actuel, heure, ID_DEMARRAGE, null));
     for (const joueur of etat.joueurs) {
       io.to(`joueur:${joueur.id}`).emit('vue', vueJoueur(etat, actuel, heure, ID_DEMARRAGE, joueur.id));
@@ -265,6 +269,14 @@ async function main(): Promise<void> {
       }
       ack(reponse);
       if (reponse.ok) diffuser();
+    });
+
+    socket.on('reglerVolume', (message) => {
+      const lien = liens.get(socket.id);
+      if (!lien?.authentifie || lien.role !== 'hote') return;
+      if (!message || typeof message.volume !== 'number' || !Number.isFinite(message.volume)) return;
+      volumeSon = Math.min(1, Math.max(0, message.volume));
+      diffuser();
     });
 
     socket.on('disconnect', () => {

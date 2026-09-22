@@ -84,4 +84,29 @@ describe('vues', () => {
     expect(aCle(hote, 'codeHote')).toBe(false);
     expect(vueMira.moi?.gpVisibles).toBe(5);
   });
+
+  it('garde l’ordre d’arrivée et calcule le rang à part', () => {
+    const base = etatInitial('GP Party');
+    const etat: EtatJeu = {
+      ...base,
+      joueurs: [
+        { id: 'mira', pseudo: 'Mira', avatar: 'soleil', couleur: '#e23d3d', rejointA: 1 },
+        { id: 'lina', pseudo: 'Lina', avatar: 'feuille', couleur: '#1f9d55', rejointA: 2 },
+      ],
+      transactions: [
+        {
+          id: 'bonus-lina',
+          joueurId: 'lina',
+          montant: 10,
+          source: 'manuel',
+          libelle: 'Bonus',
+          horodatage: 1,
+          masquee: false,
+        },
+      ],
+    };
+    const tv = vueTv(etat, presence, 10, 'dem', 'http://192.168.1.10:3000/joueur');
+    expect(tv.joueurs.map((joueur) => joueur.id)).toEqual(['mira', 'lina']);
+    expect(tv.joueurs.map((joueur) => joueur.place)).toEqual([2, 1]);
+  });
 });

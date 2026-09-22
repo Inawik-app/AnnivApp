@@ -107,6 +107,7 @@ export type JoueurPublic = {
   enLigne: boolean;
   gpVisibles: number;
   place: number;
+  rejointA: number;
 };
 
 export type EvenementVue = Evenement;
@@ -123,6 +124,8 @@ export type VueTv = {
     diagnosticTvAffiche: boolean;
   };
   urlJoueur: string;
+  placesMax: number;
+  volume: number;
   joueurs: JoueurPublic[];
   evenements: EvenementVue[];
 };
@@ -213,6 +216,7 @@ export type VueHote = {
   nbMasquees: number;
   reseau: ReseauVue;
   diagnostic: DiagnosticTv | null;
+  volume: number;
 };
 
 export type VueClient = VueTv | VueJoueur | VueHote;
@@ -225,6 +229,7 @@ export type Mesure = {
 export interface EvenementsClient {
   bonjour: (message: Bonjour, ack: (reponse: ReponseBonjour) => void) => void;
   action: (action: Action, ack: (reponse: ReponseAction) => void) => void;
+  reglerVolume: (message: { volume: number }) => void;
 }
 
 export interface EvenementsServeur {

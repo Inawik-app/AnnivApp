@@ -1,4 +1,4 @@
-import { AVATARS, LIBELLE_MAX, PSEUDO_MAX } from '../shared/constantes';
+import { LIBELLE_MAX, PSEUDO_MAX } from '../shared/constantes';
 import { clePseudo } from '../shared/soldes';
 import type { Joueur } from '../shared/types';
 
@@ -20,8 +20,10 @@ export function controlerPseudo(
   return { ok: true, pseudo };
 }
 
+const ID_AVATAR = /^[a-z0-9][a-z0-9-]{0,31}$/i;
+
 export function controlerAvatar(valeur: unknown): { ok: true; avatar: string } | { ok: false; erreur: string } {
-  if (typeof valeur !== 'string' || !AVATARS.includes(valeur as (typeof AVATARS)[number])) {
+  if (typeof valeur !== 'string' || !ID_AVATAR.test(valeur)) {
     return { ok: false, erreur: 'Choisis un avatar' };
   }
   return { ok: true, avatar: valeur };

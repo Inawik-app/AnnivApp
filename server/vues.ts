@@ -40,15 +40,19 @@ function classer(etat: EtatJeu, presence: Presence): JoueurPublic[] {
     enLigne: presence.enLigne[joueur.id] === true,
     gpVisibles: solde(etat.transactions, joueur.id, 'visibles'),
     place: 0,
+    rejointA: joueur.rejointA,
   }));
-  liste.sort((a, b) => b.gpVisibles - a.gpVisibles || a.pseudo.localeCompare(b.pseudo, 'fr'));
+  const parScore = [...liste].sort((a, b) => b.gpVisibles - a.gpVisibles || a.pseudo.localeCompare(b.pseudo, 'fr'));
   let place = 1;
-  for (let index = 0; index < liste.length; index += 1) {
-    const courant = liste[index]!;
-    const precedent = liste[index - 1];
+  const places = new Map<string, number>();
+  for (let index = 0; index < parScore.length; index += 1) {
+    const courant = parScore[index]!;
+    const precedent = parScore[index - 1];
     if (precedent && courant.gpVisibles < precedent.gpVisibles) place = index + 1;
-    courant.place = place;
+    places.set(courant.id, place);
   }
+  for (const joueur of liste) joueur.place = places.get(joueur.id) ?? liste.length;
+  liste.sort((a, b) => a.rejointA - b.rejointA || a.pseudo.localeCompare(b.pseudo, 'fr'));
   return liste;
 }
 
@@ -58,6 +62,8 @@ export function vueTv(
   heureServeur: number,
   idDemarrage: string,
   urlJoueur: string,
+  placesMax = 4,
+  volume = 0.8,
 ): VueTv {
   return {
     role: 'tv',
@@ -71,6 +77,8 @@ export function vueTv(
       diagnosticTvAffiche: etat.partie.diagnosticTvAffiche,
     },
     urlJoueur,
+    placesMax,
+    volume,
     joueurs: classer(etat, presence),
     evenements: visibles(etat.evenements, 'tv', null, 30),
   };
@@ -118,6 +126,7 @@ export function vueHote(
   reseau: ReseauVue,
   diagnostic: DiagnosticTv | null,
   annulation: string | null,
+  volume = 0.8,
 ): VueHote {
   const joueurs = classer(etat, presence).map((joueur) => ({
     ...joueur,
@@ -161,5 +170,6 @@ export function vueHote(
     nbMasquees: etat.transactions.filter((transaction) => transaction.masquee).length,
     reseau,
     diagnostic,
+    volume,
   };
 }

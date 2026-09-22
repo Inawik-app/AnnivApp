@@ -258,6 +258,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
         joueur.pseudo = pseudo.pseudo;
         ajouterEvenement(draft, 'joueur.renomme', 'public', `${ancien} s'appelle maintenant ${joueur.pseudo}`, {
           joueurId: joueur.id,
+          pseudo: joueur.pseudo,
         });
         break;
       }
@@ -315,6 +316,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
           'ecran',
           'public',
           action.ecran === 'scores' ? 'La télé affiche les scores' : 'La télé affiche l\'accueil',
+          { ecran: action.ecran },
         );
         break;
       }
