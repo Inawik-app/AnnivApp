@@ -33,7 +33,19 @@ export function lireConfigPlateau(racine: string): ConfigPlateau {
   if (typeof longueur !== 'number' || longueur < 4) throw new Error('longueur du plateau invalide');
   if (typeof gainBonus !== 'number' || gainBonus < 0) throw new Error('gainBonus invalide');
   if (typeof miseMax !== 'number' || miseMax < 0) throw new Error('miseMax invalide');
-  if (choix !== 'premier' && choix !== 'dernier') throw new Error('choixMiniJeu invalide');
+  if (!Array.isArray(brut.probasMiseMax) || brut.probasMiseMax.length !== 6) {
+    throw new Error('probasMiseMax doit contenir 6 probabilités');
+  }
+  const probasMiseMax = brut.probasMiseMax.map((valeur) => {
+    if (typeof valeur !== 'number' || valeur < 0 || !Number.isFinite(valeur)) {
+      throw new Error('probasMiseMax contient une valeur invalide');
+    }
+    return valeur;
+  });
+  const sommeProbas = probasMiseMax.reduce((total, probabilite) => total + probabilite, 0);
+  if (Math.abs(sommeProbas - 1) > 1e-4) throw new Error('probasMiseMax doit sommer à 1');
+  const probasNormalisees = probasMiseMax.map((probabilite) => probabilite / sommeProbas);
+  if (choix !== 'rotation' && choix !== 'dernierAuClassement') throw new Error('choixMiniJeu invalide');
   const nombres = ['bonus', 'chance', 'cagnotte', 'duel'] as const;
   const compte: Record<(typeof nombres)[number], number> = { bonus: 0, chance: 0, cagnotte: 0, duel: 0 };
   for (const cle of nombres) {
@@ -70,6 +82,7 @@ export function lireConfigPlateau(racine: string): ConfigPlateau {
     repartition: compte,
     gainBonus,
     miseMax,
+    probasMiseMax: probasNormalisees,
     choixMiniJeu: choix,
     duel: { miseMax: duel.miseMax, bonusVainqueur: duel.bonusVainqueur, defis: defis.map((defi) => defi.trim()) },
     ...(disposition ? { disposition } : {}),

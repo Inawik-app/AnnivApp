@@ -42,10 +42,6 @@ function miseVue(joueurId: string, montant: number | null, voirMontant: boolean)
 
 export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): CourseVue | null {
   if (!course) return null;
-  const misesPubliques = course.phase !== 'preparation' && course.phase !== 'mises';
-  const mises = Object.entries(course.mises).map(([id, montant]) =>
-    miseVue(id, montant, cible === 'hote' || (misesPubliques && montant !== null) || (id === joueurId && montant !== null)),
-  );
   let duel: DuelVue | null = null;
   let etape: CourseVue['etape'] = null;
   if (course.etape?.genre === 'lancer') etape = 'lancer';
@@ -73,7 +69,6 @@ export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | '
     arrivees: [...course.arrivees],
     cagnotte: course.cagnotte,
     tour: course.tour,
-    mises,
     ordre: [...course.ordre],
     indexCourant: course.indexCourant,
     joueurCourantId: courant,
@@ -86,6 +81,7 @@ export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | '
     classement: course.classement ? [...course.classement] : null,
     gainBonus: course.regles.gainBonus,
     miseMax: course.regles.miseMax,
+    probasMiseMax: [...course.regles.probasMiseMax],
     miseMaxDuel: course.regles.duel.miseMax,
     bonusDuel: course.regles.duel.bonusVainqueur,
   };

@@ -20,6 +20,37 @@
   margin: 0 8px 8px 0;
 }
 
+.histogramme {
+  margin: 8px 0 16px;
+}
+
+.histogramme-barres {
+  display: flex;
+  align-items: flex-end;
+  height: 120px;
+}
+
+.histogramme-colonne {
+  flex: 1;
+  margin-right: 6px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.histogramme-barre {
+  margin: 0 auto 4px;
+  width: 70%;
+  background: var(--or);
+  border: 2px solid var(--encre);
+  border-radius: 8px 8px 0 0;
+}
+
+.histogramme p {
+  margin: 8px 0 0;
+  font-weight: 800;
+}
+
 .lancer-plein {
   position: fixed;
   top: 0;

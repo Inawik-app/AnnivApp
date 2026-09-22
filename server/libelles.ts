@@ -42,14 +42,8 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return 'Nouveau plateau';
     case 'nouveauTour':
       return 'Nouveau tour';
-    case 'miser':
-      return 'Mise';
-    case 'cloreMises':
-      return 'Clôture des mises';
-    case 'revelerMises':
-      return 'Révélation des mises';
-    case 'passerAuChoix':
-      return 'Choix du mini-jeu';
+    case 'retirerOrdre':
+      return "Tirage de l'ordre";
     case 'choisirMiniJeu':
       return 'Mini-jeu';
     case 'passerAuxDeplacements':

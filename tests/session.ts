@@ -19,9 +19,7 @@ export const DISPOSITION: TypeCase[] = [
   'cagnotte',
   'bonus',
   'duel',
-  'bonus',
-  'bonus',
-  'bonus',
+  ...Array.from({ length: 29 }, () => 'bonus' as const),
   'arrivee',
 ];
 
@@ -155,7 +153,7 @@ export function verifierInvariants(etat: EtatJeu): void {
   if (course.cagnotte < 0) throw new Error(`Cagnotte négative : ${course.cagnotte}`);
   for (const joueur of etat.joueurs) {
     const position = course.positions[joueur.id] ?? 0;
-    if (position < 0 || position > 34) throw new Error(`Position hors plateau pour ${joueur.pseudo} : ${position}`);
+    if (position < 0 || position > 38) throw new Error(`Position hors plateau pour ${joueur.pseudo} : ${position}`);
     if (position > course.regles.longueur) throw new Error(`Position au-delà de l'arrivée pour ${joueur.pseudo}`);
   }
 }
@@ -170,7 +168,6 @@ export function fuitesMises(vue: VueClient, joueurId: string | null): string[] {
       if (mise.montant !== undefined) fuites.push(`${mise.joueurId}:${mise.montant}`);
     }
   };
-  if (course.phase === 'mises') secret(course.mises);
   if (course.duel?.etape === 'mises') secret(course.duel.mises);
   for (const evenement of vue.evenements) {
     if (evenement.type !== 'mise.posee' && evenement.type !== 'duel.mise') continue;

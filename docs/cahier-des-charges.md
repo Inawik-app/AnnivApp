@@ -58,20 +58,27 @@ Toute carte, case ou effet doit respecter cette règle.
 
 ## Le plateau
 
-- Course **linéaire** qui dure toute la soirée. Des tours de plateau ont lieu entre les activités.
-- Longueur à calibrer d'après le nombre de tours prévus : le dé moyen fait 3,5, donc pour environ 10 tours, prévoir 32 à 35 cases pour que le premier arrive vers la fin de soirée. **La longueur doit être configurable.**
-- Déplacement : **1 dé à 6 faces tiré par le serveur**. Enregistrer tous les lancers (utile pour les trophées de fin).
+- Course qui dure toute la soirée. Des tours de plateau ont lieu entre les activités. Le chemin est une grille en zigzag qui monte : départ en bas à gauche, arrivée en haut. Tout le plateau tient à l'écran, sans caméra ni défilement.
+- La télé découpe l'écran en zones fixes qui ne se recouvrent pas : fiches des joueurs dans l'ordre de passage, en-tête qui nomme le joueur concerné, zone du plateau, cagnotte. Le dé, la carte d'effet et les annonces apparaissent au centre de la zone plateau, puis disparaissent. Rien de tout cela n'est visible pendant les sauts.
+- Longueur à calibrer d'après le nombre de tours prévus. Un dé normal moyenne 3,5. Avec le bonus de mise, la moyenne monte vers 4,1. La configuration actuelle est de 38 cases. **La longueur doit être configurable.**
+- Déplacement : **1 dé à 6 faces tiré par le serveur**. Enregistrer chaque lancer avec sa valeur, la mise associée et l'espérance de sa distribution (utile pour les trophées de fin).
+
+### Ordre de passage
+
+L'ordre est tiré au sort une seule fois, au démarrage de la course, côté serveur. Il ne change plus de toute la partie. L'hôte peut le retirer au sort tant que le premier tour n'a pas commencé. Les joueurs déjà arrivés sont sautés.
 
 ### Déroulé d'un tour
 
-1. **Mise secrète** : chaque joueur mise des GP sur son téléphone. La télé révèle toutes les mises en même temps.
-   - La mise détermine **uniquement l'ordre de passage**. Elle ne modifie jamais le déplacement ni les probabilités du dé.
+1. **Choix du mini-jeu** : un joueur choisit le mini-jeu du tour parmi ceux encore disponibles (voir plus bas). Au tour N, c'est le joueur à la position (N − 1) modulo le nombre de joueurs dans l'ordre de passage. Le réglage `choixMiniJeu` vaut `rotation` (par défaut) ou `dernierAuClassement` (le joueur qui a le moins de GP visibles choisit).
+2. **Mini-jeu** : les joueurs s'affrontent, les GP sont attribués.
+3. **Déplacements**, dans l'ordre de passage. Quand c'est son tour, le joueur choisit une mise entre 0 et le minimum entre la mise maximale et son solde visible, puis lance.
+   - La mise et le lancer forment une seule action. Elle débite la mise, l'ajoute à la cagnotte, tire le dé avec les probabilités boostées, déplace le pion et applique l'effet de la case. Une seule annulation remet tout en place.
+   - Plus la mise est haute, plus les grandes valeurs sont probables. Une mise de 0 donne un dé normal.
    - Mise maximale : **10 GP** (configurable). Mise de 0 autorisée.
-   - En cas d'égalité, **le joueur avec le moins de GP passe devant**.
-   - Les GP misés vont dans une **cagnotte** au centre du plateau.
-2. **Choix du mini-jeu** : un joueur choisit le mini-jeu du tour parmi ceux encore disponibles (voir plus bas). *Qui choisit est à confirmer : a priori le premier dans l'ordre de passage.*
-3. **Mini-jeu** : les joueurs s'affrontent, les GP sont attribués.
-4. **Déplacements** : dans l'ordre de passage, chaque joueur lance le dé et avance, puis l'effet de sa case s'applique.
+   - L'hôte peut lancer à la place d'un joueur absent, avec la mise de son choix, 0 par défaut.
+   - La mise n'est pas secrète : la télé affiche le montant au moment du lancer.
+
+Les duels gardent leurs mises secrètes et simultanées entre les deux adversaires.
 
 ### Types de cases
 
@@ -162,12 +169,12 @@ Quand la course se termine, chaque joueur choisit une carte pouvoir **dans l'ord
 
 ## Écrans de la télé (résumé)
 
-Accueil avec QR code et joueurs connectés · plateau et tableau des scores · révélation des mises · grille des mini-jeux et règles du jeu en cours · Jeopardy (grille, question, buzzer) · minuteur du poker · révélation des GP du ping-pong · draft des pouvoirs · cérémonie des trophées · classement final.
+Accueil avec QR code et joueurs connectés · plateau et tableau des scores · tirage de l'ordre de passage · grille des mini-jeux et règles du jeu en cours · Jeopardy (grille, question, buzzer) · minuteur du poker · révélation des GP du ping-pong · draft des pouvoirs · cérémonie des trophées · classement final.
 
 ## Priorités de développement
 
 1. **Socle** : serveur, connexion des joueurs, tableau des scores sur la télé, saisie manuelle des GP par l'hôte, sauvegarde JSON. Avec ça seul, la soirée fonctionne déjà.
-2. **Plateau** : mises secrètes, ordre de passage, dé, cases, cagnotte.
+2. **Plateau** : ordre de passage tiré une fois, mise au moment de lancer le dé, cases, cagnotte.
 3. **Mini-jeux** : grille chez l'hôte, affichage télé, Jeopardy avec buzzers.
 4. **Activités** : révélation différée du ping-pong, minuteur du poker.
 5. **Finale** : draft des pouvoirs, trophées, classement.
@@ -177,7 +184,6 @@ Accueil avec QR code et joueurs connectés · plateau et tableau des scores · r
 
 ## Points encore ouverts
 
-- Qui choisit le mini-jeu à chaque tour.
 - Liste des ~10 mini-jeux et contenu du Jeopardy.
 - Pénalité ou non au Jeopardy.
 - Barème d'Undercover et des missions secrètes.

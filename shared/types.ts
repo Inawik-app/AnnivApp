@@ -36,8 +36,6 @@ export type TypeCase = 'depart' | 'bonus' | 'chance' | 'cagnotte' | 'duel' | 'ar
 
 export type PhaseCourse =
   | 'preparation'
-  | 'mises'
-  | 'revelation'
   | 'choixMiniJeu'
   | 'miniJeu'
   | 'deplacements'
@@ -65,13 +63,20 @@ export type LancerDe = {
   joueurId: string;
   valeur: number;
   usage: UsageDe;
+  /** Mise de tour associée. 0 pour un dé normal (mise nulle ou dé de carte chance). */
+  mise: number;
+  /** Espérance de la distribution utilisée pour ce lancer. */
+  esperance: number;
 };
 
 export type ReglesCourse = {
   longueur: number;
   gainBonus: number;
   miseMax: number;
-  choixMiniJeu: 'premier' | 'dernier';
+  /** Distribution des faces 1 à 6 lorsque la mise atteint miseMax. */
+  probasMiseMax: number[];
+  /** `rotation` : le choix tourne dans l'ordre de passage. `dernierAuClassement` : le moins de GP visibles choisit. */
+  choixMiniJeu: 'rotation' | 'dernierAuClassement';
   duel: { miseMax: number; bonusVainqueur: number; defis: string[] };
 };
 
@@ -114,8 +119,7 @@ export type Course = {
   defausse: string[];
   tour: number;
   phase: PhaseCourse;
-  misesCloturees: boolean;
-  mises: Record<string, number | null>;
+  /** Ordre de passage, tiré une fois au démarrage de la course. */
   ordre: string[];
   indexCourant: number;
   etape: EtapeDeplacement | null;
@@ -133,7 +137,9 @@ export type ConfigPlateau = {
   repartition: { bonus: number; chance: number; cagnotte: number; duel: number };
   gainBonus: number;
   miseMax: number;
-  choixMiniJeu: 'premier' | 'dernier';
+  /** Distribution des faces 1 à 6 lorsque la mise atteint miseMax. La somme vaut 1. */
+  probasMiseMax: number[];
+  choixMiniJeu: 'rotation' | 'dernierAuClassement';
   duel: { miseMax: number; bonusVainqueur: number; defis: string[] };
   disposition?: TypeCase[];
 };
@@ -190,13 +196,10 @@ export type Action =
   | { type: 'demarrerCourse' }
   | { type: 'regenererPlateau' }
   | { type: 'nouveauTour' }
-  | { type: 'miser'; montant: number }
-  | { type: 'cloreMises' }
-  | { type: 'revelerMises' }
-  | { type: 'passerAuChoix' }
+  | { type: 'retirerOrdre' }
   | { type: 'choisirMiniJeu'; nom: string }
   | { type: 'passerAuxDeplacements' }
-  | { type: 'lancerDe' }
+  | { type: 'lancerDe'; mise: number }
   | { type: 'choisirBeneficiaire'; joueurId: string }
   | { type: 'choisirAdversaire'; joueurId: string }
   | { type: 'miserDuel'; montant: number }
@@ -263,7 +266,6 @@ export type CourseVue = {
   arrivees: string[];
   cagnotte: number;
   tour: number;
-  mises: MiseVue[];
   ordre: string[];
   indexCourant: number;
   joueurCourantId: string | null;
@@ -276,6 +278,7 @@ export type CourseVue = {
   classement: string[] | null;
   gainBonus: number;
   miseMax: number;
+  probasMiseMax: number[];
   miseMaxDuel: number;
   bonusDuel: number;
 };

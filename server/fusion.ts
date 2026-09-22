@@ -20,6 +20,23 @@ function normaliserCourse(valeur: unknown): Course | null {
   if (!Array.isArray(course.defausse)) course.defausse = [];
   if (!course.historique) course.historique = { lancers: [], mises: [], effets: [], duels: [] };
   if (!Array.isArray(course.arrivees)) course.arrivees = [];
+  if (!Array.isArray(course.regles.probasMiseMax) || course.regles.probasMiseMax.length !== 6) {
+    course.regles.probasMiseMax = [1 / 12, 7 / 60, 3 / 20, 11 / 60, 13 / 60, 1 / 4];
+  }
+  for (const lancer of course.historique.lancers) {
+    if (typeof lancer.mise !== 'number') lancer.mise = 0;
+    if (typeof lancer.esperance !== 'number') lancer.esperance = 3.5;
+  }
+  const phase = course.phase as string;
+  if (phase === 'mises' || phase === 'revelation') {
+    course.phase = course.tour > 0 ? 'choixMiniJeu' : 'preparation';
+  }
+  if (!Array.isArray(course.ordre) || course.ordre.length === 0) {
+    course.ordre = Object.keys(course.positions);
+  }
+  const choix = course.regles.choixMiniJeu as string;
+  if (choix === 'premier' || choix !== 'dernierAuClassement') course.regles.choixMiniJeu = 'rotation';
+  if (choix === 'dernier') course.regles.choixMiniJeu = 'dernierAuClassement';
   return course;
 }
 

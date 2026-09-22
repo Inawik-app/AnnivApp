@@ -40,6 +40,7 @@ declare global {
     __etatAffiche?: InstantaneCourse;
     __etatRecu?: InstantaneCourse;
     __fileVide?: boolean;
+    __sauts?: number;
   }
 }
 
@@ -201,8 +202,9 @@ function EcranTv() {
   const [courseAffichee, setCourseAffichee] = useState<CourseVue | null>(null);
   const [positions, setPositions] = useState<Record<string, number>>({});
   const [cagnotte, setCagnotte] = useState(0);
-  const [coches, setCoches] = useState<string[]>([]);
   const [spectacle, setSpectacle] = useState<Spectacle | null>(null);
+  const [brassage, setBrassage] = useState<string[] | null>(null);
+  const [lanceId, setLanceId] = useState<string | null>(null);
   const courseRef = useRef<CourseVue | null>(null);
   const versionRef = useRef(0);
   const serieRef = useRef(0);
@@ -243,6 +245,7 @@ function EcranTv() {
 
   const marquer = (etape: string) => {
     etapeCourante.current = { evenement: evenementCourant.current, etape };
+    if (debug && etape === 'saut') window.__sauts = (window.__sauts ?? 0) + 1;
     publier();
   };
 
@@ -267,16 +270,18 @@ function EcranTv() {
       cagnotteRef.current = 0;
       setPositions({});
       setCagnotte(0);
-      setCoches([]);
+      setBrassage(null);
       setSpectacle(null);
+      setLanceId(null);
       return;
     }
     positionsRef.current = { ...course.positions };
     cagnotteRef.current = course.cagnotte;
     setPositions(positionsRef.current);
     setCagnotte(cagnotteRef.current);
-    setCoches(course.phase === 'mises' ? course.mises.filter((mise) => mise.aMise).map((mise) => mise.joueurId) : []);
+    setBrassage(null);
     setSpectacle(null);
+    setLanceId(null);
   };
   const memoriserCourse = (course: CourseVue | null) => {
     courseRef.current = course;
@@ -453,10 +458,12 @@ function EcranTv() {
     const pseudo = (idJoueur: string) => joueursRef.current.find((joueur) => joueur.id === idJoueur)?.pseudo ?? 'Un joueur';
     if (evenement.type === 'tour.nouveau') {
       const tour = typeof evenement.donnees.tour === 'number' ? evenement.donnees.tour : (courseRef.current?.tour ?? 0) + 1;
-      memoriserCourse(patchCourse(courseRef.current, { phase: 'mises', tour, ordre: [], joueurCourantId: null, etape: null, miniJeu: null }));
-      setCoches([]);
-    } else if (evenement.type === 'mises.revelees') {
-      memoriserCourse(patchCourse(courseRef.current, { phase: 'revelation' }));
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'choixMiniJeu', tour, joueurCourantId: null, etape: null, miniJeu: null }));
+    } else if (evenement.type === 'ordre.tire') {
+      const ordre = Array.isArray(evenement.donnees.ordre)
+        ? evenement.donnees.ordre.filter((item): item is string => typeof item === 'string')
+        : courseRef.current?.ordre ?? [];
+      memoriserCourse(patchCourse(courseRef.current, { ordre }));
     } else if (evenement.type === 'minijeu.annonce') {
       const idJoueur = typeof evenement.donnees.joueurId === 'string' ? evenement.donnees.joueurId : null;
       memoriserCourse(patchCourse(courseRef.current, { phase: 'choixMiniJeu', choisitId: idJoueur }));
@@ -468,7 +475,21 @@ function EcranTv() {
         phase: 'deplacements',
         etape: 'lancer',
         joueurCourantId: recue.course?.joueurCourantId ?? null,
+        ordre: recue.course?.ordre ?? [],
+        indexCourant: recue.course?.indexCourant ?? 0,
       }));
+    } else if (evenement.type === 'de.lance' && evenement.donnees.usage !== 'chance') {
+      const idLanceur = typeof evenement.donnees.joueurId === 'string' ? evenement.donnees.joueurId : null;
+      if (idLanceur && courseRef.current) {
+        setLanceId(idLanceur);
+        const index = courseRef.current.ordre.indexOf(idLanceur);
+        memoriserCourse(patchCourse(courseRef.current, {
+          phase: 'deplacements',
+          etape: 'lancer',
+          joueurCourantId: idLanceur,
+          indexCourant: index >= 0 ? index : courseRef.current.indexCourant,
+        }));
+      }
     } else if (evenement.type === 'tour.fini') {
       memoriserCourse(patchCourse(courseRef.current, { phase: 'finTour', etape: null, joueurCourantId: null }));
     } else if (evenement.type === 'course.terminee') {
@@ -496,13 +517,22 @@ function EcranTv() {
           setCourseAffichee(courseRef.current);
         }
       },
+      ajouterCagnotte: (delta) => {
+        const valeur = cagnotteRef.current + delta;
+        cagnotteRef.current = valeur;
+        setCagnotte(valeur);
+        if (courseRef.current) {
+          courseRef.current = { ...courseRef.current, cagnotte: valeur };
+          setCourseAffichee(courseRef.current);
+        }
+      },
       setSpectacle,
+      setBrassage,
       ajusterSolde: (idJoueur, delta) => poserJoueurs(ajouterSolde(joueursRef.current, idJoueur, delta)),
-      setCoches,
-      ajouterCoche: (idJoueur) => setCoches((liste) => (liste.includes(idJoueur) ? liste : [...liste, idJoueur])),
       attendre: attendreAnime,
       segment,
       marquer,
+      miseMax: courseRef.current?.miseMax ?? 1,
     });
   }
 
@@ -591,21 +621,24 @@ function EcranTv() {
   return (
     <div class={reduit ? 'scene animations-reduites' : 'scene'} ref={scene}>
       {ecran === 'accueil' && !reduit ? <Confettis /> : null}
+      {ecran === 'plateau' && courseAffichee ? (
+        <PlateauTv
+          course={courseAffichee}
+          joueurs={joueurs}
+          positions={positions}
+          cagnotte={cagnotte}
+          spectacle={spectacle}
+          brassage={brassage}
+          reduit={reduit}
+          aLance={lanceId !== null && lanceId === courseAffichee.joueurCourantId}
+        />
+      ) : null}
       <div class="contenu">
-        <p class="etat-lien">{connecte ? 'Connecté' : 'Hors ligne'}</p>
-        {sonOk ? null : <p class="bandeau-son">Appuie sur OK pour activer le son</p>}
-        <div class={`plan ${phase}${poseAnime ? '' : ' sans-transition'}`} style={sonOk ? undefined : { height: 'calc(100% - 96px)' }}>
-          {ecran === 'plateau' && courseAffichee ? (
-            <PlateauTv
-              course={courseAffichee}
-              joueurs={joueurs}
-              positions={positions}
-              cagnotte={cagnotte}
-              spectacle={spectacle}
-              reduit={reduit}
-              coches={coches}
-            />
-          ) : ecran === 'scores' ? (
+        <span class={connecte ? 'point-lien' : 'point-lien coupe'} data-connecte={connecte ? '1' : '0'} />
+        {!connecte ? <p class="bandeau-hors-ligne">Hors ligne</p> : null}
+        {sonOk || ecran === 'plateau' ? null : <p class="bandeau-son">Appuie sur OK pour activer le son</p>}
+        <div class={`plan ${phase}${poseAnime ? '' : ' sans-transition'}`} style={sonOk || ecran === 'plateau' ? undefined : { height: 'calc(100% - 96px)' }}>
+          {ecran === 'plateau' ? null : ecran === 'scores' ? (
             <section class="podium">
               {joueurs.length === 0 ? <p class="texte-tv">Aucun joueur pour l'instant</p> : null}
               {joueurs.map((joueur) => (

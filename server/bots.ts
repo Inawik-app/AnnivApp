@@ -11,22 +11,13 @@ export function actionBot(etat: EtatJeu, alea: (max: number) => number): { actio
   const bots = etat.joueurs.filter((joueur) => FICTIFS.has(clePseudo(joueur.pseudo)) && course.positions[joueur.id] !== undefined);
   if (bots.length === 0) return null;
 
-  if (course.phase === 'mises' && !course.misesCloturees) {
-    const enAttente = bots.find((joueur) => course.mises[joueur.id] === null || course.mises[joueur.id] === undefined);
-    if (!enAttente) return null;
-    const plafond = plafondMise(solde(etat.transactions, enAttente.id, 'visibles'), course.regles.miseMax);
-    return {
-      action: { type: 'miser', montant: alea(plafond + 1) },
-      origine: { role: 'joueur', joueurId: enAttente.id },
-    };
-  }
-
   if (course.phase !== 'deplacements' || !course.etape) return null;
   const courantId = course.ordre[course.indexCourant];
   const courant = bots.find((joueur) => joueur.id === courantId);
 
   if (course.etape.genre === 'lancer' && courant) {
-    return { action: { type: 'lancerDe' }, origine: { role: 'joueur', joueurId: courant.id } };
+    const plafond = plafondMise(solde(etat.transactions, courant.id, 'visibles'), course.regles.miseMax);
+    return { action: { type: 'lancerDe', mise: alea(plafond + 1) }, origine: { role: 'joueur', joueurId: courant.id } };
   }
   if (course.etape.genre === 'cadeau' && courant) {
     const autres = etat.joueurs.filter((joueur) => joueur.id !== courant.id && course.positions[joueur.id] !== undefined);

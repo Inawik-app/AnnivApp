@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { Action, VueHote } from '../../shared/types';
 import { Bouton, Tuile } from '../commun/composants';
 import { etapeSuivante, textePhase } from '../commun/course-texte';
@@ -23,11 +23,16 @@ export function PanneauCourse({
   agir: (action: Action) => void;
 }) {
   const [nomMiniJeu, setNomMiniJeu] = useState('');
+  const [miseLancer, setMiseLancer] = useState(0);
   const [positions, setPositions] = useState<Record<string, string>>({});
   const [confirmerFin, setConfirmerFin] = useState(false);
   const course = vue.course;
   const pseudos = new Map(vue.joueurs.map((joueur) => [joueur.id, joueur.pseudo]));
-  const suite = course ? etapeSuivante(course, pseudos) : null;
+  const suite = course ? etapeSuivante(course) : null;
+  const cleLancer = `${course?.tour ?? 0}|${course?.joueurCourantId ?? ''}`;
+  useEffect(() => {
+    setMiseLancer(0);
+  }, [cleLancer]);
   const joueurs = [...vue.joueurs].sort((a, b) => a.rejointA - b.rejointA || a.pseudo.localeCompare(b.pseudo, 'fr'));
 
   return (
@@ -52,6 +57,25 @@ export function PanneauCourse({
               <span key={index} class={`pastille pastille-${type}`} title={`${NOMS_CASES[type] ?? type} ${index}`} />
             ))}
           </div>
+          {course.ordre.length > 0 ? (
+            <div>
+              <h3>Ordre de passage</h3>
+              {course.ordre.map((id, index) => (
+                <p key={id}>
+                  {index + 1}. {pseudos.get(id) ?? 'Joueur'}
+                  {course.arrivees.includes(id) ? ' · arrivé' : ''}
+                </p>
+              ))}
+              {course.phase === 'preparation' ? (
+                <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'retirerOrdre' })}>
+                  Tirer à nouveau l'ordre
+                </Bouton>
+              ) : null}
+            </div>
+          ) : null}
+          {course.tour > 0 && course.choisitId ? (
+            <p>{pseudos.get(course.choisitId) ?? 'Un joueur'} choisit le mini-jeu ce tour-ci</p>
+          ) : null}
           {course.phase === 'preparation' ? (
             <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'regenererPlateau' })}>
               Regénérer le plateau
@@ -91,14 +115,25 @@ export function PanneauCourse({
               </Bouton>
             </div>
           ) : null}
-          {course.phase === 'mises' || course.phase === 'revelation' ? (
-            <div>
-              <h3>Mises</h3>
-              {course.mises.map((mise) => (
-                <p key={mise.joueurId}>
-                  {pseudos.get(mise.joueurId) ?? 'Joueur'} : {mise.aMise ? (mise.montant !== undefined ? `${mise.montant} GP` : 'a misé') : 'en attente'}
-                </p>
-              ))}
+          {course.phase === 'deplacements' && course.etape === 'lancer' && course.joueurCourantId ? (
+            <div class="pile">
+              <h3>Lancer pour {pseudos.get(course.joueurCourantId) ?? 'le joueur'}</h3>
+              <label>
+                Mise
+                <input
+                  type="number"
+                  min="0"
+                  max={course.miseMax}
+                  value={miseLancer}
+                  onInput={(event) => setMiseLancer(Math.max(0, Number((event.currentTarget as HTMLInputElement).value) || 0))}
+                />
+              </label>
+              <Bouton
+                disabled={envoi}
+                onClick={() => agir({ type: 'lancerDe', mise: miseLancer })}
+              >
+                Lancer pour {pseudos.get(course.joueurCourantId) ?? 'le joueur'}
+              </Bouton>
             </div>
           ) : null}
           {course.duel ? (

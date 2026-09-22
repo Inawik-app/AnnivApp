@@ -1,9 +1,10 @@
 {
-  "longueur": 34,
-  "repartition": { "bonus": 13, "chance": 9, "cagnotte": 5, "duel": 6 },
+  "longueur": 38,
+  "repartition": { "bonus": 14, "chance": 10, "cagnotte": 6, "duel": 7 },
   "gainBonus": 5,
   "miseMax": 10,
-  "choixMiniJeu": "premier",
+  "probasMiseMax": [0.08333333333333333, 0.11666666666666667, 0.15, 0.18333333333333333, 0.21666666666666667, 0.25],
+  "choixMiniJeu": "rotation",
   "duel": {
     "miseMax": 10,
     "bonusVainqueur": 5,

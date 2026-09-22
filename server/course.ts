@@ -2,25 +2,26 @@ import { solde } from '../shared/soldes';
 import type {
   Action,
   CarteChance,
+  ConfigPlateau,
   Course,
   DuelEnCours,
   EtatJeu,
   HistoriqueCourse,
   Origine,
   ReglesCourse,
+  UsageDe,
   Visibilite,
 } from '../shared/types';
 import { trouverJoueur } from './libelles';
 import {
   type Alea,
   calculerClassement,
-  calculerOrdre,
   creditsDuel,
   genererDisposition,
   melanger,
   plafondMise,
 } from './plateau';
-import type { ConfigPlateau } from '../shared/types';
+import { esperanceDe, probabilitesDe, tirerDePondere } from '../shared/de';
 
 export type ContexteCourse = {
   maintenant: number;
@@ -33,8 +34,13 @@ export type ContexteCourse = {
   dev: boolean;
 };
 
-function valeurDe(ctx: ContexteCourse): number {
-  return ctx.tirerDe ? ctx.tirerDe() : ctx.alea(6) + 1;
+function deNormal(ctx: ContexteCourse): number {
+  return ctx.alea(6) + 1;
+}
+
+function deDeplacement(ctx: ContexteCourse, mise: number, miseMax: number, probasMiseMax: number[]): number {
+  if (ctx.tirerDe) return ctx.tirerDe();
+  return tirerDePondere(probabilitesDe(mise, miseMax, probasMiseMax), ctx.alea);
 }
 
 type Ajouter = (
@@ -49,10 +55,7 @@ const ACTIONS = new Set<Action['type']>([
   'demarrerCourse',
   'regenererPlateau',
   'nouveauTour',
-  'miser',
-  'cloreMises',
-  'revelerMises',
-  'passerAuChoix',
+  'retirerOrdre',
   'choisirMiniJeu',
   'passerAuxDeplacements',
   'lancerDe',
@@ -80,11 +83,31 @@ function historiqueVide(): HistoriqueCourse {
   return { lancers: [], mises: [], effets: [], duels: [] };
 }
 
+function noterLancer(
+  course: Course,
+  joueurId: string,
+  valeur: number,
+  usage: UsageDe,
+  mise: number,
+): void {
+  const miseEffective = usage === 'deplacement' ? mise : 0;
+  const probas = probabilitesDe(miseEffective, course.regles.miseMax, course.regles.probasMiseMax);
+  course.historique.lancers.push({
+    tour: course.tour,
+    joueurId,
+    valeur,
+    usage,
+    mise: miseEffective,
+    esperance: esperanceDe(probas),
+  });
+}
+
 function reglesDepuis(config: ConfigPlateau): ReglesCourse {
   return {
     longueur: config.longueur,
     gainBonus: config.gainBonus,
     miseMax: config.miseMax,
+    probasMiseMax: [...config.probasMiseMax],
     choixMiniJeu: config.choixMiniJeu,
     duel: {
       miseMax: config.duel.miseMax,
@@ -106,6 +129,25 @@ function montantAutorise(valeur: number, soldeActuel: number, maximum: number): 
     return "Tu n'as pas assez de GP visibles";
   }
   return null;
+}
+
+function quiChoisit(draft: EtatJeu, course: Course): string | null {
+  const ordre = course.ordre;
+  const premier = ordre[0];
+  if (!premier) return null;
+  if (course.regles.choixMiniJeu === 'dernierAuClassement') {
+    let choisi = premier;
+    let plancher = soldeVisible(draft, choisi);
+    for (const id of ordre) {
+      const gp = soldeVisible(draft, id);
+      if (gp < plancher) {
+        plancher = gp;
+        choisi = id;
+      }
+    }
+    return choisi;
+  }
+  return ordre[(course.tour - 1) % ordre.length] ?? null;
 }
 
 function joueurCourant(course: Course): string | null {
@@ -260,9 +302,9 @@ function appliquerCarte(
     return;
   }
   if (carte.effet.type === 'gainDe') {
-    const valeur = valeurDe(ctx);
+    const valeur = deNormal(ctx);
     course.dernierDe = { joueurId, valeur, usage: 'chance' };
-    course.historique.lancers.push({ tour: course.tour, joueurId, valeur, usage: 'chance' });
+    noterLancer(course, joueurId, valeur, 'chance', 0);
     ajouter(draft, 'de.lance', 'public', `${pseudo(draft, joueurId)} lance un dé doré : ${valeur}`, {
       joueurId,
       valeur,
@@ -360,7 +402,6 @@ export function oublierJoueurCourse(draft: EtatJeu, joueurId: string): void {
   const course = draft.course;
   if (!course) return;
   delete course.positions[joueurId];
-  delete course.mises[joueurId];
   course.arrivees = course.arrivees.filter((id) => id !== joueurId);
   course.ordre = course.ordre.filter((id) => id !== joueurId);
   if (course.classement) course.classement = course.classement.filter((id) => id !== joueurId);
@@ -383,9 +424,7 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
   if (
     action.type === 'demarrerCourse' ||
     action.type === 'regenererPlateau' ||
-    action.type === 'cloreMises' ||
-    action.type === 'revelerMises' ||
-    action.type === 'passerAuChoix' ||
+    action.type === 'retirerOrdre' ||
     action.type === 'choisirMiniJeu' ||
     action.type === 'passerAuxDeplacements' ||
     action.type === 'cloreMisesDuel' ||
@@ -414,23 +453,8 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
     case 'nouveauTour':
       if (course.phase !== 'preparation' && course.phase !== 'finTour') return "Ce n'est pas le moment de lancer un tour";
       return null;
-    case 'miser': {
-      if (!joueurId) return "Seul un joueur peut miser";
-      if (course.phase !== 'mises' || course.misesCloturees) return 'Les mises sont closes';
-      if (course.positions[joueurId] === undefined) return "Tu n'es pas dans cette course";
-      return montantAutorise(action.montant, soldeVisible(etat, joueurId), course.regles.miseMax);
-    }
-    case 'cloreMises':
-      if (course.phase !== 'mises' || course.misesCloturees) return 'Les mises sont déjà closes';
-      return null;
-    case 'revelerMises': {
-      if (course.phase !== 'mises') return "Ce n'est pas le moment de révéler les mises";
-      const manque = Object.values(course.mises).some((montant) => montant === null);
-      if (manque) return 'Il reste des mises en attente';
-      return null;
-    }
-    case 'passerAuChoix':
-      if (course.phase !== 'revelation') return "Ce n'est pas le moment";
+    case 'retirerOrdre':
+      if (course.phase !== 'preparation' || course.tour !== 0) return "L'ordre ne peut plus être retiré";
       return null;
     case 'choisirMiniJeu':
       if (course.phase !== 'choixMiniJeu') return "Ce n'est pas le moment de choisir le mini-jeu";
@@ -446,7 +470,7 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
       if (!courant) return 'Personne ne doit lancer';
       if (!hote && joueurId !== courant) return "Ce n'est pas ton tour";
       if ((course.positions[courant] ?? 0) >= course.regles.longueur) return 'Tu es déjà arrivé';
-      return null;
+      return montantAutorise(action.mise, soldeVisible(etat, courant), course.regles.miseMax);
     }
     case 'choisirBeneficiaire': {
       if (course.phase !== 'deplacements' || course.etape?.genre !== 'cadeau') return "Personne n'attend de cadeau";
@@ -539,9 +563,7 @@ export function appliquerCourse(
       defausse: [],
       tour: 0,
       phase: 'preparation',
-      misesCloturees: false,
-      mises: {},
-      ordre: [],
+      ordre: melanger(draft.joueurs.map((joueur) => joueur.id), ctx.alea),
       indexCourant: 0,
       etape: null,
       miniJeu: null,
@@ -555,6 +577,10 @@ export function appliquerCourse(
     draft.partie.ecranTv = 'plateau';
     ajouter(draft, 'course.demarree', 'public', 'La course commence');
     ajouter(draft, 'ecran', 'public', 'La télé affiche le plateau', { ecran: 'plateau' });
+    const premier = draft.course.ordre[0];
+    ajouter(draft, 'ordre.tire', 'public', `${premier ? pseudo(draft, premier) : 'Un joueur'} commence !`, {
+      ordre: draft.course.ordre,
+    });
     return;
   }
 
@@ -573,66 +599,26 @@ export function appliquerCourse(
     }
     case 'nouveauTour': {
       course.tour += 1;
-      course.phase = 'mises';
-      course.misesCloturees = false;
-      course.mises = {};
-      for (const id of Object.keys(course.positions)) course.mises[id] = null;
-      course.ordre = [];
       course.indexCourant = 0;
       course.etape = null;
       course.miniJeu = null;
-      course.choisitId = null;
       course.carteCourante = null;
-      ajouter(draft, 'tour.nouveau', 'public', `Tour ${course.tour} : misez sur vos téléphones`, { tour: course.tour });
-      break;
-    }
-    case 'miser': {
-      const id = origine.role === 'joueur' ? origine.joueurId : null;
-      if (!id) return;
-      course.mises[id] = action.montant;
-      ajouter(draft, 'mise.posee', 'public', `${pseudo(draft, id)} a misé`, { joueurId: id });
-      break;
-    }
-    case 'cloreMises': {
-      for (const id of Object.keys(course.mises)) {
-        if (course.mises[id] === null) course.mises[id] = 0;
-      }
-      course.misesCloturees = true;
-      ajouter(draft, 'mises.cloturees', 'public', 'Les mises sont closes');
-      break;
-    }
-    case 'revelerMises': {
-      const liste = Object.entries(course.mises).map(([id, montant]) => ({
-        id,
-        mise: montant ?? 0,
-        gp: soldeVisible(draft, id),
-      }));
-      let total = 0;
-      for (const entree of liste) {
-        debiterMise(draft, ctx, entree.id, entree.mise, `Mise du tour ${course.tour}`);
-        course.cagnotte += entree.mise;
-        total += entree.mise;
-        course.historique.mises.push({ tour: course.tour, joueurId: entree.id, montant: entree.mise, duel: false });
-      }
-      const { ordre, tirage } = calculerOrdre(liste, ctx.alea);
-      course.ordre = ordre;
-      course.phase = 'revelation';
-      const mises = liste.map((entree) => ({ joueurId: entree.id, montant: entree.mise }));
-      ajouter(
-        draft,
-        'mises.revelees',
-        'public',
-        tirage ? 'Les mises sont révélées. Un tirage au sort départage une égalité.' : 'Les mises sont révélées',
-        { mises, ordre, cagnotte: course.cagnotte, total, tirage },
-      );
-      break;
-    }
-    case 'passerAuChoix': {
-      const id = course.regles.choixMiniJeu === 'dernier' ? course.ordre[course.ordre.length - 1] : course.ordre[0];
-      course.choisitId = id ?? null;
       course.phase = 'choixMiniJeu';
-      ajouter(draft, 'minijeu.annonce', 'public', `${id ? pseudo(draft, id) : 'Un joueur'} choisit le mini-jeu`, {
-        joueurId: id ?? null,
+      course.choisitId = quiChoisit(draft, course);
+      ajouter(draft, 'tour.nouveau', 'public', `Tour ${course.tour}`, { tour: course.tour });
+      ajouter(draft, 'minijeu.annonce', 'public', `${course.choisitId ? pseudo(draft, course.choisitId) : 'Un joueur'} choisit le mini-jeu`, {
+        joueurId: course.choisitId,
+      });
+      break;
+    }
+    case 'retirerOrdre': {
+      course.ordre = melanger(
+        draft.joueurs.filter((joueur) => course.positions[joueur.id] !== undefined).map((joueur) => joueur.id),
+        ctx.alea,
+      );
+      const premier = course.ordre[0];
+      ajouter(draft, 'ordre.tire', 'public', `${premier ? pseudo(draft, premier) : 'Un joueur'} commence !`, {
+        ordre: course.ordre,
       });
       break;
     }
@@ -656,15 +642,24 @@ export function appliquerCourse(
     case 'lancerDe': {
       const id = joueurCourant(course);
       if (!id) return;
-      const valeur = valeurDe(ctx);
+      const mise = action.mise;
+      debiterMise(draft, ctx, id, mise, `Mise du tour ${course.tour}`);
+      course.cagnotte += mise;
+      course.historique.mises.push({ tour: course.tour, joueurId: id, montant: mise, duel: false });
+      const valeur = deDeplacement(ctx, mise, course.regles.miseMax, course.regles.probasMiseMax);
       const depuis = course.positions[id] ?? 0;
       const vers = Math.min(depuis + valeur, course.regles.longueur);
       course.positions[id] = vers;
       course.dernierDe = { joueurId: id, valeur, usage: 'deplacement' };
-      course.historique.lancers.push({ tour: course.tour, joueurId: id, valeur, usage: 'deplacement' });
+      noterLancer(course, id, valeur, 'deplacement', mise);
       const cases: number[] = [];
       for (let curseur = depuis + 1; curseur <= vers; curseur += 1) cases.push(curseur);
-      ajouter(draft, 'de.lance', 'public', `${pseudo(draft, id)} lance un ${valeur}`, { joueurId: id, valeur, usage: 'deplacement' });
+      ajouter(draft, 'de.lance', 'public', `${pseudo(draft, id)} lance un ${valeur}`, {
+        joueurId: id,
+        valeur,
+        usage: 'deplacement',
+        mise,
+      });
       ajouter(draft, 'pion.avance', 'public', `${pseudo(draft, id)} avance jusqu'à la case ${vers}`, {
         joueurId: id,
         depuis,

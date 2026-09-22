@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { esperanceDe, probabilitesDe } from '../../shared/de';
 import type { Action, CourseVue, JoueurPublic, VueJoueur } from '../../shared/types';
 import { Bouton, CompteurRouleaux } from '../commun/composants';
 import { textePhase } from '../commun/course-texte';
@@ -12,6 +13,34 @@ function vibrer(ms: number): void {
   navigation.vibrate?.(ms);
 }
 
+function Histogramme({
+  montant,
+  miseMax,
+  probasMiseMax,
+}: {
+  montant: number;
+  miseMax: number;
+  probasMiseMax: number[];
+}) {
+  const probas = probabilitesDe(montant, miseMax, probasMiseMax);
+  const moyenne = esperanceDe(probas);
+  const texte = moyenne.toFixed(1).replace('.', ',');
+  return (
+    <div class="histogramme" aria-label={`En moyenne ${texte} cases`}>
+      <div class="histogramme-barres">
+        {probas.map((probabilite, index) => (
+          <div key={index + 1} class="histogramme-colonne">
+            <div class="histogramme-barre" style={{ height: `${Math.max(8, probabilite * 220)}px` }} />
+            <span>{index + 1}</span>
+            <span>{Math.round(probabilite * 100)} %</span>
+          </div>
+        ))}
+      </div>
+      <p>En moyenne {texte} cases</p>
+    </div>
+  );
+}
+
 function Selecteur({
   montant,
   maximum,
@@ -19,6 +48,7 @@ function Selecteur({
   onValider,
   libelle,
   occupe,
+  apercu,
 }: {
   montant: number;
   maximum: number;
@@ -26,6 +56,7 @@ function Selecteur({
   onValider: () => void;
   libelle: string;
   occupe: boolean;
+  apercu?: { miseMax: number; probasMiseMax: number[] };
 }) {
   const fixer = (valeur: number) => onChange(Math.max(0, Math.min(maximum, valeur)));
   return (
@@ -52,9 +83,16 @@ function Selecteur({
           Max
         </Bouton>
       </div>
-      <Bouton plein disabled={occupe} onClick={onValider}>
-        {libelle}
-      </Bouton>
+      {apercu ? <Histogramme montant={montant} miseMax={apercu.miseMax} probasMiseMax={apercu.probasMiseMax} /> : null}
+      {libelle.startsWith('Lancer le dé') ? (
+        <button type="button" class="lancer-plein" disabled={occupe} onPointerDown={(event) => { event.preventDefault(); onValider(); }}>
+          {libelle}
+        </button>
+      ) : (
+        <Bouton plein disabled={occupe} onClick={onValider}>
+          {libelle}
+        </Bouton>
+      )}
     </div>
   );
 }
@@ -87,9 +125,26 @@ export function CourseJoueur({
   const pseudos = new Map(joueurs.map((joueur) => [joueur.id, joueur.pseudo]));
   const position = course.positions[moi.id];
   const rangPassage = course.ordre.indexOf(moi.id);
-  const mise = course.mises.find((entree) => entree.joueurId === moi.id);
   const plafond = Math.max(0, Math.min(course.miseMax, solde));
   const aMoiDeLancer = course.phase === 'deplacements' && course.etape === 'lancer' && course.joueurCourantId === moi.id;
+  const debut = course.phase === 'deplacements' ? Math.max(0, course.indexCourant) : 0;
+  let joueursAvant = 0;
+  if (rangPassage >= 0) {
+    for (let index = debut; index < rangPassage; index += 1) {
+      const id = course.ordre[index];
+      if (id && !course.arrivees.includes(id)) joueursAvant += 1;
+    }
+  }
+  const dejaJoue = course.phase === 'deplacements' && rangPassage >= 0 && rangPassage < course.indexCourant;
+  const attente = course.arrivees.includes(moi.id)
+    ? 'Tu es arrivé'
+    : dejaJoue
+      ? 'Tu as déjà joué'
+      : joueursAvant === 0
+        ? "C'est bientôt à toi"
+        : joueursAvant === 1
+          ? 'Encore 1 joueur avant toi'
+          : `Encore ${joueursAvant} joueurs avant toi`;
   const cadeau = course.phase === 'deplacements' && course.etape === 'cadeau' && course.joueurCourantId === moi.id;
   const duel = course.duel;
   const jeDuelliste = duel !== null && (duel.joueurId === moi.id || duel.adversaireId === moi.id);
@@ -108,26 +163,19 @@ export function CourseJoueur({
       ) : null}
       <p>{textePhase(course, pseudos)}</p>
       {course.dernierDe?.joueurId === moi.id ? <p>Tu as fait {course.dernierDe.valeur}.</p> : null}
-      {course.phase === 'mises' && mise && mise.aMise && mise.montant !== undefined && !modifie ? (
-        <div class="pile">
-          <p>Mise enregistrée : {mise.montant} GP</p>
-          <Bouton variante="secondaire" disabled={occupe} onClick={() => { setMontant(mise.montant ?? 0); setModifie(true); }}>
-            Modifier
-          </Bouton>
+      {!aMoiDeLancer && rangPassage >= 0 ? (
+        <div>
+          <p>{attente}</p>
+          <ol class="ordre-joueur">
+            {course.ordre.map((id) => (
+              <li key={id} class={id === moi.id ? 'moi' : undefined}>
+                {pseudos.get(id) ?? 'Joueur'}
+                {id === moi.id ? ' · toi' : ''}
+                {course.arrivees.includes(id) ? ' · arrivé' : ''}
+              </li>
+            ))}
+          </ol>
         </div>
-      ) : null}
-      {course.phase === 'mises' && (!mise?.aMise || modifie) ? (
-        <Selecteur
-          montant={montant}
-          maximum={plafond}
-          onChange={setMontant}
-          occupe={occupe}
-          libelle="Valider ma mise"
-          onValider={() => {
-            setModifie(false);
-            void envoyer({ type: 'miser', montant });
-          }}
-        />
       ) : null}
       {cadeau ? (
         <div>
@@ -179,20 +227,20 @@ export function CourseJoueur({
         </div>
       ) : null}
       {aMoiDeLancer ? (
-        <button
-          type="button"
-          class="lancer-plein"
-          disabled={occupe || parti}
-          onPointerDown={(event) => {
+        <Selecteur
+          montant={montant}
+          maximum={plafond}
+          onChange={setMontant}
+          occupe={occupe || parti}
+          libelle={montant > 0 ? `Lancer le dé (mise : ${montant} GP)` : 'Lancer le dé'}
+          apercu={{ miseMax: course.miseMax, probasMiseMax: course.probasMiseMax }}
+          onValider={() => {
             if (parti || occupe) return;
-            event.preventDefault();
             setParti(true);
             vibrer(40);
-            void envoyer({ type: 'lancerDe' }).finally(() => setParti(false));
+            void envoyer({ type: 'lancerDe', mise: montant }).finally(() => setParti(false));
           }}
-        >
-          Lancer le dé
-        </button>
+        />
       ) : null}
     </div>
   );

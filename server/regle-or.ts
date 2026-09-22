@@ -3,7 +3,6 @@ import type { EtatJeu, Origine, Transaction } from '../shared/types';
 function miseEngagee(etat: EtatJeu, joueurId: string, montant: number): boolean {
   const course = etat.course;
   if (!course) return false;
-  if (course.mises[joueurId] === montant) return true;
   if (course.etape?.genre === 'duel' && course.etape.duel.mises[joueurId] === montant) return true;
   return false;
 }
