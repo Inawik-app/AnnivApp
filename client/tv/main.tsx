@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { EcranTv, JoueurPublic, VueTv } from '../../shared/types';
+import type { CourseVue, EcranTv, JoueurPublic, VueTv } from '../../shared/types';
 import { avatarsDisponibles } from '../commun/avatars';
 import { Avatar, Couronne, CompteurRouleaux, GainFlottant, Tuile, VoileConnexion } from '../commun/composants';
 import { connecter } from '../commun/connexion';
@@ -18,20 +18,10 @@ import {
   trierAccueil,
 } from '../commun/spectacle';
 import '../commun/base.css';
+import { animerPlateau, PlateauTv, type Spectacle } from './plateau';
 import './tv.css';
 
 type Gain = { id: string; montant: number; cle: number };
-
-function memesIds(gauche: JoueurPublic[], droite: JoueurPublic[]): boolean {
-  if (gauche.length !== droite.length) return false;
-  const ids = new Set(droite.map((joueur) => joueur.id));
-  return gauche.every((joueur) => ids.has(joueur.id));
-}
-
-function memesSoldes(gauche: JoueurPublic[], droite: JoueurPublic[]): boolean {
-  const soldes = new Map(droite.map((joueur) => [joueur.id, joueur.gpVisibles]));
-  return gauche.every((joueur) => soldes.get(joueur.id) === joueur.gpVisibles);
-}
 
 function collerPresence(affiches: JoueurPublic[], source: JoueurPublic[]): JoueurPublic[] {
   const parId = new Map(source.map((joueur) => [joueur.id, joueur]));
@@ -44,6 +34,11 @@ function collerPresence(affiches: JoueurPublic[], source: JoueurPublic[]): Joueu
 
 function ajouterSolde(liste: JoueurPublic[], id: string, montant: number): JoueurPublic[] {
   return liste.map((joueur) => (joueur.id === id ? { ...joueur, gpVisibles: joueur.gpVisibles + montant } : joueur));
+}
+
+function patchCourse(course: CourseVue | null, partiel: Partial<CourseVue>): CourseVue | null {
+  if (!course) return course;
+  return { ...course, ...partiel };
 }
 
 function pleinEcran(): void {
@@ -173,11 +168,38 @@ function EcranTv() {
   const [latence, setLatence] = useState<number | null>(null);
   const [fps, setFps] = useState<number | null>(null);
   const [sonOk, setSonOk] = useState(false);
+  const [courseAffichee, setCourseAffichee] = useState<CourseVue | null>(null);
+  const [positions, setPositions] = useState<Record<string, number>>({});
+  const [cagnotte, setCagnotte] = useState(0);
+  const [coches, setCoches] = useState<string[]>([]);
+  const [spectacle, setSpectacle] = useState<Spectacle | null>(null);
+  const courseRef = useRef<CourseVue | null>(null);
+  const versionRef = useRef(0);
+  const serieRef = useRef(0);
   const diagForce = new URLSearchParams(window.location.search).get('diag') === '1';
 
   const poserJoueurs = (liste: JoueurPublic[]) => {
     joueursRef.current = liste;
     setJoueurs(liste);
+  };
+  const poserCourse = (course: CourseVue | null) => {
+    courseRef.current = course;
+    setCourseAffichee(course);
+    if (!course) {
+      setPositions({});
+      setCagnotte(0);
+      setCoches([]);
+      setSpectacle(null);
+      return;
+    }
+    setPositions({ ...course.positions });
+    setCagnotte(course.cagnotte);
+    setCoches(course.phase === 'mises' ? course.mises.filter((mise) => mise.aMise).map((mise) => mise.joueurId) : []);
+    setSpectacle(null);
+  };
+  const memoriserCourse = (course: CourseVue | null) => {
+    courseRef.current = course;
+    setCourseAffichee(course);
   };
   const setEcranLocal = (suivant: EcranTv) => {
     ecranRef.current = suivant;
@@ -199,6 +221,8 @@ function EcranTv() {
       const liste = recue.partie.ecranTv === 'scores' ? actualiserPlaces(parArrivee) : parArrivee;
       poserJoueurs(liste);
       setEcranLocal(recue.partie.ecranTv);
+      poserCourse(recue.course);
+      versionRef.current = recue.version;
       setPhase('pose');
       setPoseAnime(false);
       setGain(null);
@@ -213,18 +237,26 @@ function EcranTv() {
     const frais = recue.evenements.filter((evenement) => evenement.id > dernierId.current).sort((a, b) => a.id - b.id);
     dernierId.current = Math.max(dernierId.current, maxId);
     if (frais.length === 0) {
-      if (!memesIds(joueursRef.current, recue.joueurs) || !memesSoldes(joueursRef.current, recue.joueurs)) {
+      if (recue.version !== versionRef.current) {
         snap();
         return;
       }
       poserJoueurs(collerPresence(joueursRef.current, recue.joueurs));
-      if (ecranRef.current !== recue.partie.ecranTv) {
-        file.current.ajouter(() => basculer(recue.partie.ecranTv));
-      }
       return;
     }
+    versionRef.current = recue.version;
+    if (!courseRef.current && recue.course) poserCourse(recue.course);
+    const serie = ++serieRef.current;
     frais.forEach((evenement, index) => {
-      file.current.ajouter(() => jouer(evenement, frais, index, recue));
+      file.current.ajouter(async () => {
+        await jouer(evenement, frais, index, recue);
+        if (index === frais.length - 1 && serie === serieRef.current) {
+          poserCourse(recue.course);
+          const liste = trierAccueil(recue.joueurs);
+          poserJoueurs(ecranRef.current === 'scores' ? actualiserPlaces(liste) : liste);
+          if (ecranRef.current !== recue.partie.ecranTv) setEcranLocal(recue.partie.ecranTv);
+        }
+      });
     });
   };
 
@@ -309,10 +341,48 @@ function EcranTv() {
     }
     if (evenement.type === 'partie.reinitialisee') {
       poserJoueurs([]);
+      poserCourse(null);
       setEcranLocal('accueil');
       setPhase('pose');
       setPoseAnime(false);
+      return;
     }
+    const pseudo = (idJoueur: string) => joueursRef.current.find((joueur) => joueur.id === idJoueur)?.pseudo ?? 'Un joueur';
+    if (evenement.type === 'tour.nouveau') {
+      const tour = typeof evenement.donnees.tour === 'number' ? evenement.donnees.tour : (courseRef.current?.tour ?? 0) + 1;
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'mises', tour, ordre: [], joueurCourantId: null, etape: null, miniJeu: null }));
+      setCoches([]);
+    } else if (evenement.type === 'mises.revelees') {
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'revelation' }));
+    } else if (evenement.type === 'minijeu.annonce') {
+      const idJoueur = typeof evenement.donnees.joueurId === 'string' ? evenement.donnees.joueurId : null;
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'choixMiniJeu', choisitId: idJoueur }));
+    } else if (evenement.type === 'minijeu.choisi') {
+      const nom = typeof evenement.donnees.nom === 'string' ? evenement.donnees.nom : null;
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'miniJeu', miniJeu: nom }));
+    } else if (evenement.type === 'deplacements.commences') {
+      memoriserCourse(patchCourse(courseRef.current, {
+        phase: 'deplacements',
+        etape: 'lancer',
+        joueurCourantId: recue.course?.joueurCourantId ?? null,
+      }));
+    } else if (evenement.type === 'tour.fini') {
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'finTour', etape: null, joueurCourantId: null }));
+    } else if (evenement.type === 'course.terminee') {
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'terminee', etape: null, classement: recue.course?.classement ?? null }));
+    } else if (evenement.type === 'duel.annonce' || evenement.type === 'duel.adversaire') {
+      memoriserCourse(patchCourse(courseRef.current, { etape: 'duel' }));
+    }
+    await animerPlateau(evenement, {
+      reduit: reduitRef.current,
+      pseudo,
+      setPositions,
+      setCagnotte,
+      setSpectacle,
+      ajusterSolde: (idJoueur, delta) => poserJoueurs(ajouterSolde(joueursRef.current, idJoueur, delta)),
+      setCoches,
+      ajouterCoche: (idJoueur) => setCoches((liste) => (liste.includes(idJoueur) ? liste : [...liste, idJoueur])),
+    });
   }
 
   useEffect(() => {
@@ -403,7 +473,17 @@ function EcranTv() {
         <p class="etat-lien">{connecte ? 'Connecté' : 'Hors ligne'}</p>
         {sonOk ? null : <p class="bandeau-son">Appuie sur OK pour activer le son</p>}
         <div class={`plan ${phase}${poseAnime ? '' : ' sans-transition'}`} style={sonOk ? undefined : { height: 'calc(100% - 96px)' }}>
-          {ecran === 'scores' ? (
+          {ecran === 'plateau' && courseAffichee ? (
+            <PlateauTv
+              course={courseAffichee}
+              joueurs={joueurs}
+              positions={positions}
+              cagnotte={cagnotte}
+              spectacle={spectacle}
+              reduit={reduit}
+              coches={coches}
+            />
+          ) : ecran === 'scores' ? (
             <section class="podium">
               {joueurs.length === 0 ? <p class="texte-tv">Aucun joueur pour l'instant</p> : null}
               {joueurs.map((joueur) => (

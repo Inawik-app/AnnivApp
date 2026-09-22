@@ -14,6 +14,16 @@ function contexte(): ContexteReduction {
     dev: true,
     nbJoueursMax: 4,
     estEnLigne: () => false,
+    alea: (max) => (max <= 1 ? 0 : max - 1),
+    plateau: {
+      longueur: 34,
+      repartition: { bonus: 13, chance: 9, cagnotte: 5, duel: 6 },
+      gainBonus: 5,
+      miseMax: 10,
+      choixMiniJeu: 'premier',
+      duel: { miseMax: 10, bonusVainqueur: 5, defis: ['Défi'] },
+    },
+    cartes: [{ id: 'bourse', titre: 'Bourse', texte: 'Tu gagnes.', effet: { type: 'gain', montant: 3 } }],
   };
 }
 

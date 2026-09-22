@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomInt, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
@@ -16,6 +16,7 @@ import type {
   EvenementsServeur,
   ReseauVue,
 } from '../shared/types';
+import { actionBot, delaiBot } from './bots';
 import { configValide } from './fusion';
 import { choisirIp, listerCartes } from './ip';
 import { creerStore } from './store';
@@ -73,13 +74,15 @@ function ecrireDiagnostic(fichier: string, diagnostic: DiagnosticTv): void {
 
 async function main(): Promise<void> {
   const config = configValide(JSON.parse(fs.readFileSync(path.join(RACINE, 'config', 'partie.json'), 'utf8')));
-  const dossierData = path.join(RACINE, 'data');
+  const portDemande = Number(process.env.PORT);
+  const port = Number.isInteger(portDemande) && portDemande > 0 && portDemande < 65536 ? portDemande : config.port;
+  const dossierData = process.env.GP_DONNEES ? path.resolve(process.env.GP_DONNEES) : path.join(RACINE, 'data');
   const fichierDiagnostic = path.join(dossierData, 'diagnostic-tv.json');
   const reseauChoisi = choisirIp(listerCartes(), config.ipForcee);
-  const urlDe = (ip: string, chemin: string) => `http://${ip}:${config.port}${chemin}`;
+  const urlDe = (ip: string, chemin: string) => `http://${ip}:${port}${chemin}`;
   const reseau: ReseauVue = {
     ip: reseauChoisi.retenue,
-    port: config.port,
+    port: port,
     autres: reseauChoisi.autres,
     urlTv: urlDe(reseauChoisi.retenue, '/tv'),
     urlJoueur: urlDe(reseauChoisi.retenue, '/joueur'),
@@ -96,6 +99,24 @@ async function main(): Promise<void> {
   let diagnostic = lireDiagnostic(fichierDiagnostic);
   let diffusionPrevue: NodeJS.Timeout | null = null;
   let volumeSon = 0.8;
+  let minuteurBots: NodeJS.Timeout | null = null;
+
+  const planifierBots = () => {
+    if (minuteurBots) clearTimeout(minuteurBots);
+    if (!DEV) return;
+    const etat = store.etat();
+    if (!actionBot(etat, () => 0)) return;
+    minuteurBots = setTimeout(() => {
+      minuteurBots = null;
+      const action = actionBot(store.etat(), (max) => randomInt(0, Math.max(1, max)));
+      if (!action) return;
+      const reponse = store.dispatch(action.action, action.origine);
+      if (!reponse.ok) return;
+      diffuser();
+      planifierBots();
+    }, delaiBot(etat));
+    minuteurBots.unref();
+  };
 
   const store = creerStore({
     dossierData,
@@ -268,7 +289,10 @@ async function main(): Promise<void> {
         }
       }
       ack(reponse);
-      if (reponse.ok) diffuser();
+      if (reponse.ok) {
+        diffuser();
+        planifierBots();
+      }
     });
 
     socket.on('reglerVolume', (message) => {
@@ -373,8 +397,9 @@ async function main(): Promise<void> {
   });
 
   await new Promise<void>((resoudre) => {
-    httpServer.listen(config.port, '0.0.0.0', () => resoudre());
+    httpServer.listen(port, '0.0.0.0', () => resoudre());
   });
+  planifierBots();
 
   const source = store.source.startsWith(RACINE) ? path.relative(RACINE, store.source) : store.source;
   console.log('');
@@ -382,10 +407,10 @@ async function main(): Promise<void> {
   console.log(`État chargé : ${source}`);
   console.log('');
   console.log('Sur ce PC');
-  console.log(`  http://localhost:${config.port}/`);
-  console.log(`  http://localhost:${config.port}/tv`);
-  console.log(`  http://localhost:${config.port}/joueur`);
-  console.log(`  http://localhost:${config.port}/hote`);
+  console.log(`  http://localhost:${port}/`);
+  console.log(`  http://localhost:${port}/tv`);
+  console.log(`  http://localhost:${port}/joueur`);
+  console.log(`  http://localhost:${port}/hote`);
   console.log('');
   console.log(`Sur le réseau (${reseau.ip})`);
   console.log(`  TV          ${reseau.urlTv}`);
@@ -397,7 +422,7 @@ async function main(): Promise<void> {
   console.log('Pare-feu : à la première alerte, autorise Node.js sur les réseaux privés.');
   console.log('Ou en PowerShell administrateur :');
   console.log(
-    `New-NetFirewallRule -DisplayName "GP Party" -Direction Inbound -Protocol TCP -LocalPort ${config.port} -Action Allow -Profile Private`,
+    `New-NetFirewallRule -DisplayName "GP Party" -Direction Inbound -Protocol TCP -LocalPort ${port} -Action Allow -Profile Private`,
   );
   console.log('');
 }

@@ -1,0 +1,75 @@
+.selecteur-mise {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.montant-mise {
+  margin: 0 8px;
+  min-width: 140px;
+  text-align: center;
+}
+
+.raccourcis {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.raccourcis > * {
+  margin: 0 8px 8px 0;
+}
+
+.lancer-plein {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 6;
+  border: none;
+  background: var(--or);
+  color: var(--encre);
+  font-family: "Baloo 2", sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.lancer-plein:active {
+  background: #e0a800;
+}
+
+.grille-choix {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.grille-choix > * {
+  margin: 0 8px 8px 0;
+}
+
+.apercu-plateau {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.pastille {
+  width: 22px;
+  height: 22px;
+  margin: 0 4px 4px 0;
+  border: 2px solid var(--encre);
+  border-radius: 4px;
+}
+
+.pastille-depart,
+.pastille-arrivee { background: #fff4dc; }
+.pastille-bonus { background: #ffc21a; }
+.pastille-chance { background: #2d9cff; }
+.pastille-cagnotte { background: #1fd1a0; }
+.pastille-duel { background: #ff5b4a; }
+
+.bouton-etape {
+  margin: 12px 0;
+}

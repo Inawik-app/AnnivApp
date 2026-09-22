@@ -36,6 +36,46 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return 'Réinitialisation de la partie';
     case 'ajouterJoueursFictifs':
       return 'Joueurs fictifs';
+    case 'demarrerCourse':
+      return 'Démarrage de la course';
+    case 'regenererPlateau':
+      return 'Nouveau plateau';
+    case 'nouveauTour':
+      return 'Nouveau tour';
+    case 'miser':
+      return 'Mise';
+    case 'cloreMises':
+      return 'Clôture des mises';
+    case 'revelerMises':
+      return 'Révélation des mises';
+    case 'passerAuChoix':
+      return 'Choix du mini-jeu';
+    case 'choisirMiniJeu':
+      return 'Mini-jeu';
+    case 'passerAuxDeplacements':
+      return 'Déplacements';
+    case 'lancerDe':
+      return 'Lancer de dé';
+    case 'choisirBeneficiaire':
+      return 'Cadeau';
+    case 'choisirAdversaire':
+      return 'Adversaire du duel';
+    case 'miserDuel':
+      return 'Mise de duel';
+    case 'cloreMisesDuel':
+      return 'Clôture du duel';
+    case 'autreDefi':
+      return 'Nouveau défi';
+    case 'resultatDuel':
+      return 'Résultat du duel';
+    case 'definirPosition':
+      return `Position de ${pseudoDe(etat, action.joueurId)}`;
+    case 'passerJoueur':
+      return 'Tour passé';
+    case 'terminerCourse':
+      return 'Fin de la course';
+    case 'basculerBots':
+      return 'Bots';
     default:
       return 'Action';
   }

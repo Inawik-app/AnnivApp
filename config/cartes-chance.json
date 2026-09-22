@@ -1,0 +1,16 @@
+[
+  { "id": "bourse", "titre": "Bourse trouvée", "texte": "Tu ramasses une bourse oubliée sur le tapis.", "effet": { "type": "gain", "montant": 5 } },
+  { "id": "fan-club", "titre": "Fan club", "texte": "La table t'applaudit.", "effet": { "type": "gain", "montant": 8 } },
+  { "id": "petite-piece", "titre": "Petite pièce", "texte": "Une pièce brille entre deux cases.", "effet": { "type": "gain", "montant": 3 } },
+  { "id": "jackpot", "titre": "Jackpot de poche", "texte": "Ton porte-monnaie déborde.", "effet": { "type": "gain", "montant": 10 } },
+  { "id": "pourboire", "titre": "Pourboire", "texte": "Quelqu'un te laisse un pourboire.", "effet": { "type": "gain", "montant": 6 } },
+  { "id": "tournee", "titre": "Tournée générale", "texte": "Tout le monde gagne un peu.", "effet": { "type": "gainTous", "montant": 3 } },
+  { "id": "cadeau", "titre": "Cadeau", "texte": "Tu offres un cadeau. Toi, tu ne perds rien.", "effet": { "type": "cadeau", "montant": 5 } },
+  { "id": "generosite", "titre": "Générosité", "texte": "Tu choisis qui reçoit ces GP. Toi, tu ne perds rien.", "effet": { "type": "cadeau", "montant": 8 } },
+  { "id": "de-dore", "titre": "Dé doré", "texte": "Lance un dé et gagne le double.", "effet": { "type": "gainDe" } },
+  { "id": "musique", "titre": "Prochaine musique", "texte": "Tu choisis la prochaine musique.", "effet": { "type": "neutre" } },
+  { "id": "compliment", "titre": "Compliment", "texte": "Fais un compliment à la personne à ta gauche.", "effet": { "type": "neutre" } },
+  { "id": "trinquer", "titre": "On trinque", "texte": "Tout le monde trinque.", "effet": { "type": "neutre" } },
+  { "id": "animal", "titre": "Animal", "texte": "Imite un animal jusqu'au prochain tour.", "effet": { "type": "neutre" } },
+  { "id": "gage", "titre": "Prochain gage", "texte": "Tu choisis le prochain gage.", "effet": { "type": "neutre" } }
+]

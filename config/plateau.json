@@ -1,0 +1,18 @@
+{
+  "longueur": 34,
+  "repartition": { "bonus": 13, "chance": 9, "cagnotte": 5, "duel": 6 },
+  "gainBonus": 5,
+  "miseMax": 10,
+  "choixMiniJeu": "premier",
+  "duel": {
+    "miseMax": 10,
+    "bonusVainqueur": 5,
+    "defis": [
+      "Pierre-feuille-ciseaux en 2 manches gagnantes",
+      "Un point de ping-pong",
+      "Bataille de pouces",
+      "Le premier qui rit a perdu",
+      "Lancer de bouchon le plus près du mur"
+    ]
+  }
+}

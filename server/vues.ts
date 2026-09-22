@@ -1,10 +1,14 @@
 import { solde } from '../shared/soldes';
 import type {
   AppareilVue,
+  Course,
+  CourseVue,
   DiagnosticTv,
+  DuelVue,
   EtatJeu,
   Evenement,
   JoueurPublic,
+  MiseVue,
   ReseauVue,
   VueHote,
   VueJoueur,
@@ -29,6 +33,62 @@ function visibles(evenements: Evenement[], cible: 'tv' | 'joueur' | 'hote', joue
     );
   });
   return filtres.slice(-limite);
+}
+
+function miseVue(joueurId: string, montant: number | null, voirMontant: boolean): MiseVue {
+  if (voirMontant && montant !== null) return { joueurId, aMise: true, montant };
+  return { joueurId, aMise: montant !== null };
+}
+
+export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): CourseVue | null {
+  if (!course) return null;
+  const misesPubliques = course.phase !== 'preparation' && course.phase !== 'mises';
+  const mises = Object.entries(course.mises).map(([id, montant]) =>
+    miseVue(id, montant, cible === 'hote' || (misesPubliques && montant !== null) || (id === joueurId && montant !== null)),
+  );
+  let duel: DuelVue | null = null;
+  let etape: CourseVue['etape'] = null;
+  if (course.etape?.genre === 'lancer') etape = 'lancer';
+  if (course.etape?.genre === 'cadeau') etape = 'cadeau';
+  if (course.etape?.genre === 'duel') {
+    etape = 'duel';
+    const enCours = course.etape.duel;
+    duel = {
+      joueurId: enCours.joueurId,
+      etape: enCours.etape,
+      adversaireId: enCours.adversaireId,
+      defi: enCours.defi,
+      mises: Object.entries(enCours.mises).map(([id, montant]) =>
+        miseVue(id, montant, enCours.revelees || cible === 'hote' || id === joueurId),
+      ),
+    };
+  }
+  const courant = course.phase === 'deplacements' ? (course.ordre[course.indexCourant] ?? null) : null;
+  return {
+    active: course.active,
+    phase: course.phase,
+    disposition: course.disposition,
+    longueur: course.regles.longueur,
+    positions: { ...course.positions },
+    arrivees: [...course.arrivees],
+    cagnotte: course.cagnotte,
+    tour: course.tour,
+    mises,
+    ordre: [...course.ordre],
+    indexCourant: course.indexCourant,
+    joueurCourantId: courant,
+    choisitId: course.choisitId,
+    miniJeu: course.miniJeu,
+    etape,
+    carte: course.carteCourante?.carte ?? null,
+    duel,
+    dernierDe: course.dernierDe,
+    classement: course.classement ? [...course.classement] : null,
+    gainBonus: course.regles.gainBonus,
+    miseMax: course.regles.miseMax,
+    miseMaxDuel: course.regles.duel.miseMax,
+    bonusDuel: course.regles.duel.bonusVainqueur,
+  };
 }
 
 function classer(etat: EtatJeu, presence: Presence): JoueurPublic[] {
@@ -81,6 +141,7 @@ export function vueTv(
     volume,
     joueurs: classer(etat, presence),
     evenements: visibles(etat.evenements, 'tv', null, 30),
+    course: projeterCourse(etat.course, 'tv', null),
   };
 }
 
@@ -114,6 +175,7 @@ export function vueJoueur(
         }
       : null,
     evenements: visibles(etat.evenements, 'joueur', joueurId, 30),
+    course: projeterCourse(etat.course, 'joueur', joueurId),
   };
 }
 
@@ -171,5 +233,7 @@ export function vueHote(
     reseau,
     diagnostic,
     volume,
+    course: projeterCourse(etat.course, 'hote', null),
+    bots: etat.bots === true,
   };
 }

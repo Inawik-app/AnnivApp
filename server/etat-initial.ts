@@ -16,5 +16,7 @@ export function etatInitial(titre: string): EtatJeu {
     transactions: [],
     evenements: [],
     demandesReprise: [],
+    course: null,
+    bots: false,
   };
 }

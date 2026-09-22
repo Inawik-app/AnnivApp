@@ -47,9 +47,10 @@ export function actualiserPlaces(joueurs: JoueurPublic[]): JoueurPublic[] {
   return joueurs.map((joueur) => ({ ...joueur, place: places.get(joueur.id) ?? joueur.place }));
 }
 
-export function ecranDepuis(evenement: EvenementVue): 'accueil' | 'scores' | null {
+export function ecranDepuis(evenement: EvenementVue): 'accueil' | 'scores' | 'plateau' | null {
   const brut = evenement.donnees.ecran;
-  if (brut === 'accueil' || brut === 'scores') return brut;
+  if (brut === 'accueil' || brut === 'scores' || brut === 'plateau') return brut;
+  if (evenement.libelle.includes('plateau')) return 'plateau';
   if (evenement.libelle.includes('scores')) return 'scores';
   if (evenement.libelle.includes('accueil')) return 'accueil';
   return null;

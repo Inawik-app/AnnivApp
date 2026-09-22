@@ -9,6 +9,7 @@ import { attendre, creerFile } from '../commun/file-animations';
 import '../commun/polices';
 import { ecrireJeton, lireJeton, oublierJeton } from '../commun/stockage';
 import { initiale, joueurIdDe, montantDe } from '../commun/spectacle';
+import { CourseJoueur } from './course';
 import '../commun/base.css';
 
 function vibrer(ms: number): void {
@@ -172,7 +173,21 @@ function PageJoueur() {
           <Avatar avatar={moi.avatar} couleur={moi.couleur} pseudo={moi.pseudo} taille={160} />
           <p class="pseudo-joueur">{moi.pseudo}</p>
           <CompteurRouleaux valeur={solde} duree={reduit ? 150 : 700} taille={72} />
-          <p style={{ marginTop: '16px' }}>En attente de la suite.</p>
+          <CourseJoueur
+            course={vue?.course ?? null}
+            moi={moi}
+            joueurs={vue?.joueurs ?? []}
+            solde={solde}
+            occupe={envoi}
+            envoyer={async (action) => {
+              if (!session.current) return;
+              setEnvoi(true);
+              setErreur(null);
+              const reponse = await session.current.envoyer(action);
+              setEnvoi(false);
+              if (!reponse.ok) setErreur(reponse.erreur);
+            }}
+          />
           {gain ? <GainFlottant key={gain.cle} montant={gain.montant} /> : null}
         </Tuile>
       ) : (

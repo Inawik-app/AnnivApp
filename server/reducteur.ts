@@ -2,6 +2,7 @@ import { produce } from 'immer';
 import { COULEURS, JOUEURS_FICTIFS, LIMITE_EVENEMENTS } from '../shared/constantes';
 import { clePseudo } from '../shared/soldes';
 import type { Action, EtatJeu, Evenement, Joueur, Origine, Visibilite } from '../shared/types';
+import { appliquerCourse, estActionCourse, oublierJoueurCourse, refuserCourse, type ContexteCourse } from './course';
 import { verifierRegleOr } from './regle-or';
 import { trouverJoueur } from './libelles';
 import {
@@ -21,11 +22,8 @@ export type Effet =
   | { type: 'oublierJeton'; joueurId: string }
   | { type: 'oublierTousLesJetons' };
 
-export type ContexteReduction = {
-  maintenant: number;
-  id: () => string;
+export type ContexteReduction = ContexteCourse & {
   prochainIdEvenement: number;
-  dev: boolean;
   nbJoueursMax: number;
   estEnLigne: (joueurId: string) => boolean;
 };
@@ -51,6 +49,7 @@ const ACTIONS_HOTE = new Set<Action['type']>([
 
 function refuser(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteReduction): string | null {
   if (action.type === 'annuler') return 'Action inconnue';
+  if (estActionCourse(action)) return refuserCourse(etat, action, origine, ctx);
   if (ACTIONS_HOTE.has(action.type)) {
     if (origine.role !== 'hote') return "Seul l'hôte peut faire cette action";
   }
@@ -113,7 +112,7 @@ function refuser(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteR
       }
       return null;
     case 'choisirEcranTv':
-      if (action.ecran !== 'accueil' && action.ecran !== 'scores') return 'Écran inconnu';
+      if (action.ecran !== 'accueil' && action.ecran !== 'scores' && action.ecran !== 'plateau') return 'Écran inconnu';
       return null;
     case 'ajouterJoueursFictifs': {
       if (!ctx.dev) return 'Action indisponible';
@@ -179,6 +178,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
           rejointA: ctx.maintenant,
         };
         draft.joueurs.push(joueur);
+        if (draft.course?.positions) draft.course.positions[joueur.id] = 0;
         effets.push({ type: 'creerJeton', joueurId: joueur.id });
         ajouterEvenement(draft, 'joueur.rejoint', 'public', `${joueur.pseudo} rejoint la partie`, {
           joueurId: joueur.id,
@@ -268,6 +268,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
         draft.joueurs = draft.joueurs.filter((candidat) => candidat.id !== joueur.id);
         draft.transactions = draft.transactions.filter((transaction) => transaction.joueurId !== joueur.id);
         draft.demandesReprise = draft.demandesReprise.filter((demande) => demande.joueurId !== joueur.id);
+        oublierJoueurCourse(draft, joueur.id);
         effets.push({ type: 'oublierJeton', joueurId: joueur.id });
         ajouterEvenement(draft, 'joueur.retire', 'public', `${joueur.pseudo} quitte la partie`, {
           joueurId: joueur.id,
@@ -311,13 +312,13 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
       }
       case 'choisirEcranTv': {
         draft.partie.ecranTv = action.ecran;
-        ajouterEvenement(
-          draft,
-          'ecran',
-          'public',
-          action.ecran === 'scores' ? 'La télé affiche les scores' : 'La télé affiche l\'accueil',
-          { ecran: action.ecran },
-        );
+        const libelle =
+          action.ecran === 'scores'
+            ? 'La télé affiche les scores'
+            : action.ecran === 'plateau'
+              ? 'La télé affiche le plateau'
+              : "La télé affiche l'accueil";
+        ajouterEvenement(draft, 'ecran', 'public', libelle, { ecran: action.ecran });
         break;
       }
       case 'basculerAnimationsReduites': {
@@ -353,6 +354,8 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
           animationsReduites: false,
           diagnosticTvAffiche: false,
         };
+        draft.course = null;
+        draft.bots = false;
         effets.push({ type: 'oublierTousLesJetons' });
         ajouterEvenement(draft, 'partie.reinitialisee', 'public', 'La partie est réinitialisée');
         break;
@@ -369,6 +372,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
             rejointA: ctx.maintenant,
           };
           draft.joueurs.push(joueur);
+          if (draft.course) draft.course.positions[joueur.id] = 0;
           ajouterEvenement(draft, 'joueur.rejoint', 'public', `${joueur.pseudo} rejoint la partie`, {
             joueurId: joueur.id,
             fictif: true,
@@ -377,6 +381,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
         break;
       }
       default:
+        if (estActionCourse(action)) appliquerCourse(draft, action, origine, ctx, ajouterEvenement);
         break;
     }
   });

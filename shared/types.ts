@@ -30,7 +30,113 @@ export type Evenement = {
   horodatage: number;
 };
 
-export type EcranTv = 'accueil' | 'scores';
+export type EcranTv = 'accueil' | 'scores' | 'plateau';
+
+export type TypeCase = 'depart' | 'bonus' | 'chance' | 'cagnotte' | 'duel' | 'arrivee';
+
+export type PhaseCourse =
+  | 'preparation'
+  | 'mises'
+  | 'revelation'
+  | 'choixMiniJeu'
+  | 'miniJeu'
+  | 'deplacements'
+  | 'finTour'
+  | 'terminee';
+
+export type EffetCarte =
+  | { type: 'gain'; montant: number }
+  | { type: 'gainTous'; montant: number }
+  | { type: 'cadeau'; montant: number }
+  | { type: 'gainDe' }
+  | { type: 'neutre' };
+
+export type CarteChance = {
+  id: string;
+  titre: string;
+  texte: string;
+  effet: EffetCarte;
+};
+
+export type UsageDe = 'deplacement' | 'chance';
+
+export type LancerDe = {
+  tour: number;
+  joueurId: string;
+  valeur: number;
+  usage: UsageDe;
+};
+
+export type ReglesCourse = {
+  longueur: number;
+  gainBonus: number;
+  miseMax: number;
+  choixMiniJeu: 'premier' | 'dernier';
+  duel: { miseMax: number; bonusVainqueur: number; defis: string[] };
+};
+
+export type DuelEnCours = {
+  joueurId: string;
+  etape: 'adversaire' | 'mises' | 'resultat';
+  adversaireId: string | null;
+  defi: string | null;
+  mises: Record<string, number | null>;
+  revelees: boolean;
+};
+
+export type EtapeDeplacement =
+  | { genre: 'lancer' }
+  | { genre: 'cadeau'; carteId: string }
+  | { genre: 'duel'; duel: DuelEnCours };
+
+export type HistoriqueCourse = {
+  lancers: LancerDe[];
+  mises: Array<{ tour: number; joueurId: string; montant: number; duel: boolean }>;
+  effets: Array<{ tour: number; joueurId: string; caseIndex: number; type: string; detail: Record<string, unknown> }>;
+  duels: Array<{
+    tour: number;
+    joueurId: string;
+    adversaireId: string;
+    defi: string;
+    miseJoueur: number;
+    miseAdversaire: number;
+    resultat: 'joueur' | 'adversaire' | 'egalite';
+  }>;
+};
+
+export type Course = {
+  active: boolean;
+  disposition: TypeCase[];
+  positions: Record<string, number>;
+  arrivees: string[];
+  cagnotte: number;
+  pioche: string[];
+  defausse: string[];
+  tour: number;
+  phase: PhaseCourse;
+  misesCloturees: boolean;
+  mises: Record<string, number | null>;
+  ordre: string[];
+  indexCourant: number;
+  etape: EtapeDeplacement | null;
+  miniJeu: string | null;
+  choisitId: string | null;
+  carteCourante: { joueurId: string; carte: CarteChance } | null;
+  dernierDe: { joueurId: string; valeur: number; usage: UsageDe } | null;
+  classement: string[] | null;
+  regles: ReglesCourse;
+  historique: HistoriqueCourse;
+};
+
+export type ConfigPlateau = {
+  longueur: number;
+  repartition: { bonus: number; chance: number; cagnotte: number; duel: number };
+  gainBonus: number;
+  miseMax: number;
+  choixMiniJeu: 'premier' | 'dernier';
+  duel: { miseMax: number; bonusVainqueur: number; defis: string[] };
+  disposition?: TypeCase[];
+};
 
 export type Partie = {
   titre: string;
@@ -54,6 +160,8 @@ export type EtatJeu = {
   transactions: Transaction[];
   evenements: Evenement[];
   demandesReprise: DemandeReprise[];
+  course: Course | null;
+  bots: boolean;
 };
 
 export type Action =
@@ -78,7 +186,27 @@ export type Action =
   | { type: 'basculerDiagnosticTv' }
   | { type: 'annuler' }
   | { type: 'reinitialiserPartie' }
-  | { type: 'ajouterJoueursFictifs' };
+  | { type: 'ajouterJoueursFictifs' }
+  | { type: 'demarrerCourse' }
+  | { type: 'regenererPlateau' }
+  | { type: 'nouveauTour' }
+  | { type: 'miser'; montant: number }
+  | { type: 'cloreMises' }
+  | { type: 'revelerMises' }
+  | { type: 'passerAuChoix' }
+  | { type: 'choisirMiniJeu'; nom: string }
+  | { type: 'passerAuxDeplacements' }
+  | { type: 'lancerDe' }
+  | { type: 'choisirBeneficiaire'; joueurId: string }
+  | { type: 'choisirAdversaire'; joueurId: string }
+  | { type: 'miserDuel'; montant: number }
+  | { type: 'cloreMisesDuel' }
+  | { type: 'autreDefi' }
+  | { type: 'resultatDuel'; resultat: 'joueur' | 'adversaire' | 'egalite' }
+  | { type: 'definirPosition'; joueurId: string; position: number }
+  | { type: 'passerJoueur' }
+  | { type: 'terminerCourse' }
+  | { type: 'basculerBots' };
 
 export type Origine =
   | { role: 'hote' }
@@ -112,6 +240,46 @@ export type JoueurPublic = {
 
 export type EvenementVue = Evenement;
 
+export type MiseVue = {
+  joueurId: string;
+  aMise: boolean;
+  montant?: number;
+};
+
+export type DuelVue = {
+  joueurId: string;
+  etape: 'adversaire' | 'mises' | 'resultat';
+  adversaireId: string | null;
+  defi: string | null;
+  mises: MiseVue[];
+};
+
+export type CourseVue = {
+  active: boolean;
+  phase: PhaseCourse;
+  disposition: TypeCase[];
+  longueur: number;
+  positions: Record<string, number>;
+  arrivees: string[];
+  cagnotte: number;
+  tour: number;
+  mises: MiseVue[];
+  ordre: string[];
+  indexCourant: number;
+  joueurCourantId: string | null;
+  choisitId: string | null;
+  miniJeu: string | null;
+  etape: 'lancer' | 'cadeau' | 'duel' | null;
+  carte: CarteChance | null;
+  duel: DuelVue | null;
+  dernierDe: { joueurId: string; valeur: number; usage: UsageDe } | null;
+  classement: string[] | null;
+  gainBonus: number;
+  miseMax: number;
+  miseMaxDuel: number;
+  bonusDuel: number;
+};
+
 export type VueTv = {
   role: 'tv';
   version: number;
@@ -128,6 +296,7 @@ export type VueTv = {
   volume: number;
   joueurs: JoueurPublic[];
   evenements: EvenementVue[];
+  course: CourseVue | null;
 };
 
 export type VueJoueur = {
@@ -149,6 +318,7 @@ export type VueJoueur = {
     gpVisibles: number;
   } | null;
   evenements: EvenementVue[];
+  course: CourseVue | null;
 };
 
 export type AppareilVue = {
@@ -217,6 +387,8 @@ export type VueHote = {
   reseau: ReseauVue;
   diagnostic: DiagnosticTv | null;
   volume: number;
+  course: CourseVue | null;
+  bots: boolean;
 };
 
 export type VueClient = VueTv | VueJoueur | VueHote;

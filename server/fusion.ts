@@ -1,5 +1,5 @@
 import { SCHEMA } from '../shared/constantes';
-import type { ConfigPartie, EtatJeu } from '../shared/types';
+import type { ConfigPartie, Course, EtatJeu } from '../shared/types';
 import { etatInitial } from './etat-initial';
 
 export type DonneesPersistees = {
@@ -10,6 +10,17 @@ export type DonneesPersistees = {
 
 function estObjet(valeur: unknown): valeur is Record<string, unknown> {
   return !!valeur && typeof valeur === 'object' && !Array.isArray(valeur);
+}
+
+function normaliserCourse(valeur: unknown): Course | null {
+  if (!estObjet(valeur)) return null;
+  if (!Array.isArray(valeur.disposition) || typeof valeur.phase !== 'string' || !estObjet(valeur.regles)) return null;
+  if (!estObjet(valeur.positions) || !Array.isArray(valeur.pioche)) return null;
+  const course = valeur as Course;
+  if (!Array.isArray(course.defausse)) course.defausse = [];
+  if (!course.historique) course.historique = { lancers: [], mises: [], effets: [], duels: [] };
+  if (!Array.isArray(course.arrivees)) course.arrivees = [];
+  return course;
 }
 
 export function fusionnerEtat(titre: string, brut: Record<string, unknown>): EtatJeu {
@@ -28,7 +39,8 @@ export function fusionnerEtat(titre: string, brut: Record<string, unknown>): Eta
       ...partieBrute,
       titre: typeof partieBrute.titre === 'string' ? partieBrute.titre : defaut.partie.titre,
       inscriptionsVerrouillees: partieBrute.inscriptionsVerrouillees === true,
-      ecranTv: partieBrute.ecranTv === 'scores' ? 'scores' : 'accueil',
+      ecranTv:
+        partieBrute.ecranTv === 'scores' || partieBrute.ecranTv === 'plateau' ? partieBrute.ecranTv : 'accueil',
       animationsReduites: partieBrute.animationsReduites === true,
       diagnosticTvAffiche: partieBrute.diagnosticTvAffiche === true,
     },
@@ -36,6 +48,8 @@ export function fusionnerEtat(titre: string, brut: Record<string, unknown>): Eta
     transactions: (Array.isArray(brut.transactions) ? brut.transactions : []) as EtatJeu['transactions'],
     evenements: (Array.isArray(brut.evenements) ? brut.evenements : []) as EtatJeu['evenements'],
     demandesReprise: (Array.isArray(brut.demandesReprise) ? brut.demandesReprise : []) as EtatJeu['demandesReprise'],
+    course: normaliserCourse(brut.course),
+    bots: brut.bots === true,
   };
   for (const cle of Object.keys(brut)) {
     if (!(cle in etat)) {

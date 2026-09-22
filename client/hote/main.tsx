@@ -5,6 +5,7 @@ import { Avatar, Bouton, CompteurRouleaux, Toast, Tuile, VoileConnexion } from '
 import { connecter, type Session } from '../commun/connexion';
 import '../commun/polices';
 import { cleCodeHote } from '../commun/stockage';
+import { PanneauCourse } from './course';
 import '../commun/base.css';
 
 function ligneDiagnostic(diagnostic: DiagnosticTv): string[] {
@@ -58,8 +59,14 @@ function messageAction(action: Action, vue: VueHote): string {
     return vue.partie.inscriptionsVerrouillees ? 'Inscriptions ouvertes' : 'Inscriptions fermées';
   }
   if (action.type === 'choisirEcranTv') {
-    return action.ecran === 'scores' ? 'La télé affiche les scores' : "La télé affiche l'accueil";
+    if (action.ecran === 'scores') return 'La télé affiche les scores';
+    if (action.ecran === 'plateau') return 'La télé affiche le plateau';
+    return "La télé affiche l'accueil";
   }
+  if (action.type === 'demarrerCourse') return 'La course commence';
+  if (action.type === 'regenererPlateau') return 'Plateau mélangé à nouveau';
+  if (action.type === 'basculerBots') return vue.bots ? 'Bots arrêtés' : 'Bots activés';
+  if (action.type === 'terminerCourse') return 'Course terminée';
   if (action.type === 'basculerAnimationsReduites') {
     return vue.partie.animationsReduites ? 'Animations rétablies' : 'Animations réduites';
   }
@@ -186,6 +193,7 @@ function PageHote() {
       <h1>{vue.partie.titre} — Hôte</h1>
       <p>{connecte ? 'Connecté' : 'Hors ligne'}</p>
       {erreur ? <p class="erreur">{erreur}</p> : null}
+      <PanneauCourse vue={vue} envoi={envoi} agir={(action) => void agir(action)} />
       <Tuile taille="petite">
         <p>IP retenue : {vue.reseau.ip}</p>
         <p>Autres : {vue.reseau.autres.length > 0 ? vue.reseau.autres.join(', ') : 'aucune'}</p>

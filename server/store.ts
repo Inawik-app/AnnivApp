@@ -1,6 +1,10 @@
+import { randomInt } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { nanoid } from 'nanoid';
 import { INTERVALLE_SAUVEGARDE_MS, LIMITE_ANNULATIONS } from '../shared/constantes';
 import type { Action, EtatJeu, Origine, ReponseAction } from '../shared/types';
+import { lireCartesChance, lireConfigPlateau } from './course-config';
 import { libelleAction } from './libelles';
 import { creerPersistance, type Persistance } from './persistance';
 import { reduire, type Effet } from './reducteur';
@@ -28,6 +32,7 @@ export type OptionsStore = {
   notifier?: (notification: Notification) => void;
   sauvegardesAuto?: boolean;
   intervalleSauvegardeMs?: number;
+  alea?: (max: number) => number;
 };
 
 export type Store = {
@@ -49,6 +54,10 @@ export function creerStore(options: OptionsStore): Store {
   const nouvelId = options.nouvelId ?? (() => nanoid());
   const socketVivant = options.socketVivant ?? (() => true);
   const estEnLigne = options.estEnLigne ?? (() => false);
+  const racine = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const plateau = lireConfigPlateau(racine);
+  const cartes = lireCartesChance(racine);
+  const alea = options.alea ?? ((max: number) => randomInt(0, Math.max(1, max)));
   const charge = creerPersistance(options.dossierData, options.titre, {
     sauvegardesAuto: options.sauvegardesAuto ?? true,
     intervalleMs: options.intervalleSauvegardeMs ?? INTERVALLE_SAUVEGARDE_MS,
@@ -179,6 +188,9 @@ export function creerStore(options: OptionsStore): Store {
         dev: options.dev,
         nbJoueursMax: options.nbJoueursMax,
         estEnLigne,
+        alea,
+        plateau,
+        cartes,
       });
       if (!resultat.ok) return resultat;
 
