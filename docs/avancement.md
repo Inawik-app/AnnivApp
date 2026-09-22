@@ -2,7 +2,7 @@
 
 Dernière mise à jour : 22 septembre 2026.
 
-Étapes 1A (fondations), 1B (identité visuelle) et 2 (plateau) en place. La grille des mini-jeux et le Jeopardy ne sont pas commencés.
+Étapes 1A (fondations), 1B (identité visuelle), 2 (plateau) et 2 bis (tests automatisés, enchaînement des animations) en place. La grille des mini-jeux et le Jeopardy ne sont pas commencés.
 
 ## Fait
 
@@ -24,6 +24,9 @@ Dernière mise à jour : 22 septembre 2026.
 - Sons optionnels dans `client/public/assets/sons/`. Noms utilisés : `rejoindre`, `gain`, `transition`, `de`, `revelation`, `victoire`. Encore réservés : `buzzer`, `tictac`. Le lecteur prend le MP3, sinon l'OGG du même nom, et ignore un fichier absent. Avatars PNG optionnels dans `client/public/assets/avatars/` (le nom du fichier, sans extension, est l'identifiant). Sans PNG, pastilles avec initiale.
 - Plateau jouable : mises secrètes, révélation, ordre de passage, écran d'attente du mini-jeu, dés et effets de cases (bonus, cagnotte, chance, duel). Les GP du mini-jeu passent encore par la saisie manuelle de l'hôte.
 - Tests Vitest : réducteur, règle d'or, vues, persistance, détection d'IP, et la course (ordre, mises, cagnotte, cartes, duel, arrivée, secrets, simulation de 12 tours).
+- `demarrerServeur({ port, dossierData, config })` démarre un serveur réutilisable par les tests, en moins d'une seconde. Les leviers `desForces` et `disposition` n'existent qu'avec `config`, donc jamais en production (`NODE_ENV=production` refuse ce mode). En mode test, le hasard hors dé est figé : la première carte chance piochée est Cadeau.
+- La télé affiche un état distinct de l'état reçu. La file d'animations fait avancer les pions, les compteurs de GP, la cagnotte, l'ordre de passage et la phase, événement par événement. Pour un lancer : le dé roule puis s'arrête, le pion saute case par case, la carte d'effet apparaît, puis les compteurs défilent. File vide : l'état affiché rejoint l'état reçu. Un écart (annulation, redémarrage, reconnexion) vide la file et cale l'affichage sans animation. Au-delà de 8 s de retard, la suite est jouée en vitesse ×2 ; au-delà de 20 s, la télé saute à l'état reçu.
+- `?vitesse=N` (minimum 0,25) accélère toutes les animations de la télé. `?debug=1` enregistre `window.__chronologieAnimations` (`evenement`, `etape`, `debut`, `fin`) et expose l'étape courante, l'état affiché, l'état reçu et le fait que la file est vide.
 
 ## Configuration du plateau
 
@@ -36,7 +39,7 @@ Dernière mise à jour : 22 septembre 2026.
 - `choixMiniJeu` : `"premier"` (le plus gros miseur choisit). L'autre valeur acceptée est `"dernier"`.
 - `duel.miseMax` : 10 GP. `duel.bonusVainqueur` : 5 GP, ajoutés à la mise récupérée et à la mise adverse.
 - `duel.defis` : Pierre-feuille-ciseaux en 2 manches gagnantes ; Un point de ping-pong ; Bataille de pouces ; Le premier qui rit a perdu ; Lancer de bouchon le plus près du mur. L'hôte peut en tirer un autre avant la révélation des mises.
-- `disposition` : absente. Si cette liste est ajoutée, elle remplace la génération. Elle doit respecter les mêmes contraintes (pas deux cagnottes ni deux duels d'affilée, ni l'un ni l'autre sur les cases 1 à 3).
+- `disposition` : absente. Si cette liste est ajoutée, elle remplace la génération. Le fichier vérifie la longueur, le départ et l'arrivée. Les contraintes « pas de cagnotte ni de duel sur les cases 1 à 3 » et « pas deux cagnottes ou deux duels d'affilée » ne s'appliquent qu'à la génération automatique.
 
 `config/cartes-chance.json` : 14 cartes. Neuf rapportent des GP (3, 5, 6, 8 ou 10), cinq sont neutres. Effets : `gain`, `gainTous`, `cadeau` (le donneur ne perd rien), `gainDe` (2 × le dé), `neutre`. Aucune carte ne retire de GP. La pioche est mélangée sur le serveur, tirée sans remise, puis remélangée quand elle est vide. Son ordre n'est envoyé à aucune page.
 
@@ -52,13 +55,21 @@ Le débit d'une mise (tour ou duel) est une transaction `source: mise`, sans év
 
 ## Comment tester
 
+La vérification du jeu passe par des scripts en ligne de commande. Le navigateur intégré de Cursor n'est pas utilisé : il est trop lent. Ces scripts ne touchent jamais au port 3000 ni au dossier `data/`. Chacun lance son propre serveur sur un port libre, avec un dossier temporaire supprimé à la fin.
+
 ```bat
 npm install
+npx playwright install chromium
 npm test
-npm run dev
+npm run test:e2e
+npm run test:tv
 ```
 
-Puis, depuis le PC : `http://127.0.0.1:3000/`, `/tv`, `/joueur`, `/hote`. Depuis un téléphone du même Wi-Fi, les URL affichées au démarrage.
+- `npm test` : logique de jeu (Vitest), sans réseau.
+- `npm run test:e2e` : hôte et 4 joueurs en socket, trois tours, une case de chaque type, duel gagné puis égalité, arrivée. Après chaque action, invariants et secret des mises. Annulation vérifiée pour : un ajout de GP, une mise, la clôture des mises, la révélation, le mini-jeu choisi, le passage aux déplacements, un lancer suivi de l'effet de sa case, le choix de l'adversaire d'un duel, une mise de duel, le résultat d'un duel, un nouveau tour, une arrivée. Le serveur est aussi arrêté puis relancé pendant les déplacements. Objectif : moins de 15 s.
+- `npm run test:tv` : Chromium sans interface, `/tv?debug=1&vitesse=4` en 1920×1080. Révélation, case bonus, case cagnotte, duel. La chronologie ne doit pas se chevaucher, l'ordre dé → sauts → effet → GP est exigé, et la file vide laisse l'état affiché égal à l'état reçu. Captures dans `test-results/tv/` (`02-revelation.png`, `03-de-arrete.png`, `04-pion-arrive.png`, `05-duel.png`). Objectif : moins de 30 s.
+
+Pour jouer vraiment, `npm run dev` écoute le port 3000 et écrit dans `data/`. Depuis le PC : `http://127.0.0.1:3000/`, `/tv`, `/joueur`, `/hote`. Depuis un téléphone du même Wi-Fi, les URL affichées au démarrage.
 
 Parcours utile : un joueur s'inscrit et sa tuile se retourne sur l'accueil de la télé ; l'hôte ajoute des GP visibles puis des GP masqués ; seuls les GP visibles s'affichent sur la télé et le téléphone ; sur les scores, un gain enchaîne l'étoile puis les rouleaux, et les tuiles restent à leur place. Trois gains rapides se jouent l'un après l'autre. « Révéler les GP masqués » joue un gain par joueur. « Réduire les animations » supprime les confettis et raccourcit les séquences. « Annuler » restaure l'action dont le libellé était affiché sur le bouton. Recharger `/joueur` retrouve la place, fond de la couleur du joueur. `/joueur?profil=1` et `/joueur?profil=2` sont deux joueurs. Arrêter puis relancer le serveur conserve `data/etat.json` ; les pages se reconnectent. Pour la télé, `npm run build` puis `npm start` (ou `lancer-soiree.bat`), pas le mode développement. Pour entendre un son, déposer par exemple `de.mp3` dans `client/public/assets/sons/` puis reconstruire.
 
@@ -81,7 +92,8 @@ Format audio retenu : MP3 en priorité, OGG en repli si seul le fichier OGG est 
 - « Ajouter 4 joueurs fictifs » n'existe qu'avec `npm run dev`, dans la limite des places libres.
 - Aucun PNG d'avatar ni fichier son n'est fourni pour l'instant. Les pastilles et le silence sont le comportement prévu tant que les dossiers `client/public/assets/` sont vides.
 - Le volume de la télé repart à 80 % à chaque démarrage du serveur.
-- La pile d'annulation est en mémoire : un redémarrage la vide. La sauvegarde, elle, reste.
+- La pile d'annulation est en mémoire : un redémarrage la vide. La sauvegarde, elle, reste. En mode test, cette pile remet aussi la file de dés imposés, pour rejouer le même lancer.
+- Le rattrapage de la télé (vitesse ×2 après 8 s, saut à l'état reçu après 20 s) n'est pas exercé par `npm run test:tv` : le scénario reste en dessous de ce retard.
 - Une demande de reprise en cours perd le lien avec le téléphone au redémarrage. Le téléphone peut renvoyer la demande.
 - Le code hôte par défaut est `change-moi`. À changer avant la soirée.
 - Une adresse lien-local `169.254.x.x` peut apparaître dans les autres IP. Elle n'est pas retenue s'il existe une adresse `192.168`, `10.` ou `172.16–31`.

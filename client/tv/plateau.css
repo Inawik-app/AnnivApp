@@ -42,7 +42,7 @@
   font-size: 18px;
   line-height: 30px;
   text-align: center;
-  animation: saut 250ms var(--pose);
+  animation: saut calc(250ms / var(--vitesse, 1)) var(--pose);
 }
 
 .pion.fondu {
@@ -133,7 +133,7 @@
   height: 180px;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 1s linear;
+  transition: transform calc(1s / var(--vitesse, 1)) linear;
 }
 
 .de.pose {
@@ -167,7 +167,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  transition: transform 700ms var(--pose);
+  transition: transform calc(700ms / var(--vitesse, 1)) var(--pose);
   transform-style: preserve-3d;
 }
 
@@ -251,7 +251,7 @@
 .piece-vol {
   display: inline-block;
   margin-right: 12px;
-  animation: vol 700ms linear;
+  animation: vol calc(700ms / var(--vitesse, 1)) linear;
 }
 
 .piece-vol.fondu {

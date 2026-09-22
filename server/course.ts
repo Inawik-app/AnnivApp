@@ -26,10 +26,16 @@ export type ContexteCourse = {
   maintenant: number;
   id: () => string;
   alea: Alea;
+  /** Présent seulement en mode test : valeurs de dé imposées, dans l'ordre. */
+  tirerDe?: () => number;
   plateau: ConfigPlateau;
   cartes: CarteChance[];
   dev: boolean;
 };
+
+function valeurDe(ctx: ContexteCourse): number {
+  return ctx.tirerDe ? ctx.tirerDe() : ctx.alea(6) + 1;
+}
 
 type Ajouter = (
   draft: EtatJeu,
@@ -254,7 +260,7 @@ function appliquerCarte(
     return;
   }
   if (carte.effet.type === 'gainDe') {
-    const valeur = ctx.alea(6) + 1;
+    const valeur = valeurDe(ctx);
     course.dernierDe = { joueurId, valeur, usage: 'chance' };
     course.historique.lancers.push({ tour: course.tour, joueurId, valeur, usage: 'chance' });
     ajouter(draft, 'de.lance', 'public', `${pseudo(draft, joueurId)} lance un dé doré : ${valeur}`, {
@@ -650,7 +656,7 @@ export function appliquerCourse(
     case 'lancerDe': {
       const id = joueurCourant(course);
       if (!id) return;
-      const valeur = ctx.alea(6) + 1;
+      const valeur = valeurDe(ctx);
       const depuis = course.positions[id] ?? 0;
       const vers = Math.min(depuis + valeur, course.regles.longueur);
       course.positions[id] = vers;

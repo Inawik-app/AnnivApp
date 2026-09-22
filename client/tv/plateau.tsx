@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CourseVue, EvenementVue, JoueurPublic } from '../../shared/types';
 import { Avatar, CompteurRouleaux, Piece, Tuile } from '../commun/composants';
 import { textePhase } from '../commun/course-texte';
-import { attendre } from '../commun/file-animations';
 import { useFlip } from '../commun/flip';
 import { initiale, libelleRang } from '../commun/spectacle';
 import { sons } from '../commun/sons';
@@ -292,6 +291,9 @@ type ApiPlateau = {
   ajusterSolde: (joueurId: string, delta: number) => void;
   setCoches: (ids: string[]) => void;
   ajouterCoche: (id: string) => void;
+  attendre: (ms: number) => Promise<void>;
+  segment: (etape: string, travail: () => Promise<void>) => Promise<void>;
+  marquer: (etape: string) => void;
 };
 
 function nombre(valeur: unknown): number | null {
@@ -300,6 +302,14 @@ function nombre(valeur: unknown): number | null {
 
 function texte(valeur: unknown): string | null {
   return typeof valeur === 'string' ? valeur : null;
+}
+
+async function carteEffet(api: ApiPlateau, titre: string, texteCarte: string, duree: number): Promise<void> {
+  await api.segment('effet', async () => {
+    api.setSpectacle({ type: 'effet', titre, texte: texteCarte });
+    await api.attendre(duree);
+    api.setSpectacle(null);
+  });
 }
 
 export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): Promise<boolean> {
@@ -319,103 +329,122 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
       if (typeof mise.joueurId !== 'string' || typeof mise.montant !== 'number') return [];
       return [{ joueurId: mise.joueurId, pseudo: api.pseudo(mise.joueurId), montant: mise.montant, ordre: ordre.indexOf(mise.joueurId) + 1 }];
     });
-    sons().jouer('revelation');
-    api.setSpectacle({ type: 'reveal', cartes, ouverte: false, rangee: false, pieces: false });
-    await attendre(api.reduit ? 40 : 80);
-    api.setSpectacle({ type: 'reveal', cartes, ouverte: true, rangee: false, pieces: false });
-    await attendre(duree);
-    api.setSpectacle({ type: 'reveal', cartes, ouverte: true, rangee: false, pieces: true });
-    const total = nombre(evenement.donnees.cagnotte);
-    if (total !== null) api.setCagnotte(total);
-    for (const carte of cartes) api.ajusterSolde(carte.joueurId, -carte.montant);
-    await attendre(duree);
-    api.setSpectacle({ type: 'reveal', cartes, ouverte: true, rangee: true, pieces: false });
-    await attendre(duree);
-    api.setSpectacle(null);
-    api.setCoches([]);
+    await api.segment('revelation', async () => {
+      sons().jouer('revelation');
+      api.setSpectacle({ type: 'reveal', cartes, ouverte: false, rangee: false, pieces: false });
+      await api.attendre(api.reduit ? 40 : 80);
+      api.setSpectacle({ type: 'reveal', cartes, ouverte: true, rangee: false, pieces: false });
+      await api.attendre(duree);
+      api.setSpectacle({ type: 'reveal', cartes, ouverte: true, rangee: false, pieces: true });
+      await api.attendre(duree);
+      api.setSpectacle({ type: 'reveal', cartes, ouverte: true, rangee: true, pieces: false });
+      await api.attendre(duree);
+      api.setSpectacle(null);
+      api.setCoches([]);
+    });
+    await api.segment('gp', async () => {
+      const total = nombre(evenement.donnees.cagnotte);
+      if (total !== null) api.setCagnotte(total);
+      for (const carte of cartes) api.ajusterSolde(carte.joueurId, -carte.montant);
+      await api.attendre(duree);
+    });
     return true;
   }
   if (evenement.type === 'de.lance') {
     const valeur = nombre(evenement.donnees.valeur);
     if (valeur === null) return true;
-    sons().jouer('de');
-    api.setSpectacle({ type: 'de', valeur });
-    await attendre(api.reduit ? 150 : 1000);
-    api.setSpectacle(null);
+    await api.segment('de', async () => {
+      sons().jouer('de');
+      api.marquer('de');
+      api.setSpectacle({ type: 'de', valeur });
+      await api.attendre(api.reduit ? 150 : 1000);
+      api.marquer('de-arrete');
+      await api.attendre(api.reduit ? 40 : 800);
+      api.setSpectacle(null);
+    });
     return true;
   }
   if (evenement.type === 'pion.avance' && id) {
     const cases = Array.isArray(evenement.donnees.cases) ? evenement.donnees.cases.filter((item): item is number => typeof item === 'number') : [];
-    for (const caseIndex of cases) {
-      api.setPositions((precedent) => ({ ...precedent, [id]: caseIndex }));
-      if (!api.reduit) await attendre(250);
-    }
+    await api.segment('sauts', async () => {
+      for (const caseIndex of cases) {
+        api.setPositions((precedent) => ({ ...precedent, [id]: caseIndex }));
+        if (!api.reduit) await api.attendre(250);
+      }
+      api.marquer('pion-arrive');
+      await api.attendre(api.reduit ? 40 : 800);
+    });
     return true;
   }
   if (evenement.type === 'case.bonus') {
     sons().jouer('gain');
-    api.setSpectacle({ type: 'effet', titre: `+${nombre(evenement.donnees.montant) ?? 0}`, texte: 'Case bonus' });
-    await attendre(duree);
-    api.setSpectacle(null);
+    await carteEffet(api, `+${nombre(evenement.donnees.montant) ?? 0}`, 'Case bonus', duree);
     return true;
   }
   if (evenement.type === 'case.cagnotte') {
     const montant = nombre(evenement.donnees.montant) ?? 0;
     const reste = nombre(evenement.donnees.reste);
-    if (reste !== null) api.setCagnotte(reste);
-    api.setSpectacle({
-      type: 'effet',
-      titre: montant > 0 ? `+${montant}` : 'Vide',
-      texte: montant > 0 ? 'La cagnotte se partage' : 'La cagnotte est vide',
-    });
-    await attendre(duree);
-    api.setSpectacle(null);
+    await carteEffet(
+      api,
+      montant > 0 ? `+${montant}` : 'Vide',
+      montant > 0 ? 'La cagnotte se partage' : 'La cagnotte est vide',
+      duree,
+    );
+    if (reste !== null) {
+      await api.segment('gp', async () => {
+        api.setCagnotte(reste);
+        await api.attendre(duree);
+      });
+    }
     return true;
   }
   if (evenement.type === 'case.chance') {
-    api.setSpectacle({
-      type: 'effet',
-      titre: texte(evenement.donnees.titre) ?? 'Chance',
-      texte: texte(evenement.donnees.texte) ?? '',
-    });
-    await attendre(duree);
-    api.setSpectacle(null);
+    await carteEffet(api, texte(evenement.donnees.titre) ?? 'Chance', texte(evenement.donnees.texte) ?? '', duree);
     return true;
   }
   if (evenement.type === 'joueur.arrive') {
     sons().jouer('victoire');
-    api.setSpectacle({
-      type: 'arrivee',
-      pseudo: api.pseudo(id ?? ''),
-      rang: nombre(evenement.donnees.rang) ?? 1,
+    await api.segment('arrivee', async () => {
+      api.setSpectacle({
+        type: 'arrivee',
+        pseudo: api.pseudo(id ?? ''),
+        rang: nombre(evenement.donnees.rang) ?? 1,
+      });
+      await api.attendre(duree);
+      api.setSpectacle(null);
     });
-    await attendre(duree);
-    api.setSpectacle(null);
     return true;
   }
   if (evenement.type === 'duel.annonce' || evenement.type === 'duel.adversaire' || evenement.type === 'duel.resultat') {
-    api.setSpectacle({
-      type: 'duel',
-      titre: evenement.libelle,
-      texte: texte(evenement.donnees.defi) ?? '',
+    await api.segment('duel', async () => {
+      api.setSpectacle({
+        type: 'duel',
+        titre: evenement.libelle,
+        texte: texte(evenement.donnees.defi) ?? '',
+      });
+      await api.attendre(duree);
+      api.setSpectacle(null);
     });
-    await attendre(duree);
-    api.setSpectacle(null);
     return true;
   }
   if (evenement.type === 'duel.reveles') {
-    sons().jouer('revelation');
     const brut = evenement.donnees.mises;
-    if (Array.isArray(brut)) {
-      for (const entree of brut) {
-        if (!entree || typeof entree !== 'object') continue;
-        const mise = entree as { joueurId?: unknown; montant?: unknown };
-        if (typeof mise.joueurId === 'string' && typeof mise.montant === 'number') api.ajusterSolde(mise.joueurId, -mise.montant);
+    await api.segment('duel', async () => {
+      sons().jouer('revelation');
+      api.setSpectacle({ type: 'duel', titre: 'Les mises du duel', texte: evenement.libelle });
+      await api.attendre(duree);
+      api.setSpectacle(null);
+    });
+    await api.segment('gp', async () => {
+      if (Array.isArray(brut)) {
+        for (const entree of brut) {
+          if (!entree || typeof entree !== 'object') continue;
+          const mise = entree as { joueurId?: unknown; montant?: unknown };
+          if (typeof mise.joueurId === 'string' && typeof mise.montant === 'number') api.ajusterSolde(mise.joueurId, -mise.montant);
+        }
       }
-    }
-    api.setSpectacle({ type: 'duel', titre: 'Les mises du duel', texte: evenement.libelle });
-    await attendre(duree);
-    api.setSpectacle(null);
+      await api.attendre(duree);
+    });
     return true;
   }
   if (
@@ -438,7 +467,7 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
       const vers = nombre(evenement.donnees.vers);
       if (vers !== null) api.setPositions((precedent) => ({ ...precedent, [id]: vers }));
     }
-    if (api.reduit) await attendre(150);
+    if (api.reduit) await api.attendre(150);
     return true;
   }
   return false;

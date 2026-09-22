@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nanoid } from 'nanoid';
 import { INTERVALLE_SAUVEGARDE_MS, LIMITE_ANNULATIONS } from '../shared/constantes';
-import type { Action, EtatJeu, Origine, ReponseAction } from '../shared/types';
+import type { Action, EtatJeu, Origine, ReponseAction, TypeCase } from '../shared/types';
 import { lireCartesChance, lireConfigPlateau } from './course-config';
 import { libelleAction } from './libelles';
 import { creerPersistance, type Persistance } from './persistance';
@@ -18,6 +18,8 @@ type Instantane = {
   etat: EtatJeu;
   jetons: Record<string, string>;
   suivis: Array<[string, string]>;
+  /** File de dés du mode test, pour qu'une annulation rejoue la même valeur. */
+  desForces: number[];
 };
 
 export type OptionsStore = {
@@ -33,6 +35,10 @@ export type OptionsStore = {
   sauvegardesAuto?: boolean;
   intervalleSauvegardeMs?: number;
   alea?: (max: number) => number;
+  /** Mode test : dés imposés et disposition explicite. Ignoré hors test. */
+  test?: boolean;
+  desForces?: number[];
+  disposition?: TypeCase[];
 };
 
 export type Store = {
@@ -56,8 +62,20 @@ export function creerStore(options: OptionsStore): Store {
   const estEnLigne = options.estEnLigne ?? (() => false);
   const racine = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   const plateau = lireConfigPlateau(racine);
+  if (options.test && options.disposition) {
+    plateau.longueur = options.disposition.length - 1;
+    plateau.disposition = options.disposition;
+  }
   const cartes = lireCartesChance(racine);
   const alea = options.alea ?? ((max: number) => randomInt(0, Math.max(1, max)));
+  const desForces = options.test ? [...(options.desForces ?? [])] : [];
+  const tirerDe = options.test && options.desForces
+    ? () => {
+        const force = desForces.shift();
+        if (force === undefined || !Number.isInteger(force) || force < 1 || force > 6) return alea(6) + 1;
+        return force;
+      }
+    : undefined;
   const charge = creerPersistance(options.dossierData, options.titre, {
     sauvegardesAuto: options.sauvegardesAuto ?? true,
     intervalleMs: options.intervalleSauvegardeMs ?? INTERVALLE_SAUVEGARDE_MS,
@@ -116,12 +134,17 @@ export function creerStore(options: OptionsStore): Store {
     return reponse;
   };
 
-  const empiler = (action: Action) => {
+  const restaurerDes = (valeurs: number[]) => {
+    desForces.splice(0, desForces.length, ...valeurs);
+  };
+
+  const empiler = (action: Action, desAvant: number[]) => {
     pile.push({
       libelle: libelleAction(action, etat),
       etat: cloner(etat),
       jetons: { ...jetons },
       suivis: [...suivis.entries()],
+      desForces: desAvant,
     });
     if (pile.length > LIMITE_ANNULATIONS) pile.shift();
   };
@@ -150,6 +173,7 @@ export function creerStore(options: OptionsStore): Store {
         etat = cloner(instantane.etat);
         etat.version = version;
         jetons = { ...instantane.jetons };
+        restaurerDes(instantane.desForces);
         suivis.clear();
         for (const [demandeId, suiviSocket] of instantane.suivis) suivis.set(demandeId, suiviSocket);
         taillerSuivis();
@@ -181,6 +205,7 @@ export function creerStore(options: OptionsStore): Store {
         }
       }
 
+      const desAvant = [...desForces];
       const resultat = reduire(etat, action, origine, {
         maintenant: maintenant(),
         id: nouvelId,
@@ -189,12 +214,16 @@ export function creerStore(options: OptionsStore): Store {
         nbJoueursMax: options.nbJoueursMax,
         estEnLigne,
         alea,
+        tirerDe,
         plateau,
         cartes,
       });
-      if (!resultat.ok) return resultat;
+      if (!resultat.ok) {
+        restaurerDes(desAvant);
+        return resultat;
+      }
 
-      empiler(action);
+      empiler(action, desAvant);
       etat = resultat.etat;
       prochainIdEvenement = Math.max(prochainIdEvenement, resultat.prochainIdEvenement);
       const extra = appliquerEffets(resultat.effets, socketId);

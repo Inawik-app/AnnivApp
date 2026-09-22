@@ -1,0 +1,280 @@
+import type { Action, VueClient } from '../shared/types';
+import { demarrerServeur, type ServeurJeu } from '../server/demarrer';
+import {
+  CODE_HOTE,
+  DISPOSITION,
+  agir,
+  attendreVue,
+  connecter,
+  fermerSession,
+  fuitesMises,
+  memeVue,
+  ouvrirServeur,
+  stabiliser,
+  portDisponible,
+  verifierInvariants,
+  type Participant,
+} from './session';
+
+const DES = [1, 2, 3, 4, 5, 6, 2, 2, 6, 1, 1, 1];
+
+type Monde = {
+  serveur: ServeurJeu;
+  dossier: string;
+  hote: Participant;
+  tv: Participant;
+  joueurs: Participant[];
+};
+
+const pages = (monde: Monde) => [monde.hote, monde.tv, ...monde.joueurs];
+
+async function toutLeMonde(monde: Monde, plancher: number): Promise<void> {
+  await Promise.all(pages(monde).map((page) => attendreVue(page, () => (page.vue?.version ?? 0) > plancher)));
+}
+
+async function jouer(monde: Monde, acteur: Participant, action: Action, nom: string): Promise<void> {
+  const plancher = Math.max(...pages(monde).map((page) => page.vue?.version ?? 0));
+  const reponse = await agir(acteur, action);
+  if (!reponse.ok) throw new Error(`${nom} : ${reponse.erreur}`);
+  await toutLeMonde(monde, plancher);
+  verifierInvariants(monde.serveur.etat());
+  const course = monde.tv.vue?.course;
+  if (course && (course.phase === 'mises' || course.duel?.etape === 'mises')) {
+    const fuitesTv = fuitesMises(monde.tv.vue as VueClient, null);
+    if (fuitesTv.length > 0) throw new Error(`Mise visible sur la TV (${nom}) : ${fuitesTv.join(', ')}`);
+    for (const joueur of monde.joueurs) {
+      const fuites = fuitesMises(joueur.vue as VueClient, joueur.joueurId);
+      if (fuites.length > 0) throw new Error(`Mise visible pour ${joueur.pseudo} (${nom}) : ${fuites.join(', ')}`);
+    }
+  }
+  console.log(`OK     ${nom}`);
+}
+
+async function annulerPuisRejouer(monde: Monde, nom: string, refaire: () => Promise<void>): Promise<void> {
+  const avant = pages(monde).map((page) => structuredClone(page.vue));
+  await refaire();
+  const plancher = Math.max(...pages(monde).map((page) => page.vue?.version ?? 0));
+  const reponse = await agir(monde.hote, { type: 'annuler' });
+  if (!reponse.ok) throw new Error(`Annulation ${nom} : ${reponse.erreur}`);
+  await toutLeMonde(monde, plancher);
+  pages(monde).forEach((page, index) => {
+    if (!memeVue(avant[index] ?? null, page.vue)) {
+      const gauche = JSON.stringify(stabiliser(avant[index] ?? null));
+      const droite = JSON.stringify(stabiliser(page.vue));
+      let curseur = 0;
+      while (curseur < gauche.length && gauche[curseur] === droite[curseur]) curseur += 1;
+      throw new Error(
+        `Annulation ${nom} : la vue ${page.pseudo} diffère de l'état d'avant\n${gauche.slice(Math.max(0, curseur - 80), curseur + 80)}\n${droite.slice(Math.max(0, curseur - 80), curseur + 80)}`,
+      );
+    }
+  });
+  verifierInvariants(monde.serveur.etat());
+  console.log(`OK     Annulation : ${nom}`);
+  await refaire();
+}
+
+async function preparer(desForces: number[]): Promise<Monde> {
+  const { serveur, dossier } = await ouvrirServeur({ desForces, disposition: DISPOSITION });
+  const hote = await connecter(serveur.url, 'hote', { codeHote: CODE_HOTE });
+  const tv = await connecter(serveur.url, 'tv');
+  const joueurs: Participant[] = [];
+  const fiches = [
+    { pseudo: 'Léo', avatar: 'soleil' },
+    { pseudo: 'Inès', avatar: 'lune' },
+    { pseudo: 'Noé', avatar: 'feuille' },
+    { pseudo: 'Lina', avatar: 'goutte' },
+  ];
+  for (const fiche of fiches) {
+    const joueur = await connecter(serveur.url, 'joueur');
+    joueur.pseudo = fiche.pseudo;
+    const reponse = await agir(joueur, { type: 'rejoindre', pseudo: fiche.pseudo, avatar: fiche.avatar });
+    if (!reponse.ok || !reponse.joueurId || !reponse.jeton) throw new Error(reponse.ok ? 'Joueur sans id' : reponse.erreur);
+    joueur.joueurId = reponse.joueurId;
+    joueur.jeton = reponse.jeton;
+    joueurs.push(joueur);
+  }
+  const monde: Monde = { serveur, dossier, hote, tv, joueurs };
+  const version = Math.max(...joueurs.map((joueur) => joueur.vue?.version ?? 0));
+  await Promise.all(pages(monde).map((page) => attendreVue(page, () => (page.vue?.version ?? 0) >= version && (page.vue?.joueurs.length ?? 0) >= 4)));
+  return monde;
+}
+
+async function main(): Promise<void> {
+  const debut = Date.now();
+  let monde: Monde | null = null;
+  try {
+    monde = await preparer(DES);
+    const [leo, ines, noe, lina] = monde.joueurs;
+    if (!leo || !ines || !noe || !lina) throw new Error('Il manque un joueur');
+
+    await annulerPuisRejouer(monde, 'un ajout de GP', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, {
+        type: 'ajouterGP',
+        joueurId: leo.joueurId,
+        montant: 30,
+        libelle: 'Départ',
+      }, 'Ajout de GP');
+    });
+    for (const joueur of [ines, noe, lina]) {
+      await jouer(monde, monde.hote, { type: 'ajouterGP', joueurId: joueur.joueurId, montant: 30, libelle: 'Départ' }, `Ajout de GP pour ${joueur.pseudo}`);
+    }
+
+    await jouer(monde, monde.hote, { type: 'demarrerCourse' }, 'Démarrage de la course');
+    await jouer(monde, monde.hote, { type: 'nouveauTour' }, 'Tour 1');
+
+    await annulerPuisRejouer(monde, 'une mise', async () => {
+      await jouer(monde as Monde, leo, { type: 'miser', montant: 4 }, 'Mise de Léo');
+    });
+    await jouer(monde, ines, { type: 'miser', montant: 3 }, 'Mise d\'Inès');
+    await jouer(monde, noe, { type: 'miser', montant: 2 }, 'Mise de Noé');
+    console.log('OK     Secrets des mises de tour');
+    await annulerPuisRejouer(monde, 'la clôture des mises', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'cloreMises' }, 'Clôture des mises');
+    });
+    await annulerPuisRejouer(monde, 'la révélation', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'revelerMises' }, 'Révélation des mises');
+    });
+    await jouer(monde, monde.hote, { type: 'passerAuChoix' }, 'Choix du mini-jeu');
+    await annulerPuisRejouer(monde, 'le mini-jeu choisi', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'choisirMiniJeu', nom: 'Ping-pong' }, 'Mini-jeu choisi');
+    });
+    await annulerPuisRejouer(monde, 'le passage aux déplacements', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'passerAuxDeplacements' }, 'Passage aux déplacements');
+    });
+
+    await annulerPuisRejouer(monde, 'un lancer suivi de l\'effet de sa case', async () => {
+      await jouer(monde as Monde, leo, { type: 'lancerDe' }, 'Lancer de Léo sur un bonus');
+    });
+    if (monde.serveur.etat().course?.positions[leo.joueurId] !== 1) throw new Error('Léo devrait être sur la case bonus');
+
+    await jouer(monde, ines, { type: 'lancerDe' }, 'Lancer d\'Inès sur une chance');
+    const carte = monde.serveur.etat().course?.carteCourante?.carte;
+    if (carte?.effet.type !== 'cadeau') throw new Error(`La carte piochée n'est pas un cadeau (${carte?.id ?? 'aucune'})`);
+    console.log('OK     Carte chance cadeau');
+    await jouer(monde, ines, { type: 'choisirBeneficiaire', joueurId: leo.joueurId }, 'Inès offre le cadeau');
+
+    await jouer(monde, noe, { type: 'lancerDe' }, 'Lancer de Noé');
+    await jouer(monde, lina, { type: 'lancerDe' }, 'Lancer de Lina sur un duel');
+    await annulerPuisRejouer(monde, 'le choix de l\'adversaire d\'un duel', async () => {
+      await jouer(monde as Monde, lina, { type: 'choisirAdversaire', joueurId: leo.joueurId }, 'Lina choisit Léo');
+    });
+    await jouer(monde, lina, { type: 'miserDuel', montant: 2 }, 'Mise de duel de Lina');
+    console.log('OK     Secrets des mises de duel');
+    await annulerPuisRejouer(monde, 'une mise de duel', async () => {
+      await jouer(monde as Monde, leo, { type: 'miserDuel', montant: 2 }, 'Mise de duel de Léo');
+    });
+    await annulerPuisRejouer(monde, 'le résultat d\'un duel', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'resultatDuel', resultat: 'joueur' }, 'Victoire de Lina');
+    });
+    if (monde.serveur.etat().course?.phase !== 'finTour') throw new Error('Le tour 1 devrait être fini');
+    console.log('OK     Duel en victoire');
+
+    await annulerPuisRejouer(monde, 'un nouveau tour', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'nouveauTour' }, 'Tour 2');
+    });
+    await jouer(monde, leo, { type: 'miser', montant: 4 }, 'Mise de Léo, tour 2');
+    await jouer(monde, ines, { type: 'miser', montant: 3 }, 'Mise d\'Inès, tour 2');
+    await jouer(monde, noe, { type: 'miser', montant: 2 }, 'Mise de Noé, tour 2');
+    await jouer(monde, lina, { type: 'miser', montant: 1 }, 'Mise de Lina, tour 2');
+    await jouer(monde, monde.hote, { type: 'revelerMises' }, 'Révélation du tour 2');
+    await jouer(monde, monde.hote, { type: 'passerAuChoix' }, 'Choix du tour 2');
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', nom: 'Blind test' }, 'Mini-jeu du tour 2');
+    await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Dés du tour 2');
+
+    const courseAvant = monde.serveur.etat().course;
+    if (!courseAvant || courseAvant.phase !== 'deplacements') throw new Error('Le redémarrage doit avoir lieu pendant les déplacements');
+    const memoire = {
+      phase: courseAvant.phase,
+      tour: courseAvant.tour,
+      cagnotte: courseAvant.cagnotte,
+      positions: { ...courseAvant.positions },
+      etape: courseAvant.etape?.genre ?? null,
+    };
+    const dossier = monde.dossier;
+    for (const page of pages(monde)) page.socket.close();
+    await monde.serveur.fermer();
+    monde.serveur = await demarrerServeur({
+      port: await portDisponible(),
+      dossierData: dossier,
+      config: { desForces: DES.slice(4), disposition: DISPOSITION },
+    });
+    monde.hote = await connecter(monde.serveur.url, 'hote', { codeHote: CODE_HOTE });
+    monde.tv = await connecter(monde.serveur.url, 'tv');
+    const reconnectes: Participant[] = [];
+    for (const ancien of [leo, ines, noe, lina]) {
+      const joueur = await connecter(monde.serveur.url, 'joueur', { jeton: ancien.jeton });
+      joueur.pseudo = ancien.pseudo;
+      joueur.joueurId = ancien.joueurId;
+      reconnectes.push(joueur);
+    }
+    monde.joueurs = reconnectes;
+    const course = monde.serveur.etat().course;
+    if (!course) throw new Error('La course a disparu au redémarrage');
+    if (course.phase !== memoire.phase || course.tour !== memoire.tour || course.cagnotte !== memoire.cagnotte) {
+      throw new Error('L\'état repris ne correspond pas à la phase interrompue');
+    }
+    if ((course.etape?.genre ?? null) !== memoire.etape) throw new Error('L\'étape reprise est différente');
+    for (const [id, position] of Object.entries(memoire.positions)) {
+      if (course.positions[id] !== position) throw new Error('Une position a changé au redémarrage');
+    }
+    if (monde.tv.vue?.course?.phase !== 'deplacements') throw new Error('La TV ne retrouve pas les déplacements');
+    console.log('OK     Redémarrage en phase de déplacements');
+
+    const [leo2, ines2, noe2, lina2] = monde.joueurs;
+    if (!leo2 || !ines2 || !noe2 || !lina2) throw new Error('Joueurs perdus');
+    await jouer(monde, leo2, { type: 'lancerDe' }, 'Léo ramasse la cagnotte');
+    await jouer(monde, ines2, { type: 'lancerDe' }, 'Inès tombe sur un duel');
+    await jouer(monde, ines2, { type: 'choisirAdversaire', joueurId: noe2.joueurId }, 'Inès choisit Noé');
+    await jouer(monde, ines2, { type: 'miserDuel', montant: 1 }, 'Mise de duel d\'Inès');
+    await jouer(monde, noe2, { type: 'miserDuel', montant: 1 }, 'Mise de duel de Noé');
+    await jouer(monde, monde.hote, { type: 'resultatDuel', resultat: 'egalite' }, 'Égalité du duel');
+    console.log('OK     Duel en égalité');
+    await jouer(monde, noe2, { type: 'lancerDe' }, 'Lancer de Noé, tour 2');
+    await jouer(monde, lina2, { type: 'lancerDe' }, 'Lancer de Lina, tour 2');
+
+    await jouer(monde, monde.hote, { type: 'nouveauTour' }, 'Tour 3');
+    await jouer(monde, leo2, { type: 'miser', montant: 4 }, 'Mise de Léo, tour 3');
+    await jouer(monde, ines2, { type: 'miser', montant: 3 }, 'Mise d\'Inès, tour 3');
+    await jouer(monde, noe2, { type: 'miser', montant: 2 }, 'Mise de Noé, tour 3');
+    await jouer(monde, lina2, { type: 'miser', montant: 1 }, 'Mise de Lina, tour 3');
+    await jouer(monde, monde.hote, { type: 'revelerMises' }, 'Révélation du tour 3');
+    await jouer(monde, monde.hote, { type: 'passerAuChoix' }, 'Choix du tour 3');
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', nom: 'Karaoké' }, 'Mini-jeu du tour 3');
+    await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Dés du tour 3');
+    await annulerPuisRejouer(monde, 'une arrivée', async () => {
+      await jouer(monde, leo2, { type: 'lancerDe' }, 'Léo arrive');
+    });
+    const finale = monde.serveur.etat().course;
+    if (!finale?.arrivees.includes(leo2.joueurId)) throw new Error('Léo devrait être arrivé');
+    if (finale.positions[leo2.joueurId] !== finale.regles.longueur) throw new Error('Léo n\'est pas sur l\'arrivée');
+    if (finale.ordre[finale.indexCourant] === leo2.joueurId) throw new Error('Léo relance alors qu\'il est arrivé');
+    await jouer(monde, ines2, { type: 'lancerDe' }, 'Inès joue après l\'arrivée');
+    await jouer(monde, noe2, { type: 'lancerDe' }, 'Lancer de Noé, tour 3');
+    await jouer(monde, lina2, { type: 'lancerDe' }, 'Lancer de Lina, tour 3');
+    const effets = new Set(finale && monde.serveur.etat().course?.historique.effets.map((effet) => effet.type));
+    for (const type of ['bonus', 'cagnotte', 'chance']) {
+      if (!effets.has(type)) throw new Error(`Aucun effet ${type} dans l'historique`);
+    }
+    const duels = monde.serveur.etat().course?.historique.duels ?? [];
+    if (!duels.some((duel) => duel.resultat === 'joueur') || !duels.some((duel) => duel.resultat === 'egalite')) {
+      throw new Error('Il manque une victoire ou une égalité de duel');
+    }
+    console.log('OK     Bonus, cagnotte, chance, duels et arrivée');
+    console.log('OK     Invariants tenus après chaque action');
+  } catch (erreur) {
+    console.log(`ÉCHEC  ${erreur instanceof Error ? erreur.message : String(erreur)}`);
+    process.exitCode = 1;
+  } finally {
+    if (monde) {
+      await fermerSession({
+        serveur: monde.serveur,
+        dossier: monde.dossier,
+        sockets: pages(monde).map((page) => page.socket),
+      }).catch(() => undefined);
+    }
+  }
+  if (process.exitCode) return;
+  console.log(`Durée  ${((Date.now() - debut) / 1000).toFixed(1)} s`);
+}
+
+void main();

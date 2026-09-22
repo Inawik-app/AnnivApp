@@ -13,7 +13,17 @@ body {
   background: var(--tapis);
   color: var(--carton);
   transform-origin: 0 0;
+  transform-style: preserve-3d;
   overflow: hidden;
+  --duree-rapide: calc(150ms / var(--vitesse, 1));
+  --duree-normale: calc(300ms / var(--vitesse, 1));
+  --duree-spectacle: calc(700ms / var(--vitesse, 1));
+}
+
+.scene.animations-reduites {
+  --duree-rapide: calc(150ms / var(--vitesse, 1));
+  --duree-normale: calc(150ms / var(--vitesse, 1));
+  --duree-spectacle: calc(150ms / var(--vitesse, 1));
 }
 
 .contenu {

@@ -111,7 +111,7 @@ function Rouleau({ chiffre, duree }: { chiffre: number; duree: number }) {
         class="rouleau-bande"
         style={{
           transform: `translateY(${-index * PAS_ROULEAU}em)`,
-          transition: anime ? `transform ${duree}ms var(--pose)` : 'none',
+          transition: anime ? `transform calc(${duree}ms / var(--vitesse, 1)) var(--pose)` : 'none',
         }}
       >
         {bande.map((valeur, position) => (

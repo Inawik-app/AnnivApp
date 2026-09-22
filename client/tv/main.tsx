@@ -23,6 +23,36 @@ import './tv.css';
 
 type Gain = { id: string; montant: number; cle: number };
 
+type EtapeChrono = { evenement: string; etape: string; debut: number; fin: number };
+
+type InstantaneCourse = {
+  phase: string | null;
+  cagnotte: number;
+  ordre: string[];
+  positions: Record<string, number>;
+  gp: Record<string, number>;
+};
+
+declare global {
+  interface Window {
+    __chronologieAnimations?: EtapeChrono[];
+    __etapeCourante?: { evenement: string; etape: string } | null;
+    __etatAffiche?: InstantaneCourse;
+    __etatRecu?: InstantaneCourse;
+    __fileVide?: boolean;
+  }
+}
+
+function instantane(course: CourseVue | null, joueurs: JoueurPublic[], cagnotte: number, positions: Record<string, number>): InstantaneCourse {
+  return {
+    phase: course?.phase ?? null,
+    cagnotte,
+    ordre: course ? [...course.ordre] : [],
+    positions: { ...positions },
+    gp: Object.fromEntries(joueurs.map((joueur) => [joueur.id, joueur.gpVisibles])),
+  };
+}
+
 function collerPresence(affiches: JoueurPublic[], source: JoueurPublic[]): JoueurPublic[] {
   const parId = new Map(source.map((joueur) => [joueur.id, joueur]));
   return affiches.map((joueur) => {
@@ -176,7 +206,54 @@ function EcranTv() {
   const courseRef = useRef<CourseVue | null>(null);
   const versionRef = useRef(0);
   const serieRef = useRef(0);
-  const diagForce = new URLSearchParams(window.location.search).get('diag') === '1';
+  const recuRef = useRef<VueTv | null>(null);
+  const positionsRef = useRef<Record<string, number>>({});
+  const cagnotteRef = useRef(0);
+  const chrono = useRef<EtapeChrono[]>([]);
+  const etapeCourante = useRef<{ evenement: string; etape: string } | null>(null);
+  const evenementCourant = useRef('');
+  const debutRetard = useRef(0);
+  const fileVide = useRef(true);
+  const parametres = new URLSearchParams(window.location.search);
+  const vitesseDemandee = Math.max(0.25, Number(parametres.get('vitesse')) || 1);
+  const debug = parametres.get('debug') === '1';
+  const diagForce = parametres.get('diag') === '1';
+
+  const publier = () => {
+    if (!debug) return;
+    const recue = recuRef.current;
+    window.__chronologieAnimations = chrono.current;
+    window.__etapeCourante = etapeCourante.current;
+    window.__fileVide = fileVide.current;
+    window.__etatAffiche = instantane(courseRef.current, joueursRef.current, cagnotteRef.current, positionsRef.current);
+    window.__etatRecu = recue
+      ? instantane(recue.course, recue.joueurs, recue.course?.cagnotte ?? 0, recue.course?.positions ?? {})
+      : undefined;
+  };
+
+  const facteur = () => {
+    const age = debutRetard.current === 0 ? 0 : Date.now() - debutRetard.current;
+    return vitesseDemandee * (age > 8000 ? 2 : 1);
+  };
+
+  const attendreAnime = (ms: number) => {
+    scene.current?.style.setProperty('--vitesse', String(facteur()));
+    return attendre(ms / facteur());
+  };
+
+  const marquer = (etape: string) => {
+    etapeCourante.current = { evenement: evenementCourant.current, etape };
+    publier();
+  };
+
+  const segment = async (etape: string, travail: () => Promise<void>) => {
+    const debut = performance.now();
+    marquer(etape);
+    await travail();
+    if (debug) chrono.current.push({ evenement: evenementCourant.current, etape, debut, fin: performance.now() });
+    if (etapeCourante.current?.etape === etape) etapeCourante.current = null;
+    publier();
+  };
 
   const poserJoueurs = (liste: JoueurPublic[]) => {
     joueursRef.current = liste;
@@ -186,14 +263,18 @@ function EcranTv() {
     courseRef.current = course;
     setCourseAffichee(course);
     if (!course) {
+      positionsRef.current = {};
+      cagnotteRef.current = 0;
       setPositions({});
       setCagnotte(0);
       setCoches([]);
       setSpectacle(null);
       return;
     }
-    setPositions({ ...course.positions });
-    setCagnotte(course.cagnotte);
+    positionsRef.current = { ...course.positions };
+    cagnotteRef.current = course.cagnotte;
+    setPositions(positionsRef.current);
+    setCagnotte(cagnotteRef.current);
     setCoches(course.phase === 'mises' ? course.mises.filter((mise) => mise.aMise).map((mise) => mise.joueurId) : []);
     setSpectacle(null);
   };
@@ -212,22 +293,28 @@ function EcranTv() {
 
   const traiterRef = useRef<(recue: VueTv, animer: boolean) => void>(() => undefined);
   traiterRef.current = (recue, animer) => {
+    recuRef.current = recue;
     sons().reglerVolume(recue.volume);
     reduitRef.current = recue.partie.animationsReduites;
     const maxId = recue.evenements.reduce((plus, evenement) => Math.max(plus, evenement.id), 0);
     const snap = () => {
       file.current.couper();
-      const parArrivee = trierAccueil(recue.joueurs);
-      const liste = recue.partie.ecranTv === 'scores' ? actualiserPlaces(parArrivee) : parArrivee;
+      const source = recuRef.current ?? recue;
+      const parArrivee = trierAccueil(source.joueurs);
+      const liste = source.partie.ecranTv === 'scores' ? actualiserPlaces(parArrivee) : parArrivee;
       poserJoueurs(liste);
-      setEcranLocal(recue.partie.ecranTv);
-      poserCourse(recue.course);
-      versionRef.current = recue.version;
+      setEcranLocal(source.partie.ecranTv);
+      poserCourse(source.course);
+      versionRef.current = source.version;
+      debutRetard.current = 0;
+      fileVide.current = true;
+      etapeCourante.current = null;
       setPhase('pose');
       setPoseAnime(false);
       setGain(null);
       setRetour(null);
       setFondu(null);
+      publier();
     };
     if (!animer) {
       snap();
@@ -241,20 +328,35 @@ function EcranTv() {
         snap();
         return;
       }
-      poserJoueurs(collerPresence(joueursRef.current, recue.joueurs));
+      if (fileVide.current) poserJoueurs(collerPresence(joueursRef.current, recue.joueurs));
+      publier();
       return;
     }
     versionRef.current = recue.version;
     if (!courseRef.current && recue.course) poserCourse(recue.course);
+    if (debutRetard.current === 0) debutRetard.current = Date.now();
+    fileVide.current = false;
     const serie = ++serieRef.current;
+    let abandon = false;
     frais.forEach((evenement, index) => {
       file.current.ajouter(async () => {
+        const age = debutRetard.current === 0 ? 0 : Date.now() - debutRetard.current;
+        if (abandon || age > 20000) {
+          abandon = true;
+          snap();
+          return;
+        }
+        evenementCourant.current = evenement.type;
         await jouer(evenement, frais, index, recue);
         if (index === frais.length - 1 && serie === serieRef.current) {
-          poserCourse(recue.course);
-          const liste = trierAccueil(recue.joueurs);
+          const source = recuRef.current ?? recue;
+          poserCourse(source.course);
+          const liste = trierAccueil(source.joueurs);
           poserJoueurs(ecranRef.current === 'scores' ? actualiserPlaces(liste) : liste);
-          if (ecranRef.current !== recue.partie.ecranTv) setEcranLocal(recue.partie.ecranTv);
+          if (ecranRef.current !== source.partie.ecranTv) setEcranLocal(source.partie.ecranTv);
+          debutRetard.current = 0;
+          fileVide.current = true;
+          publier();
         }
       });
     });
@@ -266,14 +368,14 @@ function EcranTv() {
     sons().jouer('transition');
     setPoseAnime(true);
     setPhase('sort');
-    await attendre(reduitRef.current ? 150 : 300);
+    await attendreAnime(reduitRef.current ? 150 : 300);
     const parArrivee = trierAccueil(joueursRef.current);
     poserJoueurs(cible === 'scores' ? actualiserPlaces(parArrivee) : parArrivee);
     setEcranLocal(cible);
     setPhase('entre');
-    await attendre(40);
+    await attendreAnime(40);
     setPhase('pose');
-    await attendre(duree);
+    await attendreAnime(duree);
   }
 
   async function jouer(
@@ -292,14 +394,14 @@ function EcranTv() {
       if (ecranRef.current !== 'accueil' || reduitRef.current) {
         if (reduitRef.current) setFondu(id);
         poserJoueurs(ecranRef.current === 'scores' ? actualiserPlaces(liste) : liste);
-        await attendre(150);
+        await attendreAnime(150);
         setFondu(null);
         return;
       }
       setRetour(id);
       poserJoueurs(liste);
       sons().jouer('rejoindre');
-      await attendre(duree);
+      await attendreAnime(duree);
       setRetour(null);
       return;
     }
@@ -307,18 +409,19 @@ function EcranTv() {
       const id = joueurIdDe(evenement);
       const montant = montantDe(evenement);
       if (!id || montant === null) return;
-      if (!reduitRef.current) {
-        setGain({ id, montant, cle: evenement.id });
-        sons().jouer('gain');
-        await attendre(duree);
+      await segment('gp', async () => {
+        if (!reduitRef.current) {
+          setGain({ id, montant, cle: evenement.id });
+          sons().jouer('gain');
+        } else {
+          setFondu(id);
+          sons().jouer('gain');
+        }
+        poserJoueurs(actualiserPlaces(ajouterSolde(joueursRef.current, id, montant)));
+        await attendreAnime(duree);
         setGain(null);
-      } else {
-        setFondu(id);
-        sons().jouer('gain');
-      }
-      poserJoueurs(actualiserPlaces(ajouterSolde(joueursRef.current, id, montant)));
-      await attendre(duree);
-      setFondu(null);
+        setFondu(null);
+      });
       return;
     }
     if (evenement.type === 'ecran') {
@@ -376,12 +479,30 @@ function EcranTv() {
     await animerPlateau(evenement, {
       reduit: reduitRef.current,
       pseudo,
-      setPositions,
-      setCagnotte,
+      setPositions: (valeur) => {
+        const suivant = typeof valeur === 'function' ? valeur(positionsRef.current) : valeur;
+        positionsRef.current = suivant;
+        setPositions(suivant);
+        if (courseRef.current) {
+          courseRef.current = { ...courseRef.current, positions: suivant };
+          setCourseAffichee(courseRef.current);
+        }
+      },
+      setCagnotte: (valeur) => {
+        cagnotteRef.current = valeur;
+        setCagnotte(valeur);
+        if (courseRef.current) {
+          courseRef.current = { ...courseRef.current, cagnotte: valeur };
+          setCourseAffichee(courseRef.current);
+        }
+      },
       setSpectacle,
       ajusterSolde: (idJoueur, delta) => poserJoueurs(ajouterSolde(joueursRef.current, idJoueur, delta)),
       setCoches,
       ajouterCoche: (idJoueur) => setCoches((liste) => (liste.includes(idJoueur) ? liste : [...liste, idJoueur])),
+      attendre: attendreAnime,
+      segment,
+      marquer,
     });
   }
 
@@ -419,6 +540,7 @@ function EcranTv() {
       const x = (window.innerWidth - 1920 * echelle) / 2;
       const y = (window.innerHeight - 1080 * echelle) / 2;
       element.style.transform = `translate(${x}px, ${y}px) scale(${echelle})`;
+      element.style.setProperty('--vitesse', String(vitesseDemandee));
     };
     ajuster();
     window.addEventListener('resize', ajuster);
