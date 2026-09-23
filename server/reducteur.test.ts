@@ -4,6 +4,11 @@ import { reduire, type ContexteReduction } from './reducteur';
 import type { Action, EtatJeu, Origine } from '../shared/types';
 import { solde } from '../shared/soldes';
 import { verifierRegleOr } from './regle-or';
+import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function contexte(): ContexteReduction {
   let n = 0;
@@ -25,6 +30,8 @@ function contexte(): ContexteReduction {
       duel: { miseMax: 10, bonusVainqueur: 5, defis: ['Défi'] },
     },
     cartes: [{ id: 'bourse', titre: 'Bourse', texte: 'Tu gagnes.', effet: { type: 'gain', montant: 3 } }],
+    catalogue: lireCatalogue(RACINE),
+    poker: lirePoker(RACINE),
   };
 }
 
@@ -67,7 +74,7 @@ describe('réducteur', () => {
     etat = jouer(etat, { type: 'rejoindre', pseudo: 'Mira', avatar: 'soleil' }, joueur, ctx);
     const doublon = reduire(etat, { type: 'rejoindre', pseudo: ' mira ', avatar: 'lune' }, joueur, ctx);
     expect(doublon).toEqual({ ok: false, erreur: 'Ce pseudo est déjà pris, choisis-en un autre' });
-    const long = reduire(etat, { type: 'rejoindre', pseudo: 'abcdefghijklmnopq', avatar: 'lune' }, joueur, ctx);
+    const long = reduire(etat, { type: 'rejoindre', pseudo: 'abcdefghijklmnopqrstu', avatar: 'lune' }, joueur, ctx);
     expect(long.ok).toBe(false);
     etat = jouer(etat, { type: 'rejoindre', pseudo: 'Noé', avatar: 'lune' }, joueur, ctx);
     etat = jouer(etat, { type: 'rejoindre', pseudo: 'Lina', avatar: 'feuille' }, joueur, ctx);

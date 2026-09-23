@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { CourseVue, EvenementVue, JoueurPublic } from '../../shared/types';
 import { Avatar, CompteurRouleaux, Piece, Tuile } from '../commun/composants';
 import { useFlip } from '../commun/flip';
@@ -59,9 +59,9 @@ export function meilleureGrille(nombre: number, largeur: number, hauteur: number
 }
 
 function slotsPions(taille: number): { pion: number; numero: number; slots: Array<{ x: number; y: number }> } {
-  const numero = Math.max(18, Math.floor(taille * 0.16));
+  const numero = Math.max(56, Math.floor(taille * 0.16));
   const marge = Math.max(4, Math.floor(taille * 0.04));
-  const plafond = numero + 8;
+  const plafond = numero + 16;
   const pion = Math.max(
     12,
     Math.min(Math.floor(taille * 0.4), Math.floor((taille - 2 * marge - 2) / 2), Math.floor((taille - plafond - marge - 2) / 2)),
@@ -214,7 +214,30 @@ export type Spectacle =
   | { type: 'effet'; titre: string; texte: string }
   | { type: 'arrivee'; pseudo: string; rang: number }
   | { type: 'duel'; titre: string; texte: string }
-  | { type: 'annonce'; texte: string };
+  | { type: 'annonce'; texte: string }
+  | { type: 'podium'; lignes: Array<{ joueurId: string; pseudo: string; montant: number; rang: number | null }> };
+
+function palier(px: number, plancher = 40): number {
+  const vise = Math.max(plancher, px);
+  return [32, 40, 48, 64, 96, 128].find((cran) => cran >= vise) ?? 128;
+}
+
+function PseudoFiche({ pseudo }: { pseudo: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    for (const taille of [48, 40]) {
+      el.style.fontSize = `${taille}px`;
+      if (el.scrollWidth <= el.clientWidth + 1) return;
+    }
+  }, [pseudo]);
+  return (
+    <p class="pseudo-fiche" ref={ref}>
+      {pseudo}
+    </p>
+  );
+}
 
 function FicheJoueur({
   joueur,
@@ -239,20 +262,24 @@ function FicheJoueur({
 }) {
   const ref = useFlip(joueur.id, signature, animer);
   return (
-    <div ref={ref} class={courant ? 'fiche-joueur courant' : 'fiche-joueur'} style={courant ? { borderColor: joueur.couleur } : undefined}>
+    <div ref={ref} class="socle-pixel fiche-socle">
+    <div class={courant ? 'fiche-joueur courant' : 'fiche-joueur'} style={courant ? { borderColor: joueur.couleur } : undefined}>
       {coche ? (
         <svg class="coche" viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M12 34 L26 48 L52 16" fill="none" stroke="#1C1633" strokeWidth="8" />
+          <path d="M12 34 L26 48 L52 16" fill="none" stroke="#FFF4DC" strokeWidth="8" />
         </svg>
       ) : null}
-      <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={courant ? 72 : 56} />
-      <div class="fiche-texte">
-        <p class="pseudo-fiche">{joueur.pseudo}</p>
-        <p class="case-fiche">Case {position}</p>
-        {ensuite ? <p class="ensuite">Ensuite</p> : null}
-        {rang !== null ? <p class="ensuite">Arrivé {libelleRang(rang)}</p> : null}
+      <div class="fiche-ligne">
+        <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={48} plancher={40} />
+        <div class="fiche-texte">
+          <p class="case-fiche">Case {position}</p>
+          {ensuite ? <p class="ensuite">Ensuite</p> : null}
+          {rang !== null ? <p class="ensuite">Arrivé {libelleRang(rang)}</p> : null}
+        </div>
+        <CompteurRouleaux valeur={joueur.gpVisibles} duree={reduit ? 150 : 700} taille={40} />
       </div>
-      <CompteurRouleaux valeur={joueur.gpVisibles} duree={reduit ? 150 : 700} taille={48} />
+      <PseudoFiche pseudo={joueur.pseudo} />
+    </div>
     </div>
   );
 }
@@ -272,7 +299,7 @@ function TuileCagnotte({ valeur, reduit }: { valeur: number; reduit: boolean }) 
       <Tuile>
         <p class="libelle-cagnotte">Cagnotte</p>
         <div class="cagnotte-ligne">
-          <CompteurRouleaux valeur={valeur} duree={reduit ? 150 : 700} taille={56} />
+          <CompteurRouleaux valeur={valeur} duree={reduit ? 150 : 700} taille={96} />
         </div>
       </Tuile>
       {vol ? (
@@ -350,7 +377,7 @@ export function PlateauTv({
   })();
 
   return (
-    <section class="plateau-scene">
+    <section class="plateau-scene" data-panneau="principal" data-ecran="plateau">
       <div class="colonne-fiches" data-zone="fiches">
         {ordre.map((id) => {
           const joueur = joueurs.find((candidat) => candidat.id === id);
@@ -402,7 +429,7 @@ export function PlateauTv({
                     <span
                       class="numero-case"
                       data-numero={index}
-                      style={{ height: `${places.numero}px`, fontSize: `${Math.max(14, places.numero - 8)}px`, lineHeight: `${places.numero - 6}px` }}
+                      style={{ height: `${places.numero}px`, fontSize: `${palier(places.numero - 16)}px`, lineHeight: 1.4 }}
                     >
                       {index}
                     </span>
@@ -432,7 +459,7 @@ export function PlateauTv({
                         key={`${joueur.id}-${index}`}
                         class={reduit ? 'pion fondu' : 'pion'}
                         data-sur-case={index}
-                        style={{ background: joueur.couleur, fontSize: `${Math.max(14, Math.floor(places.pion * 0.42))}px`, lineHeight: `${places.pion - 8}px` }}
+                        style={{ background: joueur.couleur, fontSize: `${palier(Math.floor(places.pion * 0.42))}px`, lineHeight: 1.4 }}
                       >
                         {initiale(joueur.pseudo)}
                       </span>

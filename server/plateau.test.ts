@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
 import { lireCartesChance, lireConfigPlateau } from './course-config';
+import { lireCatalogue, lirePoker } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { creerStore } from './store';
 import { vueJoueur, vueTv } from './vues';
@@ -33,6 +34,8 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     alea: aleaFixe(0),
     plateau,
     cartes: lireCartesChance(RACINE),
+    catalogue: lireCatalogue(RACINE),
+    poker: lirePoker(RACINE),
     ...partiel,
   };
 }
@@ -109,7 +112,7 @@ describe('plateau', () => {
     const ordre = etat.course?.ordre ?? [];
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     expect(etat.course?.choisitId).toBe(ordre[0]);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     while (etat.course?.phase === 'deplacements') {
       const courant = etat.course.ordre[etat.course.indexCourant];
@@ -138,7 +141,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 4, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     const trop = reduire(etat, { type: 'lancerDe', mise: 11 }, { role: 'joueur', joueurId: mira }, ctx);
     expect(trop.ok).toBe(false);
@@ -170,7 +173,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 20, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', mise: 5 }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(1);
@@ -203,7 +206,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 10, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.etape?.genre).toBe('cadeau');
@@ -230,7 +233,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 30, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
     etat = jouer(etat, { type: 'choisirAdversaire', joueurId: noe }, { role: 'joueur', joueurId: mira }, ctx);
@@ -253,7 +256,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 5, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(4);
@@ -276,7 +279,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 20, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', mise: 0 }, { role: 'joueur', joueurId: mira }, ctx);
     etat = jouer(etat, { type: 'choisirAdversaire', joueurId: noe }, { role: 'joueur', joueurId: mira }, ctx);
@@ -317,7 +320,7 @@ describe('plateau', () => {
     };
     for (let tour = 0; tour < 12 && etat.course?.phase !== 'terminee'; tour += 1) {
       etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-      etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Épreuve' }, hote, ctx);
+      etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
       etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
       let garde = 0;
       while (etat.course?.phase === 'deplacements' && garde < 40) {
@@ -373,7 +376,7 @@ describe('plateau', () => {
     store.dispatch({ type: 'demarrerCourse' }, hote);
     const lanceur = store.etat().course?.ordre[0] ?? courant;
     store.dispatch({ type: 'nouveauTour' }, hote);
-    store.dispatch({ type: 'choisirMiniJeu', nom: 'Quiz' }, hote);
+    store.dispatch({ type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote);
     store.dispatch({ type: 'passerAuxDeplacements' }, hote);
     const avant = store.etat().course?.positions[lanceur];
     const soldeAvant = solde(store.etat().transactions, lanceur, 'visibles');

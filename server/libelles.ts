@@ -46,6 +46,28 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return "Tirage de l'ordre";
     case 'choisirMiniJeu':
       return 'Mini-jeu';
+    case 'afficherGrille':
+      return 'Grille des mini-jeux';
+    case 'remettreMiniJeu':
+      return 'Remettre un mini-jeu en jeu';
+    case 'demarrerMinuteur':
+      return 'Minuteur';
+    case 'pauseMinuteur':
+      return 'Pause du minuteur';
+    case 'reprendreMinuteur':
+      return 'Reprise du minuteur';
+    case 'ajouter30s':
+      return '30 secondes de plus';
+    case 'arreterMinuteur':
+      return 'Arrêt du minuteur';
+    case 'echeanceMinuteur':
+      return 'Échéance du minuteur';
+    case 'niveauSuivant':
+      return 'Niveau de blinds suivant';
+    case 'validerResultats':
+      return 'Résultats du mini-jeu';
+    case 'validerPoker':
+      return 'Conversion du poker';
     case 'passerAuxDeplacements':
       return 'Déplacements';
     case 'lancerDe':

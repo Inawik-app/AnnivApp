@@ -19,6 +19,7 @@ import {
 } from '../commun/spectacle';
 import '../commun/base.css';
 import { animerPlateau, PlateauTv, type Spectacle } from './plateau';
+import { GrilleTv, PodiumMini, PokerTv, ReglesTv } from './mini-jeux';
 import './tv.css';
 
 type Gain = { id: string; montant: number; cle: number };
@@ -455,6 +456,40 @@ function EcranTv() {
       setPoseAnime(false);
       return;
     }
+    if (evenement.type === 'minijeu.podium') {
+      const brut = evenement.donnees.lignes;
+      const lignes = Array.isArray(brut)
+        ? brut.flatMap((entree) => {
+            if (!entree || typeof entree !== 'object') return [];
+            const ligne = entree as { joueurId?: unknown; pseudo?: unknown; montant?: unknown; rang?: unknown };
+            if (typeof ligne.joueurId !== 'string' || typeof ligne.pseudo !== 'string' || typeof ligne.montant !== 'number') return [];
+            return [{
+              joueurId: ligne.joueurId,
+              pseudo: ligne.pseudo,
+              montant: ligne.montant,
+              rang: typeof ligne.rang === 'number' ? ligne.rang : null,
+            }];
+          })
+        : [];
+      const dureePodium = reduitRef.current ? 150 : 700;
+      await segment('podium', async () => {
+        sons().jouer('victoire');
+        setSpectacle({ type: 'podium', lignes });
+        await attendreAnime(dureePodium);
+        setSpectacle(null);
+      });
+      return;
+    }
+    if (evenement.type === 'poker.niveau') {
+      const dureeNiveau = reduitRef.current ? 150 : 700;
+      await segment('annonce', async () => {
+        sons().jouer('transition');
+        setSpectacle({ type: 'annonce', texte: evenement.libelle });
+        await attendreAnime(dureeNiveau);
+        setSpectacle(null);
+      });
+      return;
+    }
     const pseudo = (idJoueur: string) => joueursRef.current.find((joueur) => joueur.id === idJoueur)?.pseudo ?? 'Un joueur';
     if (evenement.type === 'tour.nouveau') {
       const tour = typeof evenement.donnees.tour === 'number' ? evenement.donnees.tour : (courseRef.current?.tour ?? 0) + 1;
@@ -618,10 +653,19 @@ function EcranTv() {
   const inscrits = ecran === 'accueil' ? joueurs : [];
   const places = Array.from({ length: Math.max(placesMax, inscrits.length) }, (_, index) => inscrits[index] ?? null);
 
+  const live = vue?.course ?? null;
+  const podiumVisible = spectacle?.type === 'podium';
+  const grille = ecran === 'plateau' && !podiumVisible && live?.grilleVisible === true;
+  const poker = ecran === 'plateau' && !podiumVisible && !grille && live?.phase === 'miniJeu' && live.ecranMini === 'poker';
+  const regles = ecran === 'plateau' && !podiumVisible && !grille && live?.phase === 'miniJeu' && live.ecranMini === 'regles';
+
   return (
     <div class={`${reduit ? 'scene animations-reduites' : 'scene'}${ecran === 'plateau' ? ' scene-plateau' : ''}`} ref={scene}>
       {ecran === 'accueil' && !reduit ? <Confettis /> : null}
-      {ecran === 'plateau' && courseAffichee ? (
+      {grille && live ? <GrilleTv course={live} /> : null}
+      {poker && live ? <PokerTv course={live} /> : null}
+      {regles && live ? <ReglesTv course={live} /> : null}
+      {ecran === 'plateau' && courseAffichee && !grille && !poker && !regles && !podiumVisible ? (
         <PlateauTv
           course={courseAffichee}
           joueurs={joueurs}
@@ -633,13 +677,15 @@ function EcranTv() {
           aLance={lanceId !== null && lanceId === courseAffichee.joueurCourantId}
         />
       ) : null}
+      {spectacle?.type === 'podium' ? <PodiumMini lignes={spectacle.lignes} /> : null}
+      {(grille || poker || regles) && spectacle?.type === 'annonce' ? <p class="annonce-flottante">{spectacle.texte}</p> : null}
       <div class="contenu">
         <span class={connecte ? 'point-lien' : 'point-lien coupe'} data-connecte={connecte ? '1' : '0'} />
         {!connecte ? <p class="bandeau-hors-ligne">Hors ligne</p> : null}
         {sonOk || ecran === 'plateau' ? null : <p class="bandeau-son">Appuie sur OK pour activer le son</p>}
         <div class={`plan ${phase}${poseAnime ? '' : ' sans-transition'}`} style={sonOk || ecran === 'plateau' ? undefined : { height: 'calc(100% - 96px)' }}>
           {ecran === 'plateau' ? null : ecran === 'scores' ? (
-            <section class="podium">
+            <section class="podium" data-ecran="scores" data-panneau="principal">
               {joueurs.length === 0 ? <p class="texte-tv">Aucun joueur pour l'instant</p> : null}
               {joueurs.map((joueur) => (
                 <ColonneScore
@@ -655,7 +701,7 @@ function EcranTv() {
               ))}
             </section>
           ) : (
-            <section class="accueil">
+            <section class="accueil" data-ecran="accueil" data-panneau="principal">
               <div class="accueil-haut">
                 <Tuile>
                   <img class="qr" src="/qr/joueur.svg" alt="QR code vers la page joueur" />
@@ -704,4 +750,25 @@ function EcranTv() {
   );
 }
 
-render(<EcranTv />, document.getElementById('app')!);
+function PlanchePolices() {
+  const texte = '0O 1Il 2Z 5S 6G 8B · Quinte flush royale · Carré · Brelan · Blinds 1 / 2 · Niveau 1 sur 3 · 26 GP · é è à ç û';
+  const roles = ['chiffres', 'titre', 'texte'] as const;
+  return (
+    <main class="planche">
+      {roles.map((role) =>
+        [32, 48, 96].map((taille) => (
+          <p key={`${role}-${taille}`} class={`planche-${role}`} style={{ fontSize: `${taille}px`, lineHeight: 1.4 }}>
+            {texte}
+          </p>
+        )),
+      )}
+    </main>
+  );
+}
+
+function RacineTv() {
+  if (new URLSearchParams(window.location.search).get('planche') === '1') return <PlanchePolices />;
+  return <EcranTv />;
+}
+
+render(<RacineTv />, document.getElementById('app')!);

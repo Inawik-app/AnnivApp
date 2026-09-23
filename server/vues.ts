@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { lireCatalogue, lirePoker } from './mini-jeux-config';
 import { solde } from '../shared/soldes';
 import type {
   AppareilVue,
@@ -20,6 +23,8 @@ export type Presence = {
   latenceJoueur: Record<string, number | null>;
   appareils: AppareilVue[];
 };
+
+const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function visibles(evenements: Evenement[], cible: 'tv' | 'joueur' | 'hote', joueurId: string | null, limite: number): Evenement[] {
   const filtres = evenements.filter((evenement) => {
@@ -74,6 +79,15 @@ export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | '
     joueurCourantId: courant,
     choisitId: course.choisitId,
     miniJeu: course.miniJeu,
+    miniJeuId: course.miniJeuId ?? null,
+    joues: [...(course.joues ?? [])],
+    grilleVisible: course.grilleVisible === true,
+    ecranMini: course.ecranMini ?? null,
+    resultatsSaisis: course.resultatsSaisis === true,
+    minuteur: course.minuteur ?? { etat: 'arrete', finA: null, resteMs: 0, libelle: '' },
+    poker: course.poker ?? { actif: false, niveau: 0 },
+    catalogue: lireCatalogue(RACINE),
+    pokerConfig: lirePoker(RACINE),
     etape,
     carte: course.carteCourante?.carte ?? null,
     duel,

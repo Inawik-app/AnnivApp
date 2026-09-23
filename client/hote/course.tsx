@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Action, VueHote } from '../../shared/types';
 import { Bouton, Tuile } from '../commun/composants';
 import { etapeSuivante, textePhase } from '../commun/course-texte';
+import { PanneauMiniJeux } from './mini-jeux';
 import '../commun/course.css';
 
 const NOMS_CASES: Record<string, string> = {
@@ -22,7 +23,6 @@ export function PanneauCourse({
   envoi: boolean;
   agir: (action: Action) => void;
 }) {
-  const [nomMiniJeu, setNomMiniJeu] = useState('');
   const [miseLancer, setMiseLancer] = useState(0);
   const [positions, setPositions] = useState<Record<string, string>>({});
   const [confirmerFin, setConfirmerFin] = useState(false);
@@ -84,30 +84,7 @@ export function PanneauCourse({
           <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'plateau' })}>
             Afficher le plateau sur la télé
           </Bouton>
-          {course.phase === 'choixMiniJeu' ? (
-            <div class="pile">
-              <p>{pseudos.get(course.choisitId ?? '') ?? 'Un joueur'} choisit le mini-jeu</p>
-              <label>
-                Nom du mini-jeu
-                <input
-                  type="text"
-                  maxLength={40}
-                  value={nomMiniJeu}
-                  onInput={(event) => setNomMiniJeu((event.currentTarget as HTMLInputElement).value)}
-                />
-              </label>
-              <Bouton
-                plein
-                disabled={envoi || nomMiniJeu.trim().length === 0}
-                onClick={() => {
-                  void agir({ type: 'choisirMiniJeu', nom: nomMiniJeu.trim() });
-                  setNomMiniJeu('');
-                }}
-              >
-                Mini-jeu choisi
-              </Bouton>
-            </div>
-          ) : null}
+          {course.tour >= 1 ? <PanneauMiniJeux vue={vue} envoi={envoi} agir={agir} /> : null}
           {suite ? (
             <div class="bouton-etape">
               <Bouton plein disabled={envoi} onClick={() => agir(suite.action)}>

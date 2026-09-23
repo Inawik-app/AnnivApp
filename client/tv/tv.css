@@ -26,6 +26,34 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
+  image-rendering: pixelated;
+  text-shadow: var(--contour);
+}
+
+.scene.scene-plateau .panneau,
+.scene.scene-plateau .fiche-joueur,
+.scene.scene-plateau .tuile,
+.scene.scene-plateau .tuile-mini,
+.scene.scene-plateau .pastille-case,
+.scene.scene-plateau .numero-case,
+.scene.scene-plateau .de-face,
+.scene.scene-plateau .pion,
+.scene.scene-plateau .carte-effet,
+.scene.scene-plateau .annonce-arrivee,
+.scene.scene-plateau .panneau-duel,
+.scene.scene-plateau .annonce-flottante,
+.scene.scene-plateau .carte-poker,
+.scene.scene-plateau .toast {
+  text-shadow: none;
+}
+
+.scene .tuile:not(.tuile-vide),
+.scene .panneau,
+.scene .tuile-mini,
+.scene .annonce-flottante {
+  background: var(--nuit);
+  color: var(--carton);
+  --liseret: #b9d4ff;
 }
 
 .scene.animations-reduites {
@@ -70,8 +98,9 @@ body {
 .titre-tv {
   margin: 0 0 12px;
   color: var(--carton);
-  font-size: 120px;
-  line-height: 0.95;
+  font-family: var(--police-pixel);
+  font-size: var(--px-128);
+  line-height: 1.4;
 }
 
 .texte-tv {
@@ -92,23 +121,39 @@ body {
   grid-template-columns: 560px 1fr;
   gap: 48px;
   align-items: center;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.accueil-haut > .socle-pixel,
+.accueil-haut .tuile {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .qr {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
   background: var(--carton);
 }
 
 .places {
   display: grid;
   gap: 24px;
-  margin-top: auto;
+  margin-top: 24px;
+  flex: 1 1 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .place {
-  min-height: 280px;
+  height: 100%;
+  min-height: 0;
   position: relative;
 }
 
@@ -138,9 +183,19 @@ body {
   transform: rotateY(180deg);
 }
 
-.face .tuile,
-.place > .tuile {
+.face .socle-pixel,
+.place > .socle-pixel,
+.colonne > .socle-pixel {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.face .tuile,
+.place > .socle-pixel > .tuile,
+.colonne > .socle-pixel > .tuile {
+  height: 100%;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -148,10 +203,11 @@ body {
 }
 
 .pseudo-tv {
+  font-family: var(--police-pixel);
   margin: 12px 0 0;
-  font-size: 56px;
-  font-weight: 800;
-  line-height: 1.05;
+  font-size: var(--px-64);
+  font-weight: 400;
+  line-height: 1.4;
   text-align: center;
   word-break: break-word;
 }
@@ -160,25 +216,25 @@ body {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  align-items: end;
+  align-items: stretch;
   gap: 28px;
   height: 100%;
 }
 
 .colonne {
-  height: 78%;
+  height: 100%;
   position: relative;
 }
 
 .colonne.premier {
-  height: 96%;
+  height: 100%;
 }
 
 .tuile-score {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   height: 100%;
   position: relative;
   text-align: center;
@@ -186,13 +242,15 @@ body {
 
 .rang-tv {
   margin: 8px 0;
-  font-family: "Titan One", sans-serif;
-  font-size: 72px;
-  line-height: 1;
+  font-family: var(--police-pixel);
+  font-size: var(--px-64);
+  line-height: 1.4;
 }
 
 .chiffres-tv {
-  font-size: 96px;
+  font-family: var(--police-chiffres);
+  font-size: var(--px-96);
+  line-height: 1.4;
   margin: 8px 0 12px;
 }
 
@@ -223,7 +281,8 @@ body {
   background: var(--tomate, #ff5b4a);
   color: var(--encre);
   border: 4px solid var(--encre);
-  border-radius: 16px;
+  border-radius: 0;
+  clip-path: var(--escalier);
   font-size: 40px;
   font-weight: 800;
   text-align: center;
@@ -236,7 +295,8 @@ body {
   background: var(--or);
   color: var(--encre);
   border: 4px solid var(--encre);
-  border-radius: var(--rayon-petite);
+  border-radius: 0;
+  clip-path: var(--escalier);
   font-size: 40px;
   font-weight: 800;
 }
@@ -253,8 +313,8 @@ body {
 }
 
 .panneau-diag p {
-  font-size: 36px;
-  line-height: 1.2;
+  font-size: var(--px-40);
+  line-height: 1.4;
 }
 
 .panneau-diag p + p {
@@ -274,7 +334,7 @@ body {
   width: 16px;
   height: 26px;
   border: 3px solid var(--encre);
-  border-radius: 4px;
+  border-radius: 0;
   animation: deriver 14s linear infinite;
 }
 
@@ -303,4 +363,27 @@ body {
 .attente {
   font-size: 40px;
   text-align: center;
+}
+
+.planche {
+  margin: 0;
+  padding: 24px 32px;
+  background: var(--tapis);
+  color: var(--carton);
+}
+
+.planche p {
+  margin: 0 0 12px;
+}
+
+.planche-chiffres {
+  font-family: var(--police-chiffres);
+}
+
+.planche-titre {
+  font-family: var(--police-pixel);
+}
+
+.planche-texte {
+  font-family: var(--police-texte);
 }

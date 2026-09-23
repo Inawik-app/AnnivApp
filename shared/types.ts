@@ -1,3 +1,5 @@
+import type { CatalogueMiniJeux, ConfigPoker } from './mini-jeux';
+
 export type Joueur = {
   id: string;
   pseudo: string;
@@ -109,6 +111,40 @@ export type HistoriqueCourse = {
   }>;
 };
 
+export type SaisieMiniJeu = 'classement' | 'equipes' | 'libre';
+
+export type MiniJeu = {
+  id: string;
+  nom: string;
+  resume: string;
+  icone: string;
+  regles: string[];
+  materiel?: string;
+  /** Secondes. Présent seulement pour un mini-jeu chronométré. */
+  duree?: number;
+  saisie: SaisieMiniJeu;
+  /** Remplace le barème classement par défaut. */
+  bareme?: number[];
+  /** `aucun` pour un jeu physique, sinon le nom du module à l'écran. */
+  module: string;
+};
+
+export type EtatMinuteur = 'arrete' | 'enCours' | 'enPause';
+
+export type Minuteur = {
+  etat: EtatMinuteur;
+  /** Heure serveur de la fin, quand le minuteur tourne. */
+  finA: number | null;
+  resteMs: number;
+  libelle: string;
+};
+
+export type PokerCourse = {
+  actif: boolean;
+  /** Index du niveau de blinds en cours, à partir de 0. */
+  niveau: number;
+};
+
 export type Course = {
   active: boolean;
   disposition: TypeCase[];
@@ -124,6 +160,15 @@ export type Course = {
   indexCourant: number;
   etape: EtapeDeplacement | null;
   miniJeu: string | null;
+  miniJeuId: string | null;
+  /** Identifiants des mini-jeux déjà choisis pendant cette course. */
+  joues: string[];
+  grilleVisible: boolean;
+  /** `regles`, `poker`, ou un module branché plus tard. */
+  ecranMini: string | null;
+  resultatsSaisis: boolean;
+  minuteur: Minuteur;
+  poker: PokerCourse;
   choisitId: string | null;
   carteCourante: { joueurId: string; carte: CarteChance } | null;
   dernierDe: { joueurId: string; valeur: number; usage: UsageDe } | null;
@@ -197,7 +242,24 @@ export type Action =
   | { type: 'regenererPlateau' }
   | { type: 'nouveauTour' }
   | { type: 'retirerOrdre' }
-  | { type: 'choisirMiniJeu'; nom: string }
+  | { type: 'choisirMiniJeu'; id: string }
+  | { type: 'afficherGrille' }
+  | { type: 'remettreMiniJeu'; id: string }
+  | { type: 'demarrerMinuteur'; duree: number; libelle: string }
+  | { type: 'pauseMinuteur' }
+  | { type: 'reprendreMinuteur' }
+  | { type: 'ajouter30s' }
+  | { type: 'arreterMinuteur' }
+  | { type: 'echeanceMinuteur' }
+  | { type: 'niveauSuivant' }
+  | {
+      type: 'validerResultats';
+      saisie:
+        | { mode: 'classement'; ordre: Array<{ joueurId: string; exAequo: boolean }> }
+        | { mode: 'equipes'; equipeA: string[]; equipeB: string[]; gagnante: 'A' | 'B' }
+        | { mode: 'libre'; montants: Record<string, number> };
+    }
+  | { type: 'validerPoker'; tapis: Record<string, number>; tapisHote: number }
   | { type: 'passerAuxDeplacements' }
   | { type: 'lancerDe'; mise: number }
   | { type: 'choisirBeneficiaire'; joueurId: string }
@@ -271,6 +333,15 @@ export type CourseVue = {
   joueurCourantId: string | null;
   choisitId: string | null;
   miniJeu: string | null;
+  miniJeuId: string | null;
+  joues: string[];
+  grilleVisible: boolean;
+  ecranMini: string | null;
+  resultatsSaisis: boolean;
+  minuteur: Minuteur;
+  poker: PokerCourse;
+  catalogue: CatalogueMiniJeux;
+  pokerConfig: ConfigPoker;
   etape: 'lancer' | 'cadeau' | 'duel' | null;
   carte: CarteChance | null;
   duel: DuelVue | null;

@@ -15,7 +15,11 @@ export function Tuile({
   vide?: boolean;
   className?: string;
 }) {
-  return <div class={`tuile tuile-${taille}${vide ? ' tuile-vide' : ''} ${className}`.trim()}>{children}</div>;
+  return (
+    <div class={vide ? 'socle-pixel socle-vide' : 'socle-pixel'}>
+      <div class={`tuile tuile-${taille}${vide ? ' tuile-vide' : ''} ${className}`.trim()}>{children}</div>
+    </div>
+  );
 }
 
 type BoutonProps = {
@@ -39,14 +43,17 @@ export function Avatar({
   couleur,
   pseudo,
   taille,
+  plancher = 0,
 }: {
   avatar: string;
   couleur: string;
   pseudo: string;
   taille: number;
+  plancher?: number;
 }) {
   const url = urlAvatar(avatar);
-  const cote = { width: `${taille}px`, height: `${taille}px`, fontSize: `${Math.round(taille * 0.42)}px` };
+  const cran = [24, 32, 40, 48, 64, 96, 128].find((valeur) => valeur >= Math.max(plancher, Math.round(taille * 0.42))) ?? 128;
+  const cote = { width: `${taille}px`, height: `${taille}px`, fontSize: `${cran}px` };
   if (url) {
     return (
       <span class="avatar" style={{ ...cote, borderColor: couleur }}>
@@ -78,7 +85,7 @@ export function Couronne() {
   );
 }
 
-const PAS_ROULEAU = 1.24;
+const PAS_ROULEAU = 1.4;
 
 function Rouleau({ chiffre, duree }: { chiffre: number; duree: number }) {
   const [index, setIndex] = useState(chiffre);
@@ -111,7 +118,7 @@ function Rouleau({ chiffre, duree }: { chiffre: number; duree: number }) {
         class="rouleau-bande"
         style={{
           transform: `translateY(${-index * PAS_ROULEAU}em)`,
-          transition: anime ? `transform calc(${duree}ms / var(--vitesse, 1)) var(--pose)` : 'none',
+          transition: anime ? `transform calc(${duree}ms / var(--vitesse, 1)) steps(8, end)` : 'none',
         }}
       >
         {bande.map((valeur, position) => (
@@ -168,8 +175,8 @@ export function GainFlottant({ montant }: { montant: number }) {
 export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div class="toast" role="status">
-      <p>{message}</p>
+    <div class="socle-pixel socle-toast" role="status">
+      <p class="toast">{message}</p>
     </div>
   );
 }

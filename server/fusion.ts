@@ -34,6 +34,20 @@ function normaliserCourse(valeur: unknown): Course | null {
   if (!Array.isArray(course.ordre) || course.ordre.length === 0) {
     course.ordre = Object.keys(course.positions);
   }
+  if (typeof course.miniJeuId !== 'string') course.miniJeuId = null;
+  if (!Array.isArray(course.joues)) course.joues = [];
+  if (typeof course.grilleVisible !== 'boolean') course.grilleVisible = false;
+  if (typeof course.ecranMini !== 'string') course.ecranMini = null;
+  if (typeof course.resultatsSaisis !== 'boolean') course.resultatsSaisis = false;
+  if (
+    !course.minuteur ||
+    (course.minuteur.etat !== 'arrete' && course.minuteur.etat !== 'enCours' && course.minuteur.etat !== 'enPause')
+  ) {
+    course.minuteur = { etat: 'arrete', finA: null, resteMs: 0, libelle: '' };
+  }
+  if (!course.poker || typeof course.poker.actif !== 'boolean' || typeof course.poker.niveau !== 'number') {
+    course.poker = { actif: false, niveau: 0 };
+  }
   const choix = course.regles.choixMiniJeu as string;
   if (choix === 'premier' || choix !== 'dernierAuClassement') course.regles.choixMiniJeu = 'rotation';
   if (choix === 'dernier') course.regles.choixMiniJeu = 'dernierAuClassement';

@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { esperanceDe, probabilitesDe, tirerDePondere } from '../shared/de';
 import { lireConfigPlateau } from './course-config';
+import { lireCatalogue, lirePoker } from './mini-jeux-config';
 import { etatInitial } from './etat-initial';
 import { reduire, type ContexteReduction } from './reducteur';
 import type { Action, EtatJeu, Origine } from '../shared/types';
@@ -23,6 +24,8 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     alea: (max) => (max <= 0 ? 0 : 0),
     plateau: lireConfigPlateau(RACINE),
     cartes: [{ id: 'de-dore', titre: 'Dé doré', texte: 'Le dé rapporte.', effet: { type: 'gainDe' } }],
+    catalogue: lireCatalogue(RACINE),
+    poker: lirePoker(RACINE),
     ...partiel,
   };
 }
@@ -95,7 +98,7 @@ describe('dé boosté par la mise', () => {
     };
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', nom: 'Quiz' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     const premier = etat.course?.ordre[0];
     const second = etat.course?.ordre[1];

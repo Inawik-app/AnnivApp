@@ -22,6 +22,8 @@ import {
   plafondMise,
 } from './plateau';
 import { esperanceDe, probabilitesDe, tirerDePondere } from '../shared/de';
+import type { CatalogueMiniJeux, ConfigPoker } from '../shared/mini-jeux';
+import { appliquerActivite, appliquerChoix, refuserActivite, refuserChoix } from './mini-jeux';
 
 export type ContexteCourse = {
   maintenant: number;
@@ -31,6 +33,8 @@ export type ContexteCourse = {
   tirerDe?: () => number;
   plateau: ConfigPlateau;
   cartes: CarteChance[];
+  catalogue: CatalogueMiniJeux;
+  poker: ConfigPoker;
   dev: boolean;
 };
 
@@ -57,6 +61,17 @@ const ACTIONS = new Set<Action['type']>([
   'nouveauTour',
   'retirerOrdre',
   'choisirMiniJeu',
+  'afficherGrille',
+  'remettreMiniJeu',
+  'demarrerMinuteur',
+  'pauseMinuteur',
+  'reprendreMinuteur',
+  'ajouter30s',
+  'arreterMinuteur',
+  'echeanceMinuteur',
+  'niveauSuivant',
+  'validerResultats',
+  'validerPoker',
   'passerAuxDeplacements',
   'lancerDe',
   'choisirBeneficiaire',
@@ -426,6 +441,17 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
     action.type === 'regenererPlateau' ||
     action.type === 'retirerOrdre' ||
     action.type === 'choisirMiniJeu' ||
+    action.type === 'afficherGrille' ||
+    action.type === 'remettreMiniJeu' ||
+    action.type === 'demarrerMinuteur' ||
+    action.type === 'pauseMinuteur' ||
+    action.type === 'reprendreMinuteur' ||
+    action.type === 'ajouter30s' ||
+    action.type === 'arreterMinuteur' ||
+    action.type === 'echeanceMinuteur' ||
+    action.type === 'niveauSuivant' ||
+    action.type === 'validerResultats' ||
+    action.type === 'validerPoker' ||
     action.type === 'passerAuxDeplacements' ||
     action.type === 'cloreMisesDuel' ||
     action.type === 'autreDefi' ||
@@ -457,10 +483,7 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
       if (course.phase !== 'preparation' || course.tour !== 0) return "L'ordre ne peut plus être retiré";
       return null;
     case 'choisirMiniJeu':
-      if (course.phase !== 'choixMiniJeu') return "Ce n'est pas le moment de choisir le mini-jeu";
-      if (typeof action.nom !== 'string' || !action.nom.trim()) return 'Indique le nom du mini-jeu';
-      if (action.nom.trim().length > 40) return 'Le nom du mini-jeu est trop long';
-      return null;
+      return refuserChoix(etat, action, ctx);
     case 'passerAuxDeplacements':
       if (course.phase !== 'miniJeu') return "Ce n'est pas le moment des déplacements";
       return null;
@@ -532,8 +555,10 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
     }
     case 'terminerCourse':
       return null;
-    default:
-      return null;
+    default: {
+      const erreur = refuserActivite(etat, action, origine, ctx);
+      return erreur === undefined ? null : erreur;
+    }
   }
 }
 
@@ -567,6 +592,13 @@ export function appliquerCourse(
       indexCourant: 0,
       etape: null,
       miniJeu: null,
+      miniJeuId: null,
+      joues: [],
+      grilleVisible: false,
+      ecranMini: null,
+      resultatsSaisis: false,
+      minuteur: { etat: 'arrete', finA: null, resteMs: 0, libelle: '' },
+      poker: { actif: false, niveau: 0 },
       choisitId: null,
       carteCourante: null,
       dernierDe: null,
@@ -602,6 +634,11 @@ export function appliquerCourse(
       course.indexCourant = 0;
       course.etape = null;
       course.miniJeu = null;
+      course.miniJeuId = null;
+      course.ecranMini = null;
+      course.resultatsSaisis = false;
+      course.poker = { actif: false, niveau: 0 };
+      course.minuteur = { etat: 'arrete', finA: null, resteMs: 0, libelle: '' };
       course.carteCourante = null;
       course.phase = 'choixMiniJeu';
       course.choisitId = quiChoisit(draft, course);
@@ -622,15 +659,9 @@ export function appliquerCourse(
       });
       break;
     }
-    case 'choisirMiniJeu': {
-      course.miniJeu = action.nom.trim();
-      course.phase = 'miniJeu';
-      ajouter(draft, 'minijeu.choisi', 'public', `Mini-jeu : ${course.miniJeu}`, {
-        nom: course.miniJeu,
-        joueurId: course.choisitId,
-      });
+    case 'choisirMiniJeu':
+      appliquerChoix(draft, action, ctx, ajouter);
       break;
-    }
     case 'passerAuxDeplacements': {
       course.phase = 'deplacements';
       course.indexCourant = -1;
@@ -798,6 +829,7 @@ export function appliquerCourse(
       figerClassement(draft, ctx, ajouter);
       break;
     default:
+      appliquerActivite(draft, action, ctx, ajouter);
       break;
   }
 }

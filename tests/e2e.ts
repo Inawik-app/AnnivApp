@@ -1,4 +1,6 @@
 import { esperanceDe, probabilitesDe } from '../shared/de';
+import { repartirTapisHote } from '../shared/mini-jeux';
+import { solde } from '../shared/soldes';
 import type { Action, VueClient } from '../shared/types';
 import { demarrerServeur, type ServeurJeu } from '../server/demarrer';
 import {
@@ -142,8 +144,48 @@ async function main(): Promise<void> {
     console.log('OK     Ordre figé après le premier tour');
 
     await annulerPuisRejouer(monde, 'le mini-jeu choisi', async () => {
-      await jouer(monde as Monde, (monde as Monde).hote, { type: 'choisirMiniJeu', nom: 'Ping-pong' }, 'Mini-jeu choisi');
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, 'Mini-jeu choisi');
     });
+    if (monde.serveur.etat().course?.ecranMini !== 'regles') throw new Error('Un mini-jeu physique ouvre les règles');
+    if (!monde.serveur.etat().course?.joues.includes('pong-gobelets')) throw new Error('Le mini-jeu devrait être marqué joué');
+    await jouer(monde, monde.hote, { type: 'afficherGrille' }, 'Grille affichée');
+    if (monde.tv.vue?.course?.grilleVisible !== true) throw new Error('La grille devrait être visible sur la télé');
+    await jouer(monde, monde.hote, { type: 'afficherGrille' }, 'Grille masquée');
+    if (monde.tv.vue?.course?.grilleVisible !== false) throw new Error('La grille devrait être masquée');
+    await jouer(monde, monde.hote, { type: 'demarrerMinuteur', duree: 90, libelle: 'Pong gobelets' }, 'Minuteur démarré');
+    await jouer(monde, monde.hote, { type: 'pauseMinuteur' }, 'Minuteur en pause');
+    const enPause = monde.serveur.etat().course?.minuteur;
+    if (!enPause || enPause.etat !== 'enPause' || enPause.resteMs < 80_000 || enPause.resteMs > 90_000) {
+      throw new Error(`Temps restant inattendu après la pause : ${enPause?.resteMs ?? 'absent'}`);
+    }
+    await jouer(monde, monde.hote, { type: 'reprendreMinuteur' }, 'Minuteur repris');
+    if (monde.serveur.etat().course?.minuteur.etat !== 'enCours') throw new Error('Le minuteur devrait avoir repris');
+    await jouer(monde, monde.hote, { type: 'arreterMinuteur' }, 'Minuteur arrêté');
+    await annulerPuisRejouer(monde, 'la saisie des résultats', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, {
+        type: 'validerResultats',
+        saisie: {
+          mode: 'classement',
+          ordre: [
+            { joueurId: ines.joueurId, exAequo: false },
+            { joueurId: noe.joueurId, exAequo: true },
+            { joueurId: lina.joueurId, exAequo: false },
+            { joueurId: leo.joueurId, exAequo: false },
+          ],
+        },
+      }, 'Classement avec ex aequo');
+    });
+    const classement = new Map(
+      monde.serveur.etat().transactions
+        .filter((transaction) => transaction.source === 'mini-jeu' && transaction.libelle === 'Pong gobelets')
+        .map((transaction) => [transaction.joueurId, transaction.montant]),
+    );
+    if (classement.get(ines.joueurId) !== 10 || classement.get(noe.joueurId) !== 10) {
+      throw new Error('Les ex aequo devraient recevoir 10 GP');
+    }
+    if (classement.get(lina.joueurId) !== 3 || classement.get(leo.joueurId) !== 1) {
+      throw new Error('Le barème après l\'égalité est incorrect');
+    }
     await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Passage aux déplacements');
 
     await annulerPuisRejouer(monde, 'un lancer suivi de l\'effet de sa case', async () => {
@@ -177,7 +219,39 @@ async function main(): Promise<void> {
     await annulerPuisRejouer(monde, 'un nouveau tour', async () => {
       await jouer(monde as Monde, (monde as Monde).hote, { type: 'nouveauTour' }, 'Tour 2');
     });
-    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', nom: 'Blind test' }, 'Mini-jeu du tour 2');
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'poker' }, 'Poker du tour 2');
+    if (monde.serveur.etat().course?.ecranMini !== 'poker') throw new Error('Le poker devrait ouvrir son module');
+    await jouer(monde, monde.hote, { type: 'demarrerMinuteur', duree: 600, libelle: 'Blinds' }, 'Minuteur du poker');
+    await jouer(monde, monde.hote, { type: 'pauseMinuteur' }, 'Pause du poker');
+    await jouer(monde, monde.hote, { type: 'reprendreMinuteur' }, 'Reprise du poker');
+    await jouer(monde, monde.hote, { type: 'niveauSuivant' }, 'Niveau de blinds suivant');
+    if (monde.serveur.etat().course?.poker.niveau !== 1) throw new Error('Le poker devrait être au niveau 2');
+    const joueursPoker = [...monde.serveur.etat().joueurs].sort(
+      (a, b) => a.rejointA - b.rejointA || a.pseudo.localeCompare(b.pseudo, 'fr'),
+    );
+    const parts = repartirTapisHote(
+      10,
+      joueursPoker.map((joueur) => ({
+        id: joueur.id,
+        gpVisibles: solde(monde.serveur.etat().transactions, joueur.id, 'visibles'),
+      })),
+    );
+    const tapis: Record<string, number> = {};
+    for (const joueur of joueursPoker) tapis[joueur.id] = 5;
+    await annulerPuisRejouer(monde, 'la conversion du poker', async () => {
+      await jouer(monde as Monde, (monde as Monde).hote, { type: 'validerPoker', tapis, tapisHote: 10 }, 'Conversion des tapis');
+    });
+    const credits = monde.serveur.etat().transactions.filter((transaction) => transaction.source === 'poker');
+    for (const part of parts) {
+      const credit = credits.find((transaction) => transaction.joueurId === part.joueurId);
+      if (!credit || credit.montant !== part.montant + 5) {
+        throw new Error(`Conversion incorrecte pour ${part.joueurId} : ${credit?.montant ?? 'absente'}`);
+      }
+    }
+    const finMinuteur = monde.serveur.etat().course?.minuteur.finA;
+    if (!finMinuteur || monde.serveur.etat().course?.minuteur.etat !== 'enCours') {
+      throw new Error('Le minuteur du poker devrait encore tourner');
+    }
     await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Dés du tour 2');
 
     const courseAvant = monde.serveur.etat().course;
@@ -217,6 +291,12 @@ async function main(): Promise<void> {
       if (course.positions[id] !== position) throw new Error('Une position a changé au redémarrage');
     }
     if (monde.tv.vue?.course?.phase !== 'deplacements') throw new Error('La TV ne retrouve pas les déplacements');
+    const minuteurRepris = monde.serveur.etat().course?.minuteur;
+    if (!minuteurRepris || minuteurRepris.etat !== 'enCours' || minuteurRepris.finA !== finMinuteur) {
+      throw new Error('Le minuteur n\'a pas repris à la même heure de fin');
+    }
+    const resteApres = finMinuteur - Date.now();
+    if (resteApres < 540_000) throw new Error(`Temps restant trop court après redémarrage : ${resteApres}`);
     console.log('OK     Redémarrage en phase de déplacements');
 
     const [leo2, ines2, noe2, lina2] = monde.joueurs;
@@ -233,7 +313,24 @@ async function main(): Promise<void> {
 
     for (const tour of [3, 4, 5, 6, 7]) {
       await jouer(monde, monde.hote, { type: 'nouveauTour' }, `Tour ${tour}`);
-      await jouer(monde, monde.hote, { type: 'choisirMiniJeu', nom: 'Quiz' }, `Mini-jeu du tour ${tour}`);
+      if (tour === 3) {
+        await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'mime-express' }, 'Mime express');
+        await jouer(monde, monde.hote, {
+          type: 'validerResultats',
+          saisie: {
+            mode: 'equipes',
+            equipeA: [ines2.joueurId, noe2.joueurId],
+            equipeB: [lina2.joueurId, leo2.joueurId],
+            gagnante: 'A',
+          },
+        }, 'Résultats en équipes');
+        const equipe = monde.serveur.etat().transactions.filter((transaction) => transaction.libelle === 'Mime express');
+        const montant = (id: string) => equipe.find((transaction) => transaction.joueurId === id)?.montant;
+        if (montant(ines2.joueurId) !== 8 || montant(noe2.joueurId) !== 8) throw new Error('Les gagnants devraient recevoir 8 GP');
+        if (montant(lina2.joueurId) !== 2 || montant(leo2.joueurId) !== 2) throw new Error('Les perdants devraient recevoir 2 GP');
+      } else {
+        await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, `Mini-jeu du tour ${tour}`);
+      }
       await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, `Dés du tour ${tour}`);
       await jouer(monde, ines2, { type: 'lancerDe', mise: 0 }, `Lancer d'Inès, tour ${tour}`);
       await jouer(monde, noe2, { type: 'lancerDe', mise: 0 }, `Lancer de Noé, tour ${tour}`);
@@ -242,7 +339,7 @@ async function main(): Promise<void> {
     }
 
     await jouer(monde, monde.hote, { type: 'nouveauTour' }, 'Tour 8');
-    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', nom: 'Quiz' }, 'Mini-jeu du tour 8');
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, 'Mini-jeu du tour 8');
     await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Dés du tour 8');
     await annulerPuisRejouer(monde, 'une arrivée', async () => {
       await jouer(monde, ines2, { type: 'lancerDe', mise: 0 }, 'Inès arrive');

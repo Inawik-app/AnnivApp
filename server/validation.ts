@@ -11,7 +11,7 @@ export function controlerPseudo(
   const pseudo = valeur.trim();
   if (!pseudo) return { ok: false, erreur: 'Choisis un pseudo' };
   if (pseudo.length > PSEUDO_MAX) {
-    return { ok: false, erreur: 'Le pseudo doit faire au maximum 16 caractères' };
+    return { ok: false, erreur: `Le pseudo doit faire au maximum ${PSEUDO_MAX} caractères` };
   }
   if (/[\u0000-\u001F]/.test(pseudo)) return { ok: false, erreur: 'Ce pseudo n\'est pas valide' };
   const cle = clePseudo(pseudo);

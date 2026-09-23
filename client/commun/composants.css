@@ -1,20 +1,30 @@
-.tuile {
+.socle-pixel {
+  box-sizing: border-box;
+  background: var(--encre);
+  padding: 0 var(--cran) var(--cran) 0;
+}
+
+.socle-vide {
+  background: transparent;
+  padding: 0;
+}
+
+.tuile,
+.panneau {
   background: var(--carton);
   color: var(--encre);
-  border: 6px solid var(--encre);
-  box-shadow: 0 var(--ombre) 0 var(--encre);
+  border: 4px solid var(--encre);
+  border-radius: 0;
+  clip-path: var(--escalier);
+  box-shadow: inset 0 0 0 3px var(--liseret);
 }
 
 .tuile-grande {
-  border-radius: var(--rayon-grande);
   padding: 20px;
 }
 
 .tuile-petite {
-  border-radius: var(--rayon-petite);
-  border-width: 4px;
   padding: 12px;
-  --ombre: 8px;
 }
 
 .tuile-vide {
@@ -28,8 +38,8 @@
   display: inline-flex;
   vertical-align: top;
   background: var(--encre);
-  border-radius: var(--rayon-bouton);
-  padding: 0 0 8px;
+  border-radius: 0;
+  padding: 0 0 var(--cran);
 }
 
 .bouton-socle.plein,
@@ -41,13 +51,18 @@
   min-height: 56px;
   padding: 12px 16px;
   border: 4px solid var(--encre);
-  border-radius: var(--rayon-bouton);
+  border-radius: 0;
+  clip-path: var(--escalier);
+  box-shadow: inset 0 0 0 3px var(--liseret);
   background: var(--or);
   color: var(--encre);
-  font-weight: 800;
+  font-family: var(--police-pixel);
+  font-size: var(--px-32);
+  font-weight: 400;
+  line-height: 1.4;
   cursor: pointer;
   transform: translateY(0);
-  transition: transform var(--duree-rapide) var(--pose);
+  transition: transform var(--duree-rapide) steps(1, start);
   touch-action: manipulation;
 }
 
@@ -60,7 +75,7 @@
 }
 
 .bouton:active:not(:disabled) {
-  transform: translateY(8px);
+  transform: translateY(var(--cran));
 }
 
 .bouton:disabled {
@@ -77,7 +92,7 @@
   overflow: hidden;
   background: var(--carton);
   color: var(--encre);
-  font-family: "Titan One", sans-serif;
+  font-family: var(--police-pixel);
   line-height: 1;
 }
 
@@ -96,7 +111,7 @@
   display: inline-flex;
   align-items: flex-end;
   gap: 4px;
-  font-family: "Titan One", sans-serif;
+  font-family: var(--police-pixel);
   color: var(--or);
   -webkit-text-stroke: 2px var(--encre);
   line-height: 1;
@@ -110,6 +125,8 @@
   overflow: hidden;
   vertical-align: bottom;
   text-align: center;
+  font-family: var(--police-chiffres);
+  line-height: 1.4;
 }
 
 .rouleau-bande {
@@ -138,7 +155,7 @@
   gap: 8px;
   color: var(--or);
   -webkit-text-stroke: 2px var(--encre);
-  font-family: "Titan One", sans-serif;
+  font-family: var(--police-pixel);
   font-size: 64px;
   pointer-events: none;
   animation: jaillir var(--duree-spectacle) linear forwards;
@@ -163,7 +180,7 @@
   }
 }
 
-.toast {
+.socle-toast {
   position: fixed;
   top: 16px;
   left: 16px;
@@ -171,14 +188,21 @@
   z-index: 40;
   margin: 0 auto;
   max-width: 688px;
+  height: auto;
+  animation: poser-toast var(--duree-normale) steps(4, end);
+}
+
+.toast {
+  margin: 0;
   background: var(--carton);
   color: var(--encre);
   border: 4px solid var(--encre);
-  border-radius: var(--rayon-petite);
-  box-shadow: 0 8px 0 var(--encre);
+  border-radius: 0;
+  clip-path: var(--escalier);
+  box-shadow: inset 0 0 0 3px var(--liseret);
   padding: 14px 16px;
+  font-family: var(--police-texte);
   font-size: 22px;
-  animation: poser-toast var(--duree-normale) var(--pose);
 }
 
 @keyframes poser-toast {
@@ -207,7 +231,7 @@
 .voile p {
   color: var(--carton);
   font-size: 40px;
-  font-family: "Titan One", sans-serif;
+  font-family: var(--police-pixel);
 }
 
 .voile-local {
@@ -242,7 +266,7 @@
   padding: 0;
   background: var(--carton);
   color: var(--encre);
-  font-family: "Titan One", sans-serif;
+  font-family: var(--police-pixel);
   font-size: 32px;
   cursor: pointer;
 }

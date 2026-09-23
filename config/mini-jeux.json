@@ -1,0 +1,111 @@
+{
+  "baremes": {
+    "classement": [10, 6, 3, 1],
+    "equipes": { "gagnant": 8, "perdant": 2 }
+  },
+  "jeux": [
+    {
+      "id": "pong-gobelets",
+      "nom": "Pong gobelets",
+      "resume": "Le premier qui vide ses gobelets gagne.",
+      "icone": "pong",
+      "regles": [
+        "Chacun a sa rangée de gobelets.",
+        "Lance la balle pour en faire tomber un.",
+        "Un gobelet tombé est retiré.",
+        "Le premier qui vide sa rangée est premier."
+      ],
+      "materiel": "Gobelets et une balle de ping-pong",
+      "saisie": "classement",
+      "module": "aucun"
+    },
+    {
+      "id": "mime-express",
+      "nom": "Mime express",
+      "resume": "Une équipe mime, l'autre devine.",
+      "icone": "mime",
+      "regles": [
+        "Deux équipes : un mime et des devineurs.",
+        "Le mime ne parle pas et ne montre pas les lettres.",
+        "L'équipe qui trouve le plus de mots gagne.",
+        "Le chrono dure 60 secondes."
+      ],
+      "materiel": "Une liste de mots",
+      "duree": 60,
+      "saisie": "equipes",
+      "module": "aucun"
+    },
+    {
+      "id": "memoire-express",
+      "nom": "Mémoire express",
+      "resume": "Retenir une suite, puis la restituer.",
+      "icone": "memoire",
+      "regles": [
+        "Une suite d'objets est montrée une seule fois.",
+        "Chacun la répète dans l'ordre.",
+        "On a 30 secondes pour répondre.",
+        "Le plus fidèle est premier."
+      ],
+      "materiel": "Objets ou cartes à montrer",
+      "duree": 30,
+      "saisie": "classement",
+      "module": "aucun"
+    },
+    {
+      "id": "poker",
+      "nom": "Poker",
+      "resume": "Vrais jetons, l'application compte et chronomètre.",
+      "icone": "poker",
+      "regles": [
+        "On joue avec de vrais jetons.",
+        "20 GP de jetons sont offerts à chacun.",
+        "Les blinds montent toutes les 10 minutes.",
+        "À la fin, chaque jeton vaut 1 GP."
+      ],
+      "saisie": "libre",
+      "module": "poker"
+    },
+    {
+      "id": "jeopardy",
+      "nom": "Jeopardy",
+      "resume": "Des catégories, des valeurs, des réponses.",
+      "icone": "jeopardy",
+      "regles": [
+        "On choisit une catégorie et une valeur.",
+        "Une bonne réponse rapporte cette valeur.",
+        "Une mauvaise réponse ne retire rien.",
+        "L'hôte saisit les GP à la fin."
+      ],
+      "saisie": "libre",
+      "module": "jeopardy"
+    },
+    {
+      "id": "top-ten",
+      "nom": "Top Ten",
+      "resume": "Trouver les dix réponses d'un thème.",
+      "icone": "topten",
+      "regles": [
+        "Un thème, dix bonnes réponses.",
+        "Les équipes proposent à tour de rôle.",
+        "Chaque bonne réponse marque des points.",
+        "L'hôte saisit les GP à la fin."
+      ],
+      "saisie": "libre",
+      "module": "topten"
+    },
+    {
+      "id": "undercover",
+      "nom": "Undercover",
+      "resume": "Un mot secret, un mot proche, un vote.",
+      "icone": "undercover",
+      "regles": [
+        "Tous ont le même mot, sauf l'undercover.",
+        "Chacun donne un indice à voix haute.",
+        "On vote pour éliminer un joueur.",
+        "L'hôte saisit les GP à la fin."
+      ],
+      "saisie": "libre",
+      "module": "undercover"
+    }
+  ]
+}

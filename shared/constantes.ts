@@ -4,7 +4,7 @@ export const LIMITE_ANNULATIONS = 50;
 export const LIMITE_SAUVEGARDES = 30;
 export const INTERVALLE_SAUVEGARDE_MS = 5 * 60 * 1000;
 export const INTERVALLE_PING_MS = 5000;
-export const PSEUDO_MAX = 16;
+export const PSEUDO_MAX = 20;
 export const LIBELLE_MAX = 80;
 
 export const AVATARS = ['soleil', 'lune', 'feuille', 'goutte', 'flamme', 'etoile'] as const;

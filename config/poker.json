@@ -1,0 +1,16 @@
+{
+  "jetonsOfferts": 20,
+  "dureeMinutes": 30,
+  "niveaux": [
+    { "petite": 1, "grosse": 2 },
+    { "petite": 2, "grosse": 4 },
+    { "petite": 4, "grosse": 8 }
+  ],
+  "regles": [
+    "Chacun reçoit 20 GP de jetons, offerts.",
+    "Ces jetons ne sont pas pris sur les GP.",
+    "Les blinds montent toutes les 10 minutes.",
+    "Un joueur peut se retirer : il garde la moitié de son tapis, l'autre moitié va dans le prochain pot.",
+    "À la fin, chaque jeton est converti en GP, 1 pour 1."
+  ]
+}

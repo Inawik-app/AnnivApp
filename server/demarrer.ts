@@ -139,6 +139,7 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
   let diffusionPrevue: NodeJS.Timeout | null = null;
   let volumeSon = 0.8;
   let minuteurBots: NodeJS.Timeout | null = null;
+  let surveillanceMinuteur: NodeJS.Timeout | null = null;
 
   const store = creerStore({
     dossierData: options.dossierData,
@@ -224,6 +225,16 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
       io.to(`joueur:${joueur.id}`).emit('vue', vueJoueur(etat, actuel, heure, idDemarrage, joueur.id));
     }
   };
+
+  surveillanceMinuteur = setInterval(() => {
+    const course = store.etat().course;
+    if (!course || course.minuteur.etat !== 'enCours' || course.minuteur.finA === null) return;
+    if (Date.now() < course.minuteur.finA) return;
+    const reponse = store.dispatch({ type: 'echeanceMinuteur' }, { role: 'hote' });
+    if (!reponse.ok) return;
+    diffuser();
+  }, 500);
+  surveillanceMinuteur.unref();
 
   const planifierDiffusion = () => {
     if (diffusionPrevue) return;
@@ -484,6 +495,7 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
     etat: () => store.etat(),
     fermer: async () => {
       if (minuteurBots) clearTimeout(minuteurBots);
+      if (surveillanceMinuteur) clearInterval(surveillanceMinuteur);
       if (diffusionPrevue) clearTimeout(diffusionPrevue);
       for (const minuteur of minuteurs.values()) clearInterval(minuteur);
       minuteurs.clear();
