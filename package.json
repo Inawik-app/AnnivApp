@@ -12,7 +12,8 @@
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "tsx tests/e2e.ts",
-    "test:tv": "tsx tests/tv.ts"
+    "test:tv": "tsx tests/tv.ts",
+    "icones": "node scripts/decouper-icones.mjs"
   },
   "browserslist": [
     "chrome >= 38",
@@ -37,6 +38,7 @@
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
     "playwright": "^1.63.0",
+    "pngjs": "^7.0.0",
     "preact": "^10.26.6",
     "socket.io-client": "^4.8.1",
     "terser": "^5.40.0",

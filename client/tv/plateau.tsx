@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { CourseVue, EvenementVue, JoueurPublic } from '../../shared/types';
+import type { NomIcone } from '../../shared/icones';
 import { Avatar, CompteurRouleaux, Piece, Tuile } from '../commun/composants';
 import { useFlip } from '../commun/flip';
+import { Icone, estNomIcone, multipleIcone } from '../commun/icones';
 import { initiale, libelleRang } from '../commun/spectacle';
 import { sons } from '../commun/sons';
 import './plateau.css';
@@ -58,17 +60,16 @@ export function meilleureGrille(nombre: number, largeur: number, hauteur: number
   };
 }
 
-function slotsPions(taille: number): { pion: number; numero: number; slots: Array<{ x: number; y: number }> } {
-  const numero = Math.max(56, Math.floor(taille * 0.16));
+function slotsPions(taille: number, numero: number): { pion: number; numero: number; slots: Array<{ x: number; y: number }> } {
   const marge = Math.max(4, Math.floor(taille * 0.04));
-  const plafond = numero + 16;
+  const degagement = numero + 12;
   const pion = Math.max(
     12,
-    Math.min(Math.floor(taille * 0.4), Math.floor((taille - 2 * marge - 2) / 2), Math.floor((taille - plafond - marge - 2) / 2)),
+    Math.min(Math.floor(taille * 0.4), Math.floor((taille - 2 * marge - 2) / 2), Math.floor((taille - degagement - marge) / 2)),
   );
   const bloc = 2 * pion + 2;
   const x0 = Math.max(marge, Math.floor((taille - bloc) / 2));
-  const y0 = Math.max(plafond, taille - marge - bloc);
+  const y0 = Math.max(degagement, taille - marge - bloc);
   return {
     pion,
     numero,
@@ -102,52 +103,14 @@ function titreCourse(course: CourseVue, joueurs: readonly JoueurPublic[]): strin
   return 'Déplacements';
 }
 
-function Icone({ type }: { type: string }) {
-  if (type === 'bonus') {
-    return (
-      <svg class="icone-case" viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="32" cy="32" r="26" fill="#FFF6E4" stroke="#1C1633" strokeWidth="7" />
-        <circle cx="32" cy="32" r="12" fill="#E39B00" stroke="#1C1633" strokeWidth="6" />
-      </svg>
-    );
-  }
-  if (type === 'chance') {
-    return (
-      <svg class="icone-case" viewBox="0 0 64 64" aria-hidden="true">
-        <path d="M18 28c0-10 8-18 16-18s14 6 14 14c0 10-12 11-12 20" fill="none" stroke="#1C1633" strokeWidth="8" strokeLinecap="round" />
-        <circle cx="36" cy="52" r="5" fill="#1C1633" />
-      </svg>
-    );
-  }
-  if (type === 'cagnotte') {
-    return (
-      <svg class="icone-case" viewBox="0 0 64 64" aria-hidden="true">
-        <rect x="6" y="22" width="52" height="32" rx="8" fill="#FFC21A" stroke="#1C1633" strokeWidth="8" />
-        <path d="M14 22 V12 H50 V22" fill="none" stroke="#1C1633" strokeWidth="8" />
-      </svg>
-    );
-  }
-  if (type === 'duel') {
-    return (
-      <svg class="icone-case" viewBox="0 0 64 64" aria-hidden="true">
-        <path d="M10 8h12L16 30h10L8 58l10-22H8z" fill="#1C1633" />
-        <path d="M54 8H42l6 22H38l18 28-10-22h10z" fill="#1C1633" />
-      </svg>
-    );
-  }
-  if (type === 'arrivee') {
-    return (
-      <svg class="icone-case" viewBox="0 0 64 64" aria-hidden="true">
-        <path d="M14 56 V8 H50 L40 24 L50 38 H14" fill="#FF5B4A" stroke="#1C1633" strokeWidth="8" />
-      </svg>
-    );
-  }
-  return (
-    <svg class="icone-case" viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="32" r="22" fill="none" stroke="#1C1633" strokeWidth="8" />
-    </svg>
-  );
-}
+const ICONE_CASE: Record<string, NomIcone> = {
+  bonus: 'case-bonus',
+  chance: 'case-chance',
+  cagnotte: 'case-cagnotte',
+  duel: 'case-duel',
+  depart: 'case-depart',
+  arrivee: 'case-arrivee',
+};
 
 function FaceDe({ valeur }: { valeur: number }) {
   const points: Record<number, Array<[number, number]>> = {
@@ -211,7 +174,7 @@ function De3D({ valeur, reduit, boost }: { valeur: number; reduit: boolean; boos
 
 export type Spectacle =
   | { type: 'de'; valeur: number; mise: number; miseMax: number }
-  | { type: 'effet'; titre: string; texte: string }
+  | { type: 'effet'; titre: string; texte: string; icone?: NomIcone }
   | { type: 'arrivee'; pseudo: string; rang: number }
   | { type: 'duel'; titre: string; texte: string }
   | { type: 'annonce'; texte: string }
@@ -222,15 +185,33 @@ function palier(px: number, plancher = 40): number {
   return [32, 40, 48, 64, 96, 128].find((cran) => cran >= vise) ?? 128;
 }
 
+/** Pastille du numéro : au plus 30 % de la tuile, et plus petite que l'icône quand la tuile le permet. */
+function mesureNumero(taille: number, icone: number): { hauteur: number; fonte: number } {
+  const plafond = Math.floor(taille * 0.3);
+  const bord = 6;
+  let fonte = 40;
+  for (const cran of [64, 48, 40]) {
+    if (cran * 1.4 + bord <= plafond && (icone <= 0 || cran < icone)) {
+      fonte = cran;
+      break;
+    }
+  }
+  const ligne = Math.ceil(fonte * 1.4 + bord);
+  return { hauteur: plafond >= ligne ? ligne : Math.max(ligne, 0), fonte };
+}
+
 function PseudoFiche({ pseudo }: { pseudo: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    el.style.whiteSpace = 'nowrap';
     for (const taille of [48, 40]) {
       el.style.fontSize = `${taille}px`;
       if (el.scrollWidth <= el.clientWidth + 1) return;
     }
+    el.style.whiteSpace = 'normal';
+    el.style.overflowWrap = 'anywhere';
   }, [pseudo]);
   return (
     <p class="pseudo-fiche" ref={ref}>
@@ -270,15 +251,15 @@ function FicheJoueur({
         </svg>
       ) : null}
       <div class="fiche-ligne">
-        <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={48} plancher={40} />
-        <div class="fiche-texte">
-          <p class="case-fiche">Case {position}</p>
-          {ensuite ? <p class="ensuite">Ensuite</p> : null}
-          {rang !== null ? <p class="ensuite">Arrivé {libelleRang(rang)}</p> : null}
-        </div>
-        <CompteurRouleaux valeur={joueur.gpVisibles} duree={reduit ? 150 : 700} taille={40} />
+        <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={64} />
+        <PseudoFiche pseudo={joueur.pseudo} />
+        <p class="case-fiche">n°{position}</p>
       </div>
-      <PseudoFiche pseudo={joueur.pseudo} />
+      <div class="fiche-gp">
+        <CompteurRouleaux valeur={joueur.gpVisibles} duree={reduit ? 150 : 700} taille={40} />
+        {ensuite ? <p class="ensuite">Ensuite</p> : null}
+        {rang !== null ? <p class="ensuite">Arrivé {libelleRang(rang)}</p> : null}
+      </div>
     </div>
     </div>
   );
@@ -352,8 +333,16 @@ export function PlateauTv({
   }, []);
   const ordre = brassage ?? course.ordre;
   const signature = ordre.join('|');
-  const grille = meilleureGrille(course.disposition.length, boite.largeur, boite.hauteur);
-  const places = slotsPions(grille.taille);
+  const cadreL = Math.min(boite.largeur, Math.round(1920 * 0.6));
+  const cadreH = Math.min(boite.hauteur, Math.round(1080 * 0.8));
+  const grille = meilleureGrille(course.disposition.length, cadreL, cadreH);
+  const decalageX = Math.max(0, (boite.largeur - cadreL) / 2);
+  const decalageY = Math.max(0, (boite.hauteur - cadreH) / 2);
+  const tailleIcone = grille.taille > 0
+    ? multipleIcone('case-depart', Math.round(grille.taille * 0.6), Math.floor(grille.taille * 0.72)) || 64
+    : 0;
+  const numeroCase = mesureNumero(grille.taille, tailleIcone);
+  const places = slotsPions(grille.taille, numeroCase.hauteur);
   const haloId = course.joueurCourantId;
   const joueurBandeau = nomJoueur(joueurs, course.joueurCourantId);
   const enDeplacement = course.phase === 'deplacements' && joueurBandeau !== null;
@@ -377,7 +366,7 @@ export function PlateauTv({
   })();
 
   return (
-    <section class="plateau-scene" data-panneau="principal" data-ecran="plateau">
+    <section class="plateau-scene" data-ecran="plateau">
       <div class="colonne-fiches" data-zone="fiches">
         {ordre.map((id) => {
           const joueur = joueurs.find((candidat) => candidat.id === id);
@@ -409,12 +398,17 @@ export function PlateauTv({
         <div class="zone-plateau" data-zone="plateau" ref={zoneRef}>
           {grille.taille > 0 ? (
             <div class="monde">
-              <svg class="sentier" width={boite.largeur} height={boite.hauteur} aria-hidden="true">
+              <div
+                class="grille-plateau"
+                style={{ width: `${cadreL}px`, height: `${cadreH}px`, transform: `translate(${decalageX}px, ${decalageY}px)` }}
+              >
+              <svg class="sentier" width={cadreL} height={cadreH} aria-hidden="true">
                 <polyline class="route-encre" points={grille.chemin} />
                 <polyline class="route-carton" points={grille.chemin} />
               </svg>
               {course.disposition.map((type, index) => {
                 const point = grille.cases[index];
+                const nomCase = ICONE_CASE[type];
                 if (!point) return null;
                 return (
                   <div
@@ -424,12 +418,12 @@ export function PlateauTv({
                     style={{ left: `${point.x}px`, top: `${point.y}px`, width: `${grille.taille}px`, height: `${grille.taille}px` }}
                   >
                     <div class="pastille-case">
-                      <Icone type={type} />
+                      {nomCase ? <Icone nom={nomCase} taille={tailleIcone} /> : null}
                     </div>
                     <span
                       class="numero-case"
                       data-numero={index}
-                      style={{ height: `${places.numero}px`, fontSize: `${palier(places.numero - 16)}px`, lineHeight: 1.4 }}
+                      style={{ height: `${numeroCase.hauteur}px`, fontSize: `${numeroCase.fonte}px`, lineHeight: 1.4 }}
                     >
                       {index}
                     </span>
@@ -448,6 +442,8 @@ export function PlateauTv({
                   const slot = places.slots[place] ?? places.slots[0];
                   if (!slot) return null;
                   const suivi = joueur.id === haloId;
+                  const nomPion = estNomIcone(joueur.avatar) ? joueur.avatar : null;
+                  const taillePion = nomPion ? multipleIcone(nomPion, places.pion, places.pion) : 0;
                   return (
                     <div
                       key={joueur.id}
@@ -459,13 +455,19 @@ export function PlateauTv({
                         key={`${joueur.id}-${index}`}
                         class={reduit ? 'pion fondu' : 'pion'}
                         data-sur-case={index}
-                        style={{ background: joueur.couleur, fontSize: `${palier(Math.floor(places.pion * 0.42))}px`, lineHeight: 1.4 }}
+                        style={{
+                          background: taillePion > 0 ? '#fff4dc' : joueur.couleur,
+                          borderColor: joueur.couleur,
+                          fontSize: `${palier(Math.floor(places.pion * 0.42))}px`,
+                          lineHeight: 1.4,
+                        }}
                       >
-                        {initiale(joueur.pseudo)}
+                        {nomPion && taillePion > 0 ? <Icone nom={nomPion} taille={taillePion} couleur={joueur.couleur} /> : initiale(joueur.pseudo)}
                       </span>
                     </div>
                   );
                 })}
+              </div>
             </div>
           ) : null}
           {spectacle ? (
@@ -473,6 +475,7 @@ export function PlateauTv({
               {spectacle.type === 'de' ? <De3D valeur={spectacle.valeur} reduit={reduit} boost={boost} /> : null}
               {spectacle.type === 'effet' ? (
                 <div class="carte-effet">
+                  {spectacle.icone ? <Icone nom={spectacle.icone} taille={128} /> : null}
                   <h2>{spectacle.titre}</h2>
                   <p>{spectacle.texte}</p>
                 </div>
@@ -529,9 +532,9 @@ function texte(valeur: unknown): string | null {
   return typeof valeur === 'string' ? valeur : null;
 }
 
-function carteEffet(api: ApiPlateau, titre: string, texteCarte: string, duree: number): Promise<void> {
+function carteEffet(api: ApiPlateau, titre: string, texteCarte: string, duree: number, icone?: NomIcone): Promise<void> {
   return api.segment('effet', async () => {
-    api.setSpectacle({ type: 'effet', titre, texte: texteCarte });
+    api.setSpectacle({ type: 'effet', titre, texte: texteCarte, icone });
     await api.attendre(duree);
     api.setSpectacle(null);
   });
@@ -607,7 +610,13 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
     return true;
   }
   if (evenement.type === 'case.chance') {
-    await carteEffet(api, texte(evenement.donnees.titre) ?? 'Chance', texte(evenement.donnees.texte) ?? '', duree);
+    await carteEffet(
+      api,
+      texte(evenement.donnees.titre) ?? 'Chance',
+      texte(evenement.donnees.texte) ?? '',
+      duree,
+      evenement.donnees.effet === 'cadeau' ? 'cadeau' : undefined,
+    );
     return true;
   }
   if (evenement.type === 'joueur.arrive') {

@@ -1,22 +1,55 @@
-const fichiers = import.meta.glob('../public/assets/icones/*.{png,svg}', {
-  eager: true,
-  import: 'default',
-}) as Record<string, string>;
+import { useState } from 'preact/hooks';
+import { TAILLES_ICONES, type NomIcone } from '../../shared/icones';
 
-function urlIcone(id: string): string | null {
-  const entree = Object.entries(fichiers).find(([chemin]) => {
-    const fichier = chemin.split('/').pop() ?? chemin;
-    return fichier.replace(/\.(png|svg)$/i, '') === id;
-  });
-  return entree ? entree[1] : null;
+export function estNomIcone(valeur: string): valeur is NomIcone {
+  return Object.prototype.hasOwnProperty.call(TAILLES_ICONES, valeur);
+}
+
+/** Plus grand multiple de la taille source qui tient sous le plafond. 0 si même 1× dépasse. */
+export function multipleIcone(nom: NomIcone, souhaite: number, plafond = souhaite): number {
+  const source = TAILLES_ICONES[nom];
+  if (plafond < source) return 0;
+  let cran = Math.max(1, Math.round(Math.min(souhaite, plafond) / source));
+  while (cran > 1 && cran * source > plafond) cran -= 1;
+  return cran * source <= plafond ? cran * source : 0;
+}
+
+export function Icone({ nom, taille, couleur }: { nom: NomIcone; taille: number; couleur?: string }) {
+  const source = TAILLES_ICONES[nom];
+  const [manque, setManque] = useState(false);
+  const nette = taille >= source && taille % source === 0;
+  const cote = Math.max(taille, source);
+  if (!nette || manque) {
+    return (
+      <span
+        class="icone icone-repli"
+        data-repli="1"
+        data-icone={nom}
+        style={{ width: `${cote}px`, height: `${cote}px`, background: couleur ?? '#c8bda6' }}
+      />
+    );
+  }
+  return (
+    <img
+      class="icone"
+      data-icone={nom}
+      src={`/assets/icones/${nom}.png`}
+      alt=""
+      width={taille}
+      height={taille}
+      onError={() => setManque(true)}
+    />
+  );
 }
 
 export function IconeMiniJeu({ id, nom, taille }: { id: string; nom: string; taille: number }) {
-  const url = urlIcone(id);
-  if (url) return <img src={url} alt="" width={taille} height={taille} />;
+  if (estNomIcone(id)) {
+    const cote = multipleIcone(id, taille, Math.max(taille, TAILLES_ICONES[id])) || TAILLES_ICONES[id];
+    return <Icone nom={id} taille={cote} />;
+  }
   const lettre = nom.trim().charAt(0).toLocaleUpperCase('fr-FR') || '?';
   return (
-    <svg class="icone-repli" width={taille} height={taille} viewBox="0 0 64 64" aria-hidden="true">
+    <svg class="icone-repli" data-repli="1" width={taille} height={taille} viewBox="0 0 64 64" aria-hidden="true">
       <rect x="4" y="4" width="56" height="56" rx="16" fill="#ffc21a" stroke="#1c1633" strokeWidth="4" />
       <text x="32" y="44" textAnchor="middle" fontSize="32" fontFamily="DotGothic16, sans-serif" fill="#1c1633">
         {lettre}

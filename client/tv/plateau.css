@@ -4,17 +4,22 @@
   top: 54px;
   width: 1728px;
   height: 972px;
+  box-sizing: border-box;
   display: flex;
   align-items: stretch;
+  /* 12 % de 1920, moins les 96 px déjà laissés par la scène. */
+  padding-left: 140px;
+  padding-right: 140px;
 }
 
 .colonne-fiches {
-  width: 500px;
-  margin-right: 24px;
-  overflow: hidden;
+  width: 380px;
+  max-width: 380px;
+  margin-right: 16px;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
 }
 
 .milieu {
@@ -25,12 +30,20 @@
 }
 
 .entete-plateau {
-  height: 132px;
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+  align-self: flex-start;
   margin-bottom: 16px;
   flex-shrink: 0;
   box-sizing: border-box;
-  padding: 8px 16px 0;
-  overflow: hidden;
+  padding: 8px 16px;
+  background: rgba(7, 20, 51, 0.8);
+  color: var(--carton);
+  border: 4px solid var(--encre);
+  border-radius: 0;
+  clip-path: var(--escalier);
+  box-shadow: inset 0 0 0 3px var(--liseret);
 }
 
 .entete-plateau h2,
@@ -60,12 +73,18 @@
 }
 
 .colonne-droite {
-  width: 360px;
-  margin-left: 24px;
-  overflow: hidden;
+  width: 300px;
+  margin-left: 16px;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
+}
+
+.grille-plateau {
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 .monde {
@@ -181,7 +200,9 @@
 
 .pion {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
@@ -216,11 +237,10 @@
 }
 
 .fiche-socle {
-  margin-bottom: 12px;
-  flex: 1 1 auto;
+  margin-bottom: 16px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
 .fiche-socle:last-child {
@@ -234,10 +254,11 @@
   justify-content: center;
   align-items: stretch;
   width: 100%;
-  flex: 1 1 auto;
+  max-width: 380px;
+  flex: 0 0 auto;
   margin-bottom: 0;
-  padding: 8px 10px;
-  background: var(--nuit);
+  padding: 4px 6px;
+  background: rgba(7, 20, 51, 0.8);
   color: var(--carton);
   --liseret: #b9d4ff;
   border: 4px solid var(--encre);
@@ -268,10 +289,16 @@
   min-width: 0;
 }
 
-.fiche-texte {
-  margin: 0 12px;
-  flex: 1;
+.fiche-ligne .avatar {
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+.fiche-gp {
+  display: flex;
+  align-items: center;
   min-width: 0;
+  margin-top: 2px;
 }
 
 .pseudo-fiche,
@@ -281,14 +308,21 @@
 }
 
 .pseudo-fiche {
-  width: 100%;
-  margin-top: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: 6px;
   font-family: var(--police-pixel);
-  font-size: var(--px-48);
+  font-size: var(--px-40);
   font-weight: 400;
   line-height: 1.4;
   white-space: nowrap;
+  overflow-wrap: anywhere;
   overflow: hidden;
+}
+
+.case-fiche {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .case-fiche,
@@ -299,27 +333,35 @@
   line-height: 1.4;
 }
 
+.fiche-gp .ensuite {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
 .cagnotte-colonne {
   position: relative;
-  overflow: hidden;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  width: 300px;
 }
 
 .cagnotte-colonne > .socle-pixel,
 .cagnotte-colonne .tuile {
-  flex: 1 1 auto;
-  height: 100%;
+  flex: 0 0 auto;
+  height: auto;
 }
 
-.cagnotte-colonne .tuile {
+.cagnotte-colonne .tuile,
+.scene.scene-plateau .cagnotte-colonne .tuile {
   box-sizing: border-box;
-  padding: 12px 16px;
+  width: 100%;
+  min-height: 160px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
+  background: rgba(7, 20, 51, 0.8);
 }
 
 .libelle-cagnotte {
@@ -430,6 +472,10 @@
   clip-path: var(--escalier);
   box-shadow: inset 0 0 0 3px var(--liseret);
   text-align: center;
+}
+
+.carte-effet .icone {
+  margin: 0 auto 8px;
 }
 
 .annonce-arrivee h2,

@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CourseVue, Minuteur } from '../../shared/types';
-import { Coche, IconeMiniJeu } from '../commun/icones';
+import { Coche, Icone, IconeMiniJeu, multipleIcone } from '../commun/icones';
 import { lireDecalageMs } from '../commun/connexion';
 import { sons } from '../commun/sons';
 import { dureeNiveauMs, libelleBareme, resteMinuteur, texteMinuteur } from '../../shared/mini-jeux';
@@ -51,9 +51,12 @@ export function MinuteurTv({
   const alerte = minuteur.etat === 'enCours' && Math.ceil(reste / 1000) <= 10;
   return (
     <div>
-      <p class={geant ? 'minuteur minuteur-geant' : 'minuteur'} data-alerte={alerte ? '1' : '0'}>
-        {texteMinuteur(reste)}
-      </p>
+      <div class="minuteur-ligne">
+        <Icone nom="sablier" taille={multipleIcone('sablier', geant ? 96 : 64, geant ? 128 : 96)} />
+        <p class={geant ? 'minuteur minuteur-geant' : 'minuteur'} data-alerte={alerte ? '1' : '0'}>
+          {texteMinuteur(reste)}
+        </p>
+      </div>
       {milieu}
       {detail ? <p class="blinds-suite">{detail(reste)}</p> : null}
     </div>
@@ -70,7 +73,7 @@ export function GrilleTv({ course }: { course: CourseVue }) {
           return (
             <div key={jeu.id} class="socle-pixel">
             <div class={joue ? 'tuile-mini joue' : 'tuile-mini'} data-joue={joue ? '1' : '0'} data-id={jeu.id}>
-              <IconeMiniJeu id={jeu.icone} nom={jeu.nom} taille={72} />
+              <IconeMiniJeu id={jeu.icone} nom={jeu.nom} taille={64} />
               <p class="nom-mini">{jeu.nom}</p>
               <p class="resume-mini">{jeu.resume}</p>
               {joue ? <Coche /> : null}
@@ -89,7 +92,7 @@ export function ReglesTv({ course }: { course: CourseVue }) {
   return (
     <section class="ecran-mini" data-ecran="regles" data-zone="regles" data-panneau="principal">
       <div class="regles-tete">
-        <IconeMiniJeu id={jeu.icone} nom={jeu.nom} taille={120} />
+        <IconeMiniJeu id={jeu.icone} nom={jeu.nom} taille={128} />
         <h2 class="nom-regles">{jeu.nom}</h2>
       </div>
       <p class="resume-regles">{jeu.resume}</p>

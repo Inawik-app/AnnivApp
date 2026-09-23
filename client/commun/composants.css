@@ -259,6 +259,9 @@
 }
 
 .choix-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 96px;
   height: 96px;
   border-radius: 50%;
@@ -269,6 +272,27 @@
   font-family: var(--police-pixel);
   font-size: 32px;
   cursor: pointer;
+}
+
+.icone {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.icone-repli {
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.bouton .icone,
+.rouleaux .icone {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.choix-avatar:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .choix-avatar[aria-pressed='true'] {

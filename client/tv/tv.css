@@ -31,6 +31,7 @@ body {
 }
 
 .scene.scene-plateau .panneau,
+.scene.scene-plateau .entete-plateau,
 .scene.scene-plateau .fiche-joueur,
 .scene.scene-plateau .tuile,
 .scene.scene-plateau .tuile-mini,

@@ -1,0 +1,10 @@
+[
+  { "id": "perso-carpe", "nom": "Carpe", "icone": "perso-carpe" },
+  { "id": "perso-verre-eau", "nom": "Verre d'eau", "icone": "perso-verre-eau" },
+  { "id": "perso-piment", "nom": "Piment", "icone": "perso-piment" },
+  { "id": "perso-planete", "nom": "Planète", "icone": "perso-planete" },
+  { "id": "perso-appareil-photo", "nom": "Appareil photo", "icone": "perso-appareil-photo" },
+  { "id": "perso-chocolatine", "nom": "Chocolatine", "icone": "perso-chocolatine" },
+  { "id": "perso-sac-rando", "nom": "Sac de rando", "icone": "perso-sac-rando" },
+  { "id": "perso-cerveau", "nom": "Cerveau", "icone": "perso-cerveau" }
+]

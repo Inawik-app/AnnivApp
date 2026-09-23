@@ -1,14 +1,15 @@
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { AVATARS, COULEURS } from '../../shared/constantes';
+import catalogueAvatars from '../../config/avatars.json';
+import type { NomIcone } from '../../shared/icones';
 import type { VueJoueur } from '../../shared/types';
-import { avatarsDisponibles } from '../commun/avatars';
 import { Avatar, Bouton, CompteurRouleaux, GainFlottant, Tuile, VoileConnexion } from '../commun/composants';
 import { connecter, type Session } from '../commun/connexion';
 import { attendre, creerFile } from '../commun/file-animations';
+import { Icone } from '../commun/icones';
 import '../commun/polices';
 import { ecrireJeton, lireJeton, oublierJeton } from '../commun/stockage';
-import { initiale, joueurIdDe, montantDe } from '../commun/spectacle';
+import { joueurIdDe, montantDe } from '../commun/spectacle';
 import { CourseJoueur } from './course';
 import '../commun/base.css';
 
@@ -27,11 +28,17 @@ function PageJoueur() {
   const [gain, setGain] = useState<{ montant: number; cle: number } | null>(null);
   const [connecte, setConnecte] = useState(false);
   const [pseudo, setPseudo] = useState('');
-  const [avatar, setAvatar] = useState<string>(AVATARS[0]);
+  const [avatar, setAvatar] = useState(catalogueAvatars[0]?.id ?? 'perso-carpe');
   const [erreur, setErreur] = useState<string | null>(null);
   const [attenteReprise, setAttenteReprise] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
-  const images = avatarsDisponibles();
+
+  useEffect(() => {
+    const occupes = new Set((vue?.joueurs ?? []).map((joueur) => joueur.avatar));
+    if (!occupes.has(avatar)) return;
+    const libre = catalogueAvatars.find((entree) => !occupes.has(entree.id));
+    if (libre) setAvatar(libre.id);
+  }, [vue, avatar]);
 
   const traiterRef = useRef<(recue: VueJoueur, animer: boolean) => void>(() => undefined);
   traiterRef.current = (recue, animer) => {
@@ -204,36 +211,24 @@ function PageJoueur() {
                 onInput={(event) => setPseudo((event.currentTarget as HTMLInputElement).value)}
               />
             </label>
-            {images.length > 0 ? (
-              <div class="grille-avatars">
-                {images.map((image) => (
+            <div class="grille-avatars">
+              {catalogueAvatars.map((entree) => {
+                const occupe = (vue?.joueurs ?? []).some((joueur) => joueur.avatar === entree.id);
+                return (
                   <button
-                    key={image.id}
+                    key={entree.id}
                     type="button"
                     class="choix-avatar"
-                    aria-pressed={avatar === image.id}
-                    onClick={() => setAvatar(image.id)}
+                    aria-label={entree.nom}
+                    aria-pressed={avatar === entree.id}
+                    disabled={occupe}
+                    onClick={() => setAvatar(entree.id)}
                   >
-                    <Avatar avatar={image.id} couleur="#1C1633" pseudo={image.id} taille={88} />
+                    <Icone nom={entree.icone as NomIcone} taille={64} />
                   </button>
-                ))}
-              </div>
-            ) : (
-              <div class="grille-avatars">
-                {AVATARS.map((id, index) => (
-                  <button
-                    key={id}
-                    type="button"
-                    class="choix-avatar"
-                    style={{ background: COULEURS[index % COULEURS.length] }}
-                    aria-pressed={avatar === id}
-                    onClick={() => setAvatar(id)}
-                  >
-                    {initiale(pseudo || id)}
-                  </button>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
             <Bouton type="submit" plein disabled={envoi || vue?.partie.inscriptionsVerrouillees === true}>
               Rejoindre la partie
             </Bouton>

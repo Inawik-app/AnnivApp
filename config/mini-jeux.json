@@ -8,7 +8,7 @@
       "id": "pong-gobelets",
       "nom": "Pong gobelets",
       "resume": "Le premier qui vide ses gobelets gagne.",
-      "icone": "pong",
+      "icone": "ping-pong",
       "regles": [
         "Chacun a sa rangée de gobelets.",
         "Lance la balle pour en faire tomber un.",
@@ -23,7 +23,7 @@
       "id": "mime-express",
       "nom": "Mime express",
       "resume": "Une équipe mime, l'autre devine.",
-      "icone": "mime",
+      "icone": "masques",
       "regles": [
         "Deux équipes : un mime et des devineurs.",
         "Le mime ne parle pas et ne montre pas les lettres.",
@@ -39,7 +39,7 @@
       "id": "memoire-express",
       "nom": "Mémoire express",
       "resume": "Retenir une suite, puis la restituer.",
-      "icone": "memoire",
+      "icone": "perso-cerveau",
       "regles": [
         "Une suite d'objets est montrée une seule fois.",
         "Chacun la répète dans l'ordre.",
@@ -69,7 +69,7 @@
       "id": "jeopardy",
       "nom": "Jeopardy",
       "resume": "Des catégories, des valeurs, des réponses.",
-      "icone": "jeopardy",
+      "icone": "buzzer",
       "regles": [
         "On choisit une catégorie et une valeur.",
         "Une bonne réponse rapporte cette valeur.",
@@ -83,7 +83,7 @@
       "id": "top-ten",
       "nom": "Top Ten",
       "resume": "Trouver les dix réponses d'un thème.",
-      "icone": "topten",
+      "icone": "pouvoir-pari",
       "regles": [
         "Un thème, dix bonnes réponses.",
         "Les équipes proposent à tour de rôle.",
@@ -97,7 +97,7 @@
       "id": "undercover",
       "nom": "Undercover",
       "resume": "Un mot secret, un mot proche, un vote.",
-      "icone": "undercover",
+      "icone": "enveloppe",
       "regles": [
         "Tous ont le même mot, sauf l'undercover.",
         "Chacun donne un indice à voix haute.",

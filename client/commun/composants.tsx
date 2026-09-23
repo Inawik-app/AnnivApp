@@ -1,6 +1,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { urlAvatar } from './avatars';
+import { TAILLES_ICONES } from '../../shared/icones';
+import { estNomIcone, Icone, multipleIcone } from './icones';
 import { initiale } from './spectacle';
 import './composants.css';
 
@@ -51,38 +52,29 @@ export function Avatar({
   taille: number;
   plancher?: number;
 }) {
-  const url = urlAvatar(avatar);
-  const cran = [24, 32, 40, 48, 64, 96, 128].find((valeur) => valeur >= Math.max(plancher, Math.round(taille * 0.42))) ?? 128;
-  const cote = { width: `${taille}px`, height: `${taille}px`, fontSize: `${cran}px` };
-  if (url) {
+  if (estNomIcone(avatar)) {
+    const cote = multipleIcone(avatar, taille, taille + TAILLES_ICONES[avatar]) || TAILLES_ICONES[avatar];
     return (
-      <span class="avatar" style={{ ...cote, borderColor: couleur }}>
-        <img src={url} alt="" />
+      <span class="avatar" data-icone={avatar} style={{ width: `${cote}px`, height: `${cote}px`, borderColor: couleur }}>
+        <Icone nom={avatar} taille={cote} couleur={couleur} />
       </span>
     );
   }
+  const cran = [24, 32, 40, 48, 64, 96, 128].find((valeur) => valeur >= Math.max(plancher, Math.round(taille * 0.42))) ?? 128;
   return (
-    <span class="avatar" style={{ ...cote, background: couleur }}>
+    <span class="avatar" style={{ width: `${taille}px`, height: `${taille}px`, fontSize: `${cran}px`, background: couleur }}>
       {initiale(pseudo)}
     </span>
   );
 }
 
-export function Piece({ taille = 48 }: { taille?: number }) {
-  return (
-    <svg class="piece" width={taille} height={taille} viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="32" r="26" fill="#FFC21A" stroke="#1C1633" strokeWidth="4" />
-      <circle cx="32" cy="32" r="16" fill="none" stroke="#1C1633" strokeWidth="3" />
-    </svg>
-  );
+export function Piece({ taille = 64 }: { taille?: number }) {
+  const cote = multipleIcone('gp-piece', taille, Math.max(taille, TAILLES_ICONES['gp-piece'])) || TAILLES_ICONES['gp-piece'];
+  return <Icone nom="gp-piece" taille={cote} />;
 }
 
 export function Couronne() {
-  return (
-    <svg class="couronne" width="96" height="64" viewBox="0 0 80 48" aria-hidden="true">
-      <path fill="#FFC21A" stroke="#1C1633" strokeWidth="3" d="M6 42 L12 16 L28 28 L40 6 L52 28 L68 16 L74 42 Z" />
-    </svg>
-  );
+  return <Icone nom="couronne" taille={TAILLES_ICONES.couronne} />;
 }
 
 const PAS_ROULEAU = 1.4;

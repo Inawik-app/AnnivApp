@@ -160,7 +160,7 @@ export function PanneauMiniJeux({
             return (
               <div key={candidat.id} class="tuile-hote">
                 <Bouton plein disabled={envoi} onClick={() => choisir(candidat.id)}>
-                  <IconeMiniJeu id={candidat.icone} nom={candidat.nom} taille={28} /> {candidat.nom}
+                  <IconeMiniJeu id={candidat.icone} nom={candidat.nom} taille={64} /> {candidat.nom}
                   {joue ? ' · joué' : ''}
                 </Bouton>
                 {joue ? (

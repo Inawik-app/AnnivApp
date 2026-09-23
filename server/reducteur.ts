@@ -65,6 +65,7 @@ function refuser(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteR
       if (!pseudo.ok) return pseudo.erreur;
       const avatar = controlerAvatar(action.avatar);
       if (!avatar.ok) return avatar.erreur;
+      if (etat.joueurs.some((joueur) => joueur.avatar === avatar.avatar)) return 'Ce personnage est déjà pris';
       return null;
     }
     case 'demanderReprise': {
@@ -119,7 +120,10 @@ function refuser(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteR
       if (etat.joueurs.length >= ctx.nbJoueursMax) return messagePartieComplete(ctx.nbJoueursMax);
       const places = ctx.nbJoueursMax - etat.joueurs.length;
       const disponibles = JOUEURS_FICTIFS.filter(
-        (fictif) => !etat.joueurs.some((joueur) => clePseudo(joueur.pseudo) === clePseudo(fictif.pseudo)),
+        (fictif) =>
+          !etat.joueurs.some(
+            (joueur) => clePseudo(joueur.pseudo) === clePseudo(fictif.pseudo) || joueur.avatar === fictif.avatar,
+          ),
       );
       if (disponibles.length === 0 || places <= 0) return messagePartieComplete(ctx.nbJoueursMax);
       return null;
@@ -363,7 +367,7 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
       case 'ajouterJoueursFictifs': {
         for (const fictif of JOUEURS_FICTIFS) {
           if (draft.joueurs.length >= ctx.nbJoueursMax) break;
-          if (draft.joueurs.some((joueur) => clePseudo(joueur.pseudo) === clePseudo(fictif.pseudo))) continue;
+          if (draft.joueurs.some((joueur) => clePseudo(joueur.pseudo) === clePseudo(fictif.pseudo) || joueur.avatar === fictif.avatar)) continue;
           const joueur: Joueur = {
             id: ctx.id(),
             pseudo: fictif.pseudo,

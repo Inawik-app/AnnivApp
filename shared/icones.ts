@@ -1,0 +1,48 @@
+// Généré par scripts/decouper-icones.mjs — ne pas modifier à la main.
+
+export const TAILLES_ICONES = {
+  'perso-carpe': 64,
+  'perso-verre-eau': 64,
+  'perso-piment': 64,
+  'perso-planete': 64,
+  'perso-appareil-photo': 64,
+  'perso-chocolatine': 64,
+  'perso-sac-rando': 64,
+  'perso-cerveau': 64,
+  'case-bonus': 64,
+  'case-chance': 64,
+  'case-cagnotte': 64,
+  'case-duel': 64,
+  'case-depart': 64,
+  'case-arrivee': 64,
+  'gp-piece': 64,
+  'de': 64,
+  'couronne': 64,
+  'trophee': 64,
+  'cadeau': 64,
+  'sablier': 64,
+  'buzzer': 64,
+  'ping-pong': 64,
+  'poker': 64,
+  'enveloppe': 64,
+  'pouvoir-double': 64,
+  'pouvoir-pari': 64,
+  'pouvoir-assurance': 64,
+  'pouvoir-tout-ou-rien': 64,
+  'trophee-malchanceux': 64,
+  'trophee-dernier-pingpong': 64,
+  'trophee-genereux': 64,
+  'trophee-prudent': 64,
+  'trophee-audacieux': 64,
+  'trophee-touriste': 64,
+  'medaille': 64,
+  'confettis': 64,
+  'manette': 64,
+  'musique': 64,
+  'megaphone': 64,
+  'masques': 64,
+} as const;
+
+export type NomIcone = keyof typeof TAILLES_ICONES;
+
+export const NOMS_ICONES = Object.keys(TAILLES_ICONES) as NomIcone[];

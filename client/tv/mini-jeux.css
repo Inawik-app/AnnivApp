@@ -152,6 +152,16 @@
   line-height: 1.4;
 }
 
+.minuteur-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.minuteur-ligne .icone {
+  margin-right: 16px;
+}
+
 .minuteur {
   margin: 16px 0 0;
   font-family: var(--police-chiffres);
@@ -233,6 +243,15 @@
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
+}
+
+.panneau-temps .minuteur-ligne {
+  flex-direction: column;
+}
+
+.panneau-temps .minuteur-ligne .icone {
+  margin-right: 0;
+  margin-bottom: 8px;
 }
 
 .panneau-temps .minuteur {

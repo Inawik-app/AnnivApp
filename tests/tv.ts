@@ -161,21 +161,24 @@ async function verifierRendu(page: Page): Promise<void> {
         return boite;
       };
       const panneau = document.querySelector('[data-panneau="principal"]');
-      if (!(panneau instanceof HTMLElement)) return 'panneau principal absent';
-      const cadre = rect(panneau);
-      let haut = Infinity;
-      let bas = -Infinity;
-      const descendants = panneau.querySelectorAll('*');
-      for (let i = 0; i < descendants.length; i += 1) {
-        const el = descendants[i];
-        if (!(el instanceof HTMLElement)) continue;
-        const boite = montre(el);
-        if (!boite || boite.height < 8) continue;
-        haut = Math.min(haut, boite.top);
-        bas = Math.max(bas, boite.bottom);
+      const ecranPlateau = document.querySelector('[data-ecran="plateau"]');
+      const remplir = panneau instanceof HTMLElement && montre(panneau) && !(ecranPlateau instanceof HTMLElement && montre(ecranPlateau));
+      if (remplir && panneau instanceof HTMLElement) {
+        const cadre = rect(panneau);
+        let haut = Infinity;
+        let bas = -Infinity;
+        const descendants = panneau.querySelectorAll('*');
+        for (let i = 0; i < descendants.length; i += 1) {
+          const el = descendants[i];
+          if (!(el instanceof HTMLElement)) continue;
+          const boite = montre(el);
+          if (!boite || boite.height < 8) continue;
+          haut = Math.min(haut, boite.top);
+          bas = Math.max(bas, boite.bottom);
+        }
+        const part = (bas - haut) / cadre.height;
+        if (!(part >= 0.8)) return 'le contenu occupe ' + Math.round(part * 100) + '% du panneau';
       }
-      const part = (bas - haut) / cadre.height;
-      if (!(part >= 0.8)) return 'le contenu occupe ' + Math.round(part * 100) + '% du panneau';
       const scene = document.querySelector('.scene') || document.body;
       const noeuds = scene.querySelectorAll('*');
       for (let i = 0; i < noeuds.length; i += 1) {
@@ -231,6 +234,85 @@ async function verifierRendu(page: Page): Promise<void> {
   if (erreur) throw new Error(`Rendu : ${erreur}`);
 }
 
+async function verifierFondPlateau(page: Page): Promise<void> {
+  const erreur = await page.evaluate(
+    new Function(`
+      const scene = document.querySelector('.scene');
+      if (!(scene instanceof HTMLElement)) return 'scène absente';
+      const sceneBox = scene.getBoundingClientRect();
+      const bande = sceneBox.width * 0.12;
+      const gauche = sceneBox.left + bande;
+      const droite = sceneBox.right - bande;
+      const rect = (el) => el.getBoundingClientRect();
+      function alphaFond(el) {
+        const style = getComputedStyle(el);
+        if (style.visibility === 'hidden' || style.display === 'none' || Number.parseFloat(style.opacity) === 0) return 0;
+        const bg = style.backgroundColor || '';
+        const trouve = bg.match(/rgba?\\(([^)]+)\\)/);
+        if (!trouve) return 0;
+        const morceaux = trouve[1].split(',');
+        if (morceaux.length < 4) return 1;
+        return Number.parseFloat(morceaux[3] || '1');
+      }
+      const noeuds = document.querySelectorAll('.plateau-scene *');
+      for (let i = 0; i < noeuds.length; i += 1) {
+        const el = noeuds[i];
+        if (!(el instanceof HTMLElement)) continue;
+        if (alphaFond(el) <= 0.15) continue;
+        const boite = rect(el);
+        if (boite.width < 1 || boite.height < 1) continue;
+        const dansGauche = boite.left < gauche - 1 && boite.right > sceneBox.left + 1;
+        const dansDroite = boite.right > droite + 1 && boite.left < sceneBox.right - 1;
+        if (dansGauche || dansDroite) return 'élément opaque dans la bande latérale : ' + String(el.className).slice(0, 40);
+      }
+      const couverts = document.querySelectorAll('.fiche-socle, .cagnotte-colonne > .socle-pixel, .entete-plateau, .case-plateau');
+      let surface = 0;
+      for (let i = 0; i < couverts.length; i += 1) {
+        const el = couverts[i];
+        if (!(el instanceof HTMLElement)) continue;
+        const boite = rect(el);
+        if (boite.width < 1 || boite.height < 1) continue;
+        surface += boite.width * boite.height;
+      }
+      const part = surface / (sceneBox.width * sceneBox.height);
+      if (part > 0.65) return 'panneaux et cases couvrent ' + Math.round(part * 100) + '% de l\\'écran';
+      const fiches = document.querySelectorAll('.fiche-joueur');
+      if (fiches.length < 4) return 'fiches absentes';
+      for (let i = 0; i < fiches.length; i += 1) {
+        const fiche = fiches[i];
+        if (!(fiche instanceof HTMLElement)) continue;
+        const boite = rect(fiche);
+        if (boite.height >= 200) return 'fiche trop haute : ' + Math.round(boite.height);
+      }
+      const cases = document.querySelectorAll('.case-plateau');
+      if (cases.length < 1) return 'aucune case';
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < cases.length; i += 1) {
+        const tuile = cases[i];
+        if (!(tuile instanceof HTMLElement)) continue;
+        const icone = tuile.querySelector('.icone');
+        const numero = tuile.querySelector('.numero-case');
+        if (!(icone instanceof HTMLElement) || !(numero instanceof HTMLElement)) return 'case sans icône ou numéro';
+        const boiteIcone = rect(icone);
+        const boiteNumero = rect(numero);
+        if (boiteIcone.width * boiteIcone.height <= boiteNumero.width * boiteNumero.height) return 'l\\'icône n\\'est pas plus grande que le numéro';
+        const boite = rect(tuile);
+        minX = Math.min(minX, boite.left);
+        maxX = Math.max(maxX, boite.right);
+        minY = Math.min(minY, boite.top);
+        maxY = Math.max(maxY, boite.bottom);
+      }
+      if ((maxX - minX) / sceneBox.width > 0.6) return 'le plateau dépasse 60 % de la largeur';
+      if ((maxY - minY) / sceneBox.height > 0.8) return 'le plateau dépasse 80 % de la hauteur';
+      return '';
+    `) as () => string,
+  );
+  if (erreur) throw new Error(`Fond plateau : ${erreur}`);
+}
+
 type Instantane = {
   phase: string | null;
   cagnotte: number;
@@ -248,6 +330,53 @@ declare global {
     __fileVide?: boolean;
     __sauts?: number;
   }
+}
+
+async function verifierIcones(page: Page, mode: 'plateau' | 'grille'): Promise<void> {
+  const erreur = await page.evaluate(
+    new Function('mode', `
+      const replis = document.querySelectorAll('[data-repli]');
+      if (replis.length > 0) return 'une icône est en repli';
+      function visibles(selecteur) {
+        const noeuds = document.querySelectorAll(selecteur);
+        for (let i = 0; i < noeuds.length; i += 1) {
+          const el = noeuds[i];
+          if (!(el instanceof HTMLElement)) continue;
+          const boite = el.getBoundingClientRect();
+          if (boite.width < 16 || boite.height < 16) return 'icone invisible';
+        }
+        return '';
+      }
+      if (mode === 'plateau') {
+        const pions = [];
+        const noeudsPions = document.querySelectorAll('.pion [data-icone]');
+        for (let i = 0; i < noeudsPions.length; i += 1) {
+          const nom = noeudsPions[i].getAttribute('data-icone');
+          if (nom) pions.push(nom);
+        }
+        const fiches = [];
+        const noeudsFiches = document.querySelectorAll('.fiche-joueur .avatar');
+        for (let i = 0; i < noeudsFiches.length; i += 1) {
+          const nom = noeudsFiches[i].getAttribute('data-icone');
+          if (nom) fiches.push(nom);
+        }
+        if (pions.length !== 4 || new Set(pions).size !== 4) return 'pions ' + pions.join(',');
+        if (fiches.length !== 4 || new Set(fiches).size !== 4) return 'fiches ' + fiches.join(',');
+        if (document.querySelectorAll('.case-plateau [data-icone]').length < 9) return 'cases sans icône';
+        if (!document.querySelector('[data-zone="cagnotte"] [data-icone="gp-piece"]')) return 'cagnotte sans pièce';
+        const manque = visibles('.pion [data-icone], .fiche-joueur .avatar, .case-plateau [data-icone], [data-zone="cagnotte"] [data-icone]');
+        if (manque) return manque;
+      }
+      if (mode === 'grille') {
+        if (document.querySelectorAll('.tuile-mini [data-icone]').length < 7) return 'grille sans icônes';
+        const manque = visibles('.tuile-mini [data-icone]');
+        if (manque) return manque;
+      }
+      return '';
+    `) as (mode: string) => string,
+    mode,
+  );
+  if (erreur) throw new Error(`Icônes : ${erreur}`);
 }
 
 function suite(chrono: EtapeChrono[], depart: number): string[] {
@@ -365,10 +494,10 @@ async function main(): Promise<void> {
     const hote = await connecter(serveur.url, 'hote', { codeHote: CODE_HOTE });
     sockets.push(hote);
     const fiches = [
-      { pseudo: 'Maximilien-Alexandre', avatar: 'soleil' },
-      { pseudo: 'Inès', avatar: 'lune' },
-      { pseudo: 'Noé', avatar: 'feuille' },
-      { pseudo: 'Lina', avatar: 'goutte' },
+      { pseudo: 'Maximilien-Alexandre', avatar: 'perso-carpe' },
+      { pseudo: 'Inès', avatar: 'perso-verre-eau' },
+      { pseudo: 'Noé', avatar: 'perso-piment' },
+      { pseudo: 'Lina', avatar: 'perso-planete' },
     ];
     const joueurs: Participant[] = [];
     for (const fiche of fiches) {
@@ -405,9 +534,36 @@ async function main(): Promise<void> {
     const nombreCases = course.regles.longueur + 1;
     await page.waitForFunction((attendu) => document.querySelectorAll('[data-case]').length === attendu, nombreCases, { timeout: 20000 });
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    await page.waitForFunction(() => {
+      const pions = document.querySelectorAll('.pion');
+      for (let i = 0; i < pions.length; i += 1) {
+        const pion = pions[i];
+        if (!(pion instanceof HTMLElement) || !pion.getAnimations) continue;
+        const animations = pion.getAnimations();
+        for (let j = 0; j < animations.length; j += 1) {
+          if (animations[j]?.playState === 'running') return false;
+        }
+      }
+      return true;
+    }, undefined, { timeout: 20000 });
     await verifierPlateau(page, { nombreCases, groupe: { index: 0, nombre: 4 } });
     await verifierTextes(page);
     await verifierRendu(page);
+    await verifierIcones(page, 'plateau');
+    await verifierFondPlateau(page);
+    const panneauAgrandi = await page.addStyleTag({
+      content: '.fiche-joueur { min-height: 480px !important; width: 900px !important; }',
+    });
+    let panneauRefuse = false;
+    try {
+      await verifierFondPlateau(page);
+    } catch (erreur) {
+      panneauRefuse = true;
+      if (!(erreur instanceof Error) || !erreur.message.startsWith('Fond plateau')) throw erreur;
+    }
+    await panneauAgrandi.evaluate((balise) => balise.remove());
+    if (!panneauRefuse) throw new Error('Un panneau agrandi aurait dû être refusé');
+    console.log('OK     Un panneau agrandi est refusé');
     await page.screenshot({ path: path.join(captures, '01-depart.png') });
     await page.screenshot({ path: path.join(captures, '12-plateau-pixel.png') });
 
@@ -524,6 +680,7 @@ async function main(): Promise<void> {
     await page.waitForSelector('[data-ecran="grille"] [data-joue="1"]', { timeout: 20000 });
     await page.screenshot({ path: path.join(captures, '06-grille.png') });
     await page.screenshot({ path: path.join(captures, '13-grille-pixel.png') });
+    await verifierIcones(page, 'grille');
     await verifierZone(page, 'grille');
     await verifierTextes(page);
     await verifierRendu(page);
@@ -602,7 +759,7 @@ async function main(): Promise<void> {
     if (!combinaisonCassee) throw new Error('Une mise en page cassée des combinaisons aurait dû échouer');
     console.log('OK     Une mise en page cassée est refusée');
 
-    console.log('OK     Cases dans la zone, sans chevauchement');
+    console.log('OK     Bandes libres, fiches compactes, icône plus grande que le numéro');
     console.log('OK     Pions dans leur case, numéros visibles');
     console.log('OK     Colonnes et en-tête hors du plateau');
     console.log('OK     Pseudos visibles, y compris le plus long');
