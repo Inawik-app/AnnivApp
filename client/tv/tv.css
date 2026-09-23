@@ -76,6 +76,15 @@ body {
   transform-origin: 50% 40%;
 }
 
+/* Sur le plateau, le plan couvre toute la scène : .contenu est en retrait de 5 % (96 × 54 px). */
+.scene-plateau .plan {
+  position: absolute;
+  left: -96px;
+  top: -54px;
+  width: 1920px;
+  height: 1080px;
+}
+
 .plan.sort {
   transform: translateX(-110%);
   transition: transform var(--duree-normale) linear;

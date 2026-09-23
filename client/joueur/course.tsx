@@ -4,6 +4,9 @@ import type { Action, CourseVue, JoueurPublic, VueJoueur } from '../../shared/ty
 import { Bouton, CompteurRouleaux } from '../commun/composants';
 import { textePhase } from '../commun/course-texte';
 import { libelleRang } from '../commun/spectacle';
+import { TopTenJoueur } from '../commun/topten';
+import { JeopardyJoueur } from '../commun/jeopardy';
+import { UndercoverJoueur } from '../commun/undercover';
 import '../commun/course.css';
 
 type Moi = NonNullable<VueJoueur['moi']>;
@@ -123,6 +126,7 @@ export function CourseJoueur({
   if (!course || !course.active) return <p style={{ marginTop: '16px' }}>En attente de la suite.</p>;
 
   const pseudos = new Map(joueurs.map((joueur) => [joueur.id, joueur.pseudo]));
+  const nom = (id: string) => (id === moi.id ? 'toi' : pseudos.get(id) ?? 'Joueur');
   const position = course.positions[moi.id];
   const rangPassage = course.ordre.indexOf(moi.id);
   const plafond = Math.max(0, Math.min(course.miseMax, solde));
@@ -162,6 +166,13 @@ export function CourseJoueur({
         </p>
       ) : null}
       <p>{textePhase(course, pseudos)}</p>
+      {course.phase === 'miniJeu' && course.topten ? (
+        <TopTenJoueur topten={course.topten} moiId={moi.id} pseudos={pseudos} occupe={occupe} envoyer={envoyer} />
+      ) : null}
+      {course.phase === 'miniJeu' && course.jeopardy ? (
+        <JeopardyJoueur jeopardy={course.jeopardy} ordre={course.ordre} nom={nom} envoyer={envoyer} />
+      ) : null}
+      {course.phase === 'miniJeu' && course.undercover ? <UndercoverJoueur undercover={course.undercover} nom={nom} /> : null}
       {course.dernierDe?.joueurId === moi.id ? <p>Tu as fait {course.dernierDe.valeur}.</p> : null}
       {!aMoiDeLancer && rangPassage >= 0 ? (
         <div>

@@ -1,20 +1,20 @@
 .plateau-scene {
   position: absolute;
-  left: 96px;
-  top: 54px;
-  width: 1728px;
-  height: 972px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
   display: flex;
   align-items: stretch;
-  /* 12 % de 1920, moins les 96 px déjà laissés par la scène. */
-  padding-left: 140px;
-  padding-right: 140px;
+  /* Cagnotte à 5 % du coin haut droit ; les fiches sont collées au coin haut gauche, à 16 px. */
+  padding: 54px 96px 54px 16px;
 }
 
 .colonne-fiches {
   width: 380px;
   max-width: 380px;
+  margin-top: -38px;
   margin-right: 16px;
   align-self: flex-start;
   display: flex;
@@ -44,6 +44,11 @@
   border-radius: 0;
   clip-path: var(--escalier);
   box-shadow: inset 0 0 0 3px var(--liseret);
+  /* Une seule ligne : si l'en-tête changeait de hauteur, la zone du plateau aussi, et la grille serait recalculée. */
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .entete-plateau h2,
@@ -58,7 +63,7 @@
 }
 
 .entete-plateau p {
-  margin-top: 8px;
+  margin-left: 24px;
   font-size: var(--px-40);
   font-weight: 400;
   line-height: 1.4;
@@ -73,7 +78,7 @@
 }
 
 .colonne-droite {
-  width: 300px;
+  width: 240px;
   margin-left: 16px;
   align-self: flex-start;
   display: flex;
@@ -152,19 +157,23 @@
   left: 4px;
   top: 2px;
   box-sizing: border-box;
-  min-width: 28px;
-  padding: 0 6px;
+  min-width: 0;
+  padding: 0 4px;
   background: var(--carton);
-  border: 3px solid var(--encre);
+  border: 2px solid var(--encre);
   border-radius: 0;
   clip-path: var(--escalier);
   font-family: var(--police-chiffres);
-  font-weight: 400;
+  font-weight: 200;
   line-height: 1.4;
   text-align: center;
   color: var(--encre);
   overflow: hidden;
-  z-index: 1;
+  z-index: 2;
+  /* La ligne de 1,4 peut dépasser la pastille : centrée, seule l'interligne est rognée, jamais le chiffre. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pion-ancre {
@@ -237,10 +246,12 @@
 }
 
 .fiche-socle {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  /* Le décalage du socle tient dans la marge de la colonne, pour laisser 380 px à la fiche. */
+  padding-right: 0;
 }
 
 .fiche-socle:last-child {
@@ -257,7 +268,7 @@
   max-width: 380px;
   flex: 0 0 auto;
   margin-bottom: 0;
-  padding: 4px 6px;
+  padding: 0;
   background: rgba(7, 20, 51, 0.8);
   color: var(--carton);
   --liseret: #b9d4ff;
@@ -285,20 +296,58 @@
 
 .fiche-ligne {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   min-width: 0;
 }
 
 .fiche-ligne .avatar {
   flex-shrink: 0;
-  margin-right: 6px;
+  align-self: center;
+  margin: 0 8px;
+  border-width: 4px;
+}
+
+.fiche-corps {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fiche-haut,
+.fiche-bas {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.fiche-haut .pseudo-fiche,
+.fiche-bas .pseudo-fiche,
+.fiche-vide {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .fiche-gp {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  min-width: 0;
-  margin-top: 2px;
+  margin: 0 0 0 8px;
+}
+
+.fiche-gp .rouleaux {
+  gap: 0;
+  align-items: center;
+}
+
+.fiche-gp .icone {
+  width: 16px;
+  height: 16px;
+  margin-right: -6px;
 }
 
 .pseudo-fiche,
@@ -308,20 +357,22 @@
 }
 
 .pseudo-fiche {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin-right: 6px;
+  position: relative;
+  z-index: 2;
   font-family: var(--police-pixel);
   font-size: var(--px-40);
   font-weight: 400;
   line-height: 1.4;
   white-space: nowrap;
-  overflow-wrap: anywhere;
-  overflow: hidden;
+  /* Resserré pour laisser le numéro et les GP à côté du plus long pseudo, sans les toucher. */
+  letter-spacing: -4px;
 }
 
 .case-fiche {
-  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  margin: 0 0 0 8px;
   white-space: nowrap;
 }
 
@@ -333,9 +384,20 @@
   line-height: 1.4;
 }
 
-.fiche-gp .ensuite {
-  margin-left: 8px;
+.fiche-gp .ensuite,
+.fiche-bas > .ensuite {
+  margin: 0 0 0 8px;
   white-space: nowrap;
+}
+
+.ensuite-pose {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0 4px;
+  white-space: nowrap;
+  z-index: 1;
 }
 
 .cagnotte-colonne {
@@ -343,7 +405,7 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  width: 300px;
+  width: 240px;
 }
 
 .cagnotte-colonne > .socle-pixel,
@@ -356,8 +418,8 @@
 .scene.scene-plateau .cagnotte-colonne .tuile {
   box-sizing: border-box;
   width: 100%;
-  min-height: 160px;
-  padding: 8px 12px;
+  min-height: 0;
+  padding: 0 8px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -365,12 +427,21 @@
 }
 
 .libelle-cagnotte {
-  margin: 0 0 8px;
+  margin: 0;
   font-family: var(--police-pixel);
   font-size: var(--px-40);
   font-weight: 400;
   line-height: 1.4;
   color: inherit;
+}
+
+.cagnotte-ligne .rouleaux {
+  align-items: center;
+}
+
+.cagnotte-ligne .icone {
+  width: 36px;
+  height: 36px;
 }
 
 .cagnotte-ligne {

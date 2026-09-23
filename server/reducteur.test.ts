@@ -4,7 +4,7 @@ import { reduire, type ContexteReduction } from './reducteur';
 import type { Action, EtatJeu, Origine } from '../shared/types';
 import { solde } from '../shared/soldes';
 import { verifierRegleOr } from './regle-or';
-import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,6 +32,9 @@ function contexte(): ContexteReduction {
     cartes: [{ id: 'bourse', titre: 'Bourse', texte: 'Tu gagnes.', effet: { type: 'gain', montant: 3 } }],
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
+    topten: lireTopTen(RACINE),
+    jeopardy: lireJeopardy(RACINE),
+    undercover: lireUndercover(RACINE),
   };
 }
 

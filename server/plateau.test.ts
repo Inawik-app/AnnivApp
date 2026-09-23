@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
 import { lireCartesChance, lireConfigPlateau } from './course-config';
-import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { creerStore } from './store';
 import { vueJoueur, vueTv } from './vues';
@@ -36,6 +36,9 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     cartes: lireCartesChance(RACINE),
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
+    topten: lireTopTen(RACINE),
+    jeopardy: lireJeopardy(RACINE),
+    undercover: lireUndercover(RACINE),
     ...partiel,
   };
 }

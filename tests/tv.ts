@@ -74,7 +74,7 @@ async function verifierTextes(page: Page): Promise<void> {
         if (rect.width < 1 || rect.height < 1) continue;
         const taille = Number.parseFloat(style.fontSize);
         const dansCombi = combinaisons instanceof HTMLElement && combinaisons.contains(el);
-        const min = dansCombi ? 28 : 36;
+        const min = dansCombi ? 28 : el.classList.contains('numero-case') ? 24 : 36;
         if (taille + 0.1 < min) return Math.round(taille) + 'px < ' + min + ' : ' + texte.trim().slice(0, 48);
       }
       return '';
@@ -209,7 +209,7 @@ async function verifierRendu(page: Page): Promise<void> {
           }
         }
       }
-      const parents = document.querySelectorAll('.plateau-scene, .ecran-poker, .poker-gauche, .accueil, .podium');
+      const parents = document.querySelectorAll('.plateau-scene, .ecran-poker, .poker-gauche, .accueil, .podium, .ecran-topten, .topten-cartes, .topten-rangees, .ecran-jeopardy, .jeopardy-grille, .ecran-undercover, .undercover-ordre, .undercover-mots');
       for (let p = 0; p < parents.length; p += 1) {
         const parent = parents[p];
         if (!(parent instanceof HTMLElement) || !montre(parent)) continue;
@@ -232,6 +232,56 @@ async function verifierRendu(page: Page): Promise<void> {
     `) as () => string,
   );
   if (erreur) throw new Error(`Rendu : ${erreur}`);
+}
+
+async function attendreAnimations(page: Page, selecteur: string): Promise<void> {
+  await page.waitForFunction(
+    new Function('selecteur', `
+      const racine = document.querySelector(selecteur);
+      if (!(racine instanceof HTMLElement) || !racine.getAnimations) return true;
+      return racine.getAnimations({ subtree: true }).every((animation) => animation.playState !== 'running');
+    `) as (selecteur: string) => boolean,
+    selecteur,
+    { timeout: 20000 },
+  );
+}
+
+async function verifierTopTen(page: Page): Promise<void> {
+  await attendreAnimations(page, '[data-zone="topten"]');
+  await verifierZone(page, 'topten');
+  await verifierTextes(page);
+  await verifierRendu(page);
+  const erreur = await page.evaluate(
+    new Function(`
+      const chiffres = document.querySelectorAll('.chiffre-carte, .gp-total, .podium-gp');
+      for (let i = 0; i < chiffres.length; i += 1) {
+        const el = chiffres[i];
+        if (!(el instanceof HTMLElement) || !(el.textContent || '').trim()) continue;
+        if (Number.parseFloat(getComputedStyle(el).fontSize) < 90) return 'chiffre clé trop petit : ' + el.className;
+      }
+      return '';
+    `) as () => string,
+  );
+  if (erreur) throw new Error(`Top Ten : ${erreur}`);
+}
+
+async function verifierModule(page: Page, zone: string): Promise<void> {
+  await attendreAnimations(page, `[data-zone="${zone}"]`);
+  await verifierZone(page, zone);
+  await verifierTextes(page);
+  await verifierRendu(page);
+  const erreur = await page.evaluate(
+    new Function(`
+      const chiffres = document.querySelectorAll('.jeopardy-case, .podium-gp, .jeopardy-nom, .undercover-mot-texte');
+      for (let i = 0; i < chiffres.length; i += 1) {
+        const el = chiffres[i];
+        if (!(el instanceof HTMLElement) || !(el.textContent || '').trim()) continue;
+        if (Number.parseFloat(getComputedStyle(el).fontSize) < 90) return 'élément clé trop petit : ' + el.className;
+      }
+      return '';
+    `) as () => string,
+  );
+  if (erreur) throw new Error(`${zone} : ${erreur}`);
 }
 
 async function verifierFondPlateau(page: Page): Promise<void> {
@@ -258,6 +308,7 @@ async function verifierFondPlateau(page: Page): Promise<void> {
       for (let i = 0; i < noeuds.length; i += 1) {
         const el = noeuds[i];
         if (!(el instanceof HTMLElement)) continue;
+        if (el.closest('.colonne-fiches, .colonne-droite')) continue;
         if (alphaFond(el) <= 0.15) continue;
         const boite = rect(el);
         if (boite.width < 1 || boite.height < 1) continue;
@@ -282,8 +333,36 @@ async function verifierFondPlateau(page: Page): Promise<void> {
         const fiche = fiches[i];
         if (!(fiche instanceof HTMLElement)) continue;
         const boite = rect(fiche);
-        if (boite.height >= 200) return 'fiche trop haute : ' + Math.round(boite.height);
+        if (boite.height >= 130) return 'fiche trop haute : ' + Math.round(boite.height);
+        if (boite.width >= 400) return 'fiche trop large : ' + Math.round(boite.width);
+        const image = fiche.querySelector('.avatar [data-icone], .avatar');
+        if (!(image instanceof HTMLElement)) return 'avatar absent de la fiche';
+        const cote = rect(image);
+        if (cote.width < 63 || cote.height < 63) return 'avatar de fiche trop petit : ' + Math.round(cote.width) + 'x' + Math.round(cote.height);
       }
+      const pile = document.querySelector('.colonne-fiches');
+      if (pile instanceof HTMLElement && rect(pile).height > sceneBox.height * 0.5) {
+        return 'pile de fiches trop haute : ' + Math.round(rect(pile).height);
+      }
+      const margeX = sceneBox.width * 0.05;
+      const margeY = sceneBox.height * 0.05;
+      let hautFiches = Infinity;
+      let gaucheFiches = Infinity;
+      for (let i = 0; i < fiches.length; i += 1) {
+        const boite = rect(fiches[i]);
+        hautFiches = Math.min(hautFiches, boite.top);
+        gaucheFiches = Math.min(gaucheFiches, boite.left);
+      }
+      if (Math.abs(gaucheFiches - sceneBox.left - 16) > 6 || Math.abs(hautFiches - sceneBox.top - 16) > 6) {
+        return 'fiches hors du coin haut gauche : ' + Math.round(gaucheFiches - sceneBox.left) + ',' + Math.round(hautFiches - sceneBox.top);
+      }
+      const cagnotte = document.querySelector('.cagnotte-colonne .tuile');
+      if (!(cagnotte instanceof HTMLElement)) return 'cagnotte absente';
+      const coinDroit = rect(cagnotte);
+      if (Math.abs(sceneBox.right - margeX - coinDroit.right) > 12 || Math.abs(coinDroit.top - sceneBox.top - margeY) > 12) {
+        return 'cagnotte hors du coin haut droit : ' + Math.round(sceneBox.right - coinDroit.right) + ',' + Math.round(coinDroit.top - sceneBox.top);
+      }
+      if (rect(cagnotte).height >= 140) return 'cagnotte trop haute : ' + Math.round(rect(cagnotte).height);
       const cases = document.querySelectorAll('.case-plateau');
       if (cases.length < 1) return 'aucune case';
       let minX = Infinity;
@@ -296,16 +375,19 @@ async function verifierFondPlateau(page: Page): Promise<void> {
         const icone = tuile.querySelector('.icone');
         const numero = tuile.querySelector('.numero-case');
         if (!(icone instanceof HTMLElement) || !(numero instanceof HTMLElement)) return 'case sans icône ou numéro';
+        const boite = rect(tuile);
         const boiteIcone = rect(icone);
         const boiteNumero = rect(numero);
-        if (boiteIcone.width * boiteIcone.height <= boiteNumero.width * boiteNumero.height) return 'l\\'icône n\\'est pas plus grande que le numéro';
-        const boite = rect(tuile);
+        if (boiteIcone.height + 0.5 < boiteNumero.height * 2) return 'l\\'icône n\\'est pas deux fois plus haute que le numéro';
+        const seTouchent = boiteIcone.left < boiteNumero.right - 1 && boiteIcone.right > boiteNumero.left + 1 && boiteIcone.top < boiteNumero.bottom - 1 && boiteIcone.bottom > boiteNumero.top + 1;
+        if (seTouchent) return 'le numéro recouvre l\\'icône';
+        if (boiteIcone.top < boite.top - 1 || boiteIcone.bottom > boite.bottom + 1 || boiteIcone.left < boite.left - 1 || boiteIcone.right > boite.right + 1) return 'l\\'icône est rognée';
         minX = Math.min(minX, boite.left);
         maxX = Math.max(maxX, boite.right);
         minY = Math.min(minY, boite.top);
         maxY = Math.max(maxY, boite.bottom);
       }
-      if ((maxX - minX) / sceneBox.width > 0.6) return 'le plateau dépasse 60 % de la largeur';
+      if ((maxX - minX) / sceneBox.width > 0.43) return 'le plateau dépasse 43 % de la largeur';
       if ((maxY - minY) / sceneBox.height > 0.8) return 'le plateau dépasse 80 % de la hauteur';
       return '';
     `) as () => string,
@@ -332,6 +414,35 @@ declare global {
   }
 }
 
+/** Le déplacement FLIP démarre à l'image suivante : attendre des fiches sans décalage et immobiles. */
+async function attendreFichesPosees(page: Page): Promise<void> {
+  let precedent = '';
+  let stables = 0;
+  const limite = Date.now() + 20000;
+  while (stables < 3) {
+    if (Date.now() > limite) throw new Error('Les fiches ne se posent pas');
+    const etat = await page.evaluate(
+      new Function(`
+        const socles = document.querySelectorAll('.fiche-socle');
+        const morceaux = [];
+        for (let i = 0; i < socles.length; i += 1) {
+          const el = socles[i];
+          if (!(el instanceof HTMLElement)) continue;
+          const matrice = new DOMMatrix(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform);
+          if (Math.abs(matrice.m41) > 0.5 || Math.abs(matrice.m42) > 0.5) return 'mouvement';
+          const boite = el.getBoundingClientRect();
+          morceaux.push(Math.round(boite.left) + ',' + Math.round(boite.top));
+        }
+        return morceaux.join('|');
+      `) as () => string,
+    );
+    if (etat !== 'mouvement' && etat === precedent) stables += 1;
+    else stables = 0;
+    precedent = etat;
+    await page.waitForTimeout(100);
+  }
+}
+
 async function verifierIcones(page: Page, mode: 'plateau' | 'grille'): Promise<void> {
   const erreur = await page.evaluate(
     new Function('mode', `
@@ -343,7 +454,7 @@ async function verifierIcones(page: Page, mode: 'plateau' | 'grille'): Promise<v
           const el = noeuds[i];
           if (!(el instanceof HTMLElement)) continue;
           const boite = el.getBoundingClientRect();
-          if (boite.width < 16 || boite.height < 16) return 'icone invisible';
+          if (boite.width < 16 || boite.height < 16) return 'icone invisible : ' + (el.getAttribute('data-icone') || '');
         }
         return '';
       }
@@ -446,14 +557,19 @@ async function verifierPlateau(page: Page, attendu: ControlePlateau): Promise<vo
       if (fiches.length < 4) return 'Les quatre fiches ne sont pas affichées';
       let pseudoLong = false;
       for (const fiche of fiches) {
-        const pseudo = fiche.querySelector('.pseudo-fiche');
-        if (!(pseudo instanceof HTMLElement)) return "Une fiche n'a pas de pseudo";
-        const boite = rect(pseudo);
-        if (boite.width <= 0 || boite.height <= 0) return 'Un pseudo a une largeur nulle';
-        if (!dedans(boite, rect(fiche))) return 'Le pseudo sort de sa fiche';
-        if ((pseudo.textContent || '').indexOf('Maximilien-Alexandre') >= 0) {
+        const pseudos = [...fiche.querySelectorAll('.pseudo-fiche')].filter((el) => el instanceof HTMLElement);
+        if (pseudos.length === 0) return "Une fiche n'a pas de pseudo";
+        const texte = pseudos.map((el) => el.textContent || '').join('');
+        for (const pseudo of pseudos) {
+          const boite = rect(pseudo);
+          if (boite.width <= 0 || boite.height <= 0) return 'Un pseudo a une largeur nulle';
+          if (!dedans(boite, rect(fiche))) return 'Le pseudo sort de sa fiche';
+        }
+        if (texte.indexOf('Maximilien-Alexandre') >= 0) {
           pseudoLong = true;
-          if (pseudo.scrollWidth > pseudo.clientWidth + 1) return 'Le pseudo long est tronqué';
+          for (const pseudo of pseudos) {
+            if (pseudo.scrollWidth > pseudo.clientWidth + 1) return 'Le pseudo long est tronqué';
+          }
         }
       }
       if (!pseudoLong) return 'Le pseudo long est absent';
@@ -470,6 +586,19 @@ async function verifierPlateau(page: Page, attendu: ControlePlateau): Promise<vo
 
 async function texteEntete(page: Page): Promise<string> {
   return page.locator('[data-zone="entete"]').innerText();
+}
+
+/** Position et taille de chaque case : elles ne doivent pas bouger quand l'en-tête change. */
+async function formatPlateau(page: Page): Promise<string> {
+  return page.evaluate(`(() => [...document.querySelectorAll('[data-case]')].map((el) => {
+    const boite = el.getBoundingClientRect();
+    return [boite.left, boite.top, boite.width, boite.height].map(Math.round).join(',');
+  }).join(' '))()`);
+}
+
+async function verifierFormatPlateau(page: Page, reference: string, moment: string): Promise<void> {
+  const format = await formatPlateau(page);
+  if (format !== reference) throw new Error(`Le plateau change de format ${moment} : ${reference} devient ${format}`);
 }
 
 async function main(): Promise<void> {
@@ -535,7 +664,7 @@ async function main(): Promise<void> {
     await page.waitForFunction((attendu) => document.querySelectorAll('[data-case]').length === attendu, nombreCases, { timeout: 20000 });
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
     await page.waitForFunction(() => {
-      const pions = document.querySelectorAll('.pion');
+      const pions = document.querySelectorAll('.pion, .plan, .fiche-socle');
       for (let i = 0; i < pions.length; i += 1) {
         const pion = pions[i];
         if (!(pion instanceof HTMLElement) || !pion.getAnimations) continue;
@@ -546,6 +675,7 @@ async function main(): Promise<void> {
       }
       return true;
     }, undefined, { timeout: 20000 });
+    await attendreFichesPosees(page);
     await verifierPlateau(page, { nombreCases, groupe: { index: 0, nombre: 4 } });
     await verifierTextes(page);
     await verifierRendu(page);
@@ -564,8 +694,10 @@ async function main(): Promise<void> {
     await panneauAgrandi.evaluate((balise) => balise.remove());
     if (!panneauRefuse) throw new Error('Un panneau agrandi aurait dû être refusé');
     console.log('OK     Un panneau agrandi est refusé');
+    await attendreFichesPosees(page);
     await page.screenshot({ path: path.join(captures, '01-depart.png') });
     await page.screenshot({ path: path.join(captures, '12-plateau-pixel.png') });
+    const formatDepart = await formatPlateau(page);
 
     await agirHote({ type: 'nouveauTour' });
     await page.getByText('Inès choisit le mini-jeu').waitFor({ timeout: 20000 });
@@ -575,7 +707,10 @@ async function main(): Promise<void> {
     await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
     await agirHote({ type: 'passerAuxDeplacements' });
     await page.getByText('À Inès de jouer').waitFor({ timeout: 20000 });
-    await page.getByText('Inès choisit sa mise').waitFor({ timeout: 20000 });
+    await page.getByText('choisit sa mise').waitFor({ timeout: 20000 });
+    const mise = await texteEntete(page);
+    if (!mise.includes('Inès')) throw new Error(`En-tête de la mise : ${mise}`);
+    await verifierFormatPlateau(page, formatDepart, 'pendant le choix de la mise');
 
     const saut = (async () => {
       await page.waitForFunction(() => {
@@ -607,9 +742,13 @@ async function main(): Promise<void> {
         }
       }`);
     })();
+    const pendantDe = page.getByText('Mise : 0 GP').waitFor({ timeout: 20000 })
+      .then(() => verifierFormatPlateau(page, formatDepart, 'pendant le dé'));
     const lancer = await agir(ines, { type: 'lancerDe', mise: 0 });
     if (!lancer.ok) throw new Error(lancer.erreur);
+    await pendantDe;
     await saut;
+    await verifierFormatPlateau(page, formatDepart, 'après le saut');
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
 
     const second = await agir(noe, { type: 'lancerDe', mise: 0 });
@@ -759,7 +898,228 @@ async function main(): Promise<void> {
     if (!combinaisonCassee) throw new Error('Une mise en page cassée des combinaisons aurait dû échouer');
     console.log('OK     Une mise en page cassée est refusée');
 
-    console.log('OK     Bandes libres, fiches compactes, icône plus grande que le numéro');
+    await agirHote({ type: 'passerAuxDeplacements' });
+    for (let essai = 0; essai < 6; essai += 1) {
+      if (serveur.etat().course?.phase !== 'deplacements') break;
+      await agirHote({ type: 'passerJoueur' });
+      await attendreFile();
+    }
+    await agirHote({ type: 'nouveauTour' });
+    await attendreFile();
+    await agirHote({ type: 'choisirMiniJeu', id: 'top-ten' });
+    await page.waitForSelector('[data-ecran="topten"][data-etape="intro"]', { timeout: 20000 });
+    await verifierTopTen(page);
+    await agirHote({ type: 'lancerMancheTopTen' });
+    await page.waitForSelector('[data-ecran="topten"][data-etape="reponses"]', { timeout: 20000 });
+    await verifierTopTen(page);
+    const annonce = await page.evaluate(() => document.querySelector('[data-zone="topten"]')?.textContent ?? '');
+    const premiere = serveur.etat().course?.topten?.manches[0];
+    if (!premiere) throw new Error('Manche de Top Ten absente');
+    const pseudoCapten = joueurs.find((joueur) => joueur.joueurId === premiere.captenId)?.pseudo ?? '';
+    if (!annonce.includes(premiere.theme.intitule) || !annonce.includes(`Cap'Ten : ${pseudoCapten}`)) {
+      throw new Error("Le thème ou le Cap'Ten manque à la télé");
+    }
+    if (!annonce.includes(`1 = ${premiere.theme.bas} · 10 = ${premiere.theme.haut}`)) throw new Error('Les pôles manquent à la télé');
+    await page.screenshot({ path: path.join(captures, '17-topten-theme.png') });
+    const croissant = [...premiere.repondants].sort((a, b) => (premiere.numeros[a] ?? 0) - (premiere.numeros[b] ?? 0));
+    const [petit, deuxieme, ...fin] = croissant;
+    const plusGrand = croissant[3];
+    if (!petit || !deuxieme || !plusGrand) throw new Error('Répondants manquants');
+    const propose = [deuxieme, petit, ...fin];
+    const faux = ((premiere.numeros[petit] ?? 0) % 10) + 1;
+    const cachees = page.waitForSelector('[data-revelation="cachees"]', { timeout: 20000 }).then(async () => {
+      await attendreAnimations(page, '.topten-rangees');
+      const avant = await page.evaluate(() => ({
+        retournees: document.querySelectorAll('[data-retournee="1"]').length,
+        devinees: document.querySelectorAll('[data-carte="devinee"]').length,
+        nomsCaches: Array.from(document.querySelectorAll('[data-carte="bon-ordre"] .nom-carte')).every((el) => !(el.textContent ?? '').trim()),
+        marques: document.querySelectorAll('[data-bon-rang="1"], [data-exact="1"]').length,
+      }));
+      if (avant.retournees !== 0) throw new Error(`${avant.retournees} cartes déjà retournées avant la révélation`);
+      if (avant.devinees !== 4) throw new Error(`Rangée « Deviné » : ${avant.devinees} cartes posées au lieu de 4`);
+      if (!avant.nomsCaches) throw new Error('La rangée « Bon ordre » montre un nom avant le retournement');
+      if (avant.marques !== 0) throw new Error('Bordures vertes ou fonds dorés allumés avant le retournement');
+      await page.screenshot({ path: path.join(captures, '18-topten-cartes-cachees.png') });
+    });
+    await agirHote({
+      type: 'validerOrdreTopTen',
+      ordre: propose,
+      devines: { [plusGrand]: premiere.numeros[plusGrand] ?? null, [petit]: faux },
+    });
+    await cachees;
+    await page.waitForSelector('[data-revelation="fin"]', { timeout: 20000 });
+    await attendreAnimations(page, '[data-zone="topten"]');
+    const lu = await page.evaluate(() => {
+      const zone = document.querySelector('[data-zone="topten"]');
+      return {
+        rangees: document.querySelectorAll('.topten-rangees').length,
+        libelles: Array.from(document.querySelectorAll('.rangee-libelle')).map((el) => (el.textContent ?? '').trim()),
+        cartes: Array.from(document.querySelectorAll('.carte-topten')).map((el) => {
+          const boite = el.getBoundingClientRect();
+          const html = el as HTMLElement;
+          return {
+            type: html.dataset.carte ?? '',
+            id: html.dataset.repondant ?? '',
+            numero: html.dataset.numero ?? '',
+            bonRang: html.dataset.bonRang === '1',
+            exact: el.querySelector('[data-exact="1"]') !== null,
+            chiffre: (el.querySelector('.chiffre-carte')?.textContent ?? '').trim(),
+            gauche: Math.round(boite.left),
+            haut: Math.round(boite.top),
+            bas: Math.round(boite.bottom),
+          };
+        }),
+        paires: document.querySelectorAll('.paire-topten, .topten-paires').length + ((zone?.textContent ?? '').includes(' avant ') ? 1 : 0),
+        total: document.querySelector('.montant-total')?.textContent ?? '',
+        piece: document.querySelector('.gp-total [data-icone="gp-piece"]') !== null,
+      };
+    });
+    const resultat = {
+      ...lu,
+      cartes: lu.cartes.length,
+      devinees: lu.cartes.filter((c) => c.type === 'devinee'),
+      bonOrdre: lu.cartes.filter((c) => c.type === 'bon-ordre'),
+    };
+    if (resultat.rangees !== 1 || resultat.cartes !== 8 || resultat.devinees.length !== 4 || resultat.bonOrdre.length !== 4) {
+      throw new Error(`Résultat : ${resultat.cartes} cartes (${resultat.devinees.length} devinées, ${resultat.bonOrdre.length} bon ordre), 2 rangées de 4 attendues`);
+    }
+    if (resultat.libelles.join('|') !== 'Deviné|Bon ordre') throw new Error(`Libellés des rangées : ${resultat.libelles.join(', ')}`);
+    const memeHaut = (cartes: { haut: number }[]) => cartes.every((c) => Math.abs(c.haut - (cartes[0]?.haut ?? 0)) <= 1);
+    if (!memeHaut(resultat.devinees) || !memeHaut(resultat.bonOrdre)) throw new Error('Les cartes d\'une rangée ne sont pas alignées');
+    if ((resultat.bonOrdre[0]?.haut ?? 0) < Math.max(...resultat.devinees.map((c) => c.bas))) throw new Error('La rangée « Bon ordre » doit être sous « Deviné »');
+    resultat.devinees.forEach((c, index) => {
+      if (Math.abs(c.gauche - (resultat.bonOrdre[index]?.gauche ?? -99)) > 1) throw new Error(`Colonne ${index + 1} mal alignée`);
+    });
+    if (resultat.devinees.map((c) => c.id).join('|') !== propose.join('|')) throw new Error('La rangée « Deviné » ne suit pas l\'ordre du Cap\'Ten');
+    if (resultat.bonOrdre.map((c) => c.id).join('|') !== croissant.join('|')) throw new Error('La rangée « Bon ordre » n\'est pas triée par numéro');
+    const numerosAffiches = resultat.bonOrdre.map((c) => Number(c.numero));
+    if (numerosAffiches.some((n, i) => i > 0 && n <= (numerosAffiches[i - 1] ?? 0))) throw new Error(`Bon ordre non croissant : ${numerosAffiches.join(', ')}`);
+    const attendusVerts = propose.filter((id, index) => croissant[index] === id);
+    const verts = resultat.devinees.filter((c) => c.bonRang).map((c) => c.id);
+    if (verts.join('|') !== attendusVerts.join('|') || verts.length !== 2) throw new Error(`Bordures vertes : ${verts.length}, attendues ${attendusVerts.length}`);
+    const dores = resultat.devinees.filter((c) => c.exact).map((c) => c.id);
+    if (dores.join('|') !== plusGrand) throw new Error(`Fonds dorés : ${dores.length}, seul le numéro exact est attendu`);
+    const chiffres = Object.fromEntries(resultat.devinees.map((c) => [c.id, c.chiffre]));
+    if (chiffres[petit] !== String(faux) || chiffres[deuxieme] !== '?') throw new Error('Numéro deviné ou « ? » mal affiché');
+    if (resultat.paires !== 0) throw new Error('La liste des paires est encore affichée');
+    if (resultat.total !== '6GP' || !resultat.piece) throw new Error(`Total affiché « ${resultat.total} », attendu « 6GP » avec la pièce`);
+    await verifierTopTen(page);
+    await page.screenshot({ path: path.join(captures, '19-topten-resultat.png') });
+    for (let manche = 2; manche <= 4; manche += 1) {
+      await agirHote({ type: 'lancerMancheTopTen' });
+      const courante = serveur.etat().course?.topten?.manches[manche - 1];
+      if (!courante) throw new Error(`Manche ${manche} absente`);
+      await agirHote({ type: 'validerOrdreTopTen', ordre: courante.repondants, devines: {} });
+    }
+    await agirHote({ type: 'recapTopTen' });
+    await page.waitForSelector('[data-ecran="topten"][data-etape="recap"]', { timeout: 20000 });
+    const lignesRecap = await page.evaluate(() => document.querySelectorAll('.topten-bilan li').length);
+    if (lignesRecap !== 4) throw new Error(`${lignesRecap} lignes au récapitulatif au lieu de 4`);
+    await verifierTopTen(page);
+    await page.screenshot({ path: path.join(captures, '20-topten-recap.png') });
+    console.log("OK     Top Ten : thème et Cap'Ten, rangée « Deviné » posée, « Bon ordre » trié et retourné, bons rangs en vert, numéros exacts dorés, sans paires, récapitulatif");
+
+    const tourSuivant = async () => {
+      await agirHote({ type: 'passerAuxDeplacements' });
+      for (let essai = 0; essai < 6; essai += 1) {
+        if (serveur.etat().course?.phase !== 'deplacements') break;
+        await agirHote({ type: 'passerJoueur' });
+        await attendreFile();
+      }
+      await agirHote({ type: 'nouveauTour' });
+      await attendreFile();
+    };
+    const texteZone = (zone: string) => page.evaluate((cible) => document.querySelector(`[data-zone="${cible}"]`)?.textContent ?? '', zone);
+    const pseudoDe = (id: string | null | undefined) => joueurs.find((joueur) => joueur.joueurId === id)?.pseudo ?? '';
+
+    await tourSuivant();
+    await agirHote({ type: 'choisirMiniJeu', id: 'jeopardy' });
+    await page.waitForSelector('[data-ecran="jeopardy"][data-etape="grille"]', { timeout: 20000 });
+    await verifierModule(page, 'jeopardy');
+    const jeopardy = () => serveur.etat().course?.jeopardy;
+    const choisisseur = jeopardy()?.choisisseurId ?? '';
+    await agirHote({ type: 'choisirCaseJeopardy', theme: 1, niveau: 0 });
+    await page.waitForSelector('[data-ecran="jeopardy"][data-etape="question"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'jeopardy');
+    const question = await texteZone('jeopardy');
+    if (!question.includes('Quelle est la planète la plus proche du Soleil ?') || !question.includes(pseudoDe(choisisseur))) {
+      throw new Error('La question ou le choisisseur manque à la télé');
+    }
+    if (question.includes('Mercure')) throw new Error('La réponse apparaît sur la télé');
+    await page.screenshot({ path: path.join(captures, '22-jeopardy-question.png') });
+    await agirHote({ type: 'jugerJeopardy', juste: false });
+    const buzzeur = joueurs.find((joueur) => joueur.joueurId !== choisisseur);
+    if (!buzzeur) throw new Error('Aucun joueur pour buzzer');
+    const buzz = await agir(buzzeur, { type: 'buzzJeopardy' });
+    if (!buzz.ok) throw new Error(buzz.erreur);
+    await page.waitForSelector(`[data-ecran="jeopardy"] [data-etat="buzz"]`, { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'jeopardy');
+    const main = await texteZone('jeopardy');
+    if (!main.includes(buzzeur.pseudo)) throw new Error('Le nom du joueur qui a buzzé manque à la télé');
+    await page.screenshot({ path: path.join(captures, '23-jeopardy-buzz.png') });
+    const etapesBuzz = await page.evaluate(() => (window.__chronologieAnimations ?? []).filter((etape) => etape.evenement === 'jeopardy.buzz').length);
+    if (etapesBuzz < 1) throw new Error('Le buzz ne passe pas par la file d\'animations');
+    await agirHote({ type: 'jugerJeopardy', juste: true });
+    await page.waitForSelector('[data-ecran="jeopardy"][data-etape="grille"] [data-jouee="1"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'jeopardy');
+    const prochain = jeopardy()?.choisisseurId;
+    const grilleTexte = await texteZone('jeopardy');
+    if (!prochain || !grilleTexte.includes(`Au tour de ${pseudoDe(prochain)}`)) throw new Error('Le prochain choisisseur manque à la télé');
+    await page.screenshot({ path: path.join(captures, '21-jeopardy-grille.png') });
+    await agirHote({ type: 'terminerJeopardy' });
+    await page.waitForSelector('[data-ecran="jeopardy"][data-etape="fin"]', { timeout: 20000 });
+    await verifierModule(page, 'jeopardy');
+    console.log('OK     Jeopardy : grille et prochain choisisseur, question sans réponse, buzz, récapitulatif');
+
+    await tourSuivant();
+    await agirHote({ type: 'choisirMiniJeu', id: 'undercover' });
+    await page.waitForSelector('[data-ecran="undercover"][data-etape="intro"]', { timeout: 20000 });
+    await verifierModule(page, 'undercover');
+    await agirHote({ type: 'lancerMancheUndercover' });
+    await page.waitForSelector('[data-ecran="undercover"][data-etape="indices"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'undercover');
+    const mancheUc = serveur.etat().course?.undercover?.manches[0];
+    if (!mancheUc) throw new Error('Manche d\'Undercover absente');
+    const ordreAffiche = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.undercover-ordre [data-joueur]')).map((ligne) => (ligne as HTMLElement).dataset.joueur ?? ''),
+    );
+    if (ordreAffiche.join('|') !== mancheUc.ordreParole.join('|')) throw new Error('L\'ordre de parole affiché diffère');
+    const motsCaches = async () => {
+      const texte = await page.evaluate(() => document.body.textContent ?? '');
+      if (texte.includes(mancheUc.paire.civils) || texte.includes(mancheUc.paire.undercover)) throw new Error('Un mot apparaît sur la télé avant la fin');
+    };
+    await motsCaches();
+    await page.screenshot({ path: path.join(captures, '24-undercover-ordre.png') });
+    const civil = mancheUc.ordreParole.find((id) => id !== mancheUc.undercoverId) ?? '';
+    await agirHote({ type: 'eliminerUndercover', joueurId: civil });
+    await page.waitForSelector('[data-ecran="undercover"][data-revelation="civil"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'undercover');
+    await motsCaches();
+    if (!(await texteZone('undercover')).includes(`${pseudoDe(civil)} était civil`)) throw new Error('La révélation du civil manque');
+    await page.screenshot({ path: path.join(captures, '25-undercover-civil.png') });
+    await agirHote({ type: 'eliminerUndercover', joueurId: mancheUc.undercoverId });
+    await page.waitForSelector('[data-ecran="undercover"][data-revelation="undercover"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'undercover');
+    await motsCaches();
+    if (!(await texteZone('undercover')).includes(`${pseudoDe(mancheUc.undercoverId)} était l'undercover`)) {
+      throw new Error('La révélation de l\'undercover manque');
+    }
+    await page.screenshot({ path: path.join(captures, '26-undercover-revele.png') });
+    await agirHote({ type: 'devinerUndercover', trouve: false });
+    await page.waitForSelector('[data-ecran="undercover"][data-etape="finie"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'undercover');
+    const motsFin = await texteZone('undercover');
+    if (!motsFin.includes(mancheUc.paire.civils) || !motsFin.includes(mancheUc.paire.undercover)) throw new Error('Les deux mots ne sont pas révélés');
+    console.log('OK     Undercover : ordre de parole, civil révélé, undercover révélé, mots cachés jusqu\'à la fin');
+
+    console.log('OK     Fiches et cagnotte dans les coins, plateau hors des bandes, icône plus grande que le numéro');
     console.log('OK     Pions dans leur case, numéros visibles');
     console.log('OK     Colonnes et en-tête hors du plateau');
     console.log('OK     Pseudos visibles, y compris le plus long');

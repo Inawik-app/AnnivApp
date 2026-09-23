@@ -22,7 +22,10 @@
 }
 
 .ecran-mini[data-ecran="regles"],
-.ecran-mini[data-ecran="podium"] {
+.ecran-mini[data-ecran="podium"],
+.ecran-mini[data-ecran="topten"],
+.ecran-mini[data-ecran="jeopardy"],
+.ecran-mini[data-ecran="undercover"] {
   background: var(--nuit);
   --liseret: #b9d4ff;
   border: 4px solid var(--encre);

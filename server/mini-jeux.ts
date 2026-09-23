@@ -56,7 +56,7 @@ function idsConnus(etat: EtatJeu, ids: string[]): string | null {
   return null;
 }
 
-function crediter(
+export function crediter(
   draft: EtatJeu,
   ctx: ContexteCourse,
   ajouter: Ajouter,
@@ -146,6 +146,25 @@ export function appliquerChoix(
   course.resultatsSaisis = false;
   course.minuteur = { etat: 'arrete', finA: null, resteMs: 0, libelle: '' };
   course.poker = jeu.module === 'poker' ? { actif: true, niveau: 0 } : { actif: false, niveau: 0 };
+  if (jeu.module === 'topten') {
+    course.topten = {
+      captens: [...course.ordre],
+      manches: [],
+      themesJoues: [...(course.topten?.themesJoues ?? [])],
+      recap: false,
+    };
+  }
+  if (jeu.module === 'jeopardy') {
+    course.jeopardy = { choisisseurId: course.ordre[0] ?? null, jouees: [], question: null, gains: {}, termine: false };
+  }
+  if (jeu.module === 'undercover') {
+    course.undercover = {
+      nbManches: ctx.undercover.manches,
+      manches: [],
+      pairesJouees: [...(course.undercover?.pairesJouees ?? [])],
+      recap: false,
+    };
+  }
   if (!course.joues.includes(jeu.id)) course.joues.push(jeu.id);
   ajouter(draft, 'minijeu.choisi', 'public', `Mini-jeu : ${jeu.nom}`, {
     nom: jeu.nom,
@@ -201,6 +220,9 @@ export function refuserActivite(etat: EtatJeu, action: Action, origine: Origine,
       const jeu = jeuParId(ctx.catalogue, course.miniJeuId);
       if (!jeu) return "Ce mini-jeu n'existe pas";
       if (jeu.module === 'poker') return 'Le poker se termine par la conversion des tapis';
+      if (jeu.module === 'topten') return 'Le Top Ten se joue manche par manche depuis son panneau';
+      if (jeu.module === 'jeopardy') return 'Le Jeopardy se joue case par case depuis son panneau';
+      if (jeu.module === 'undercover') return "L'Undercover se joue manche par manche depuis son panneau";
       if (action.saisie.mode !== jeu.saisie) return 'Cette saisie ne correspond pas au mini-jeu';
       return refuserSaisie(etat, action);
     }

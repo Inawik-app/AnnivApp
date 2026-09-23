@@ -21,7 +21,7 @@ export type EntreeClassement = { joueurId: string; exAequo: boolean };
 export type GainMiniJeu = { joueurId: string; montant: number; rang?: number };
 
 /** Modules dont l'écran existe. Les autres affichent les règles, en attendant l'étape suivante. */
-export const MODULES_PRETS = new Set(['poker']);
+export const MODULES_PRETS = new Set(['poker', 'topten', 'jeopardy', 'undercover']);
 
 export function modulePret(module: string): boolean {
   return module === 'aucun' || MODULES_PRETS.has(module);

@@ -185,39 +185,50 @@ function palier(px: number, plancher = 40): number {
   return [32, 40, 48, 64, 96, 128].find((cran) => cran >= vise) ?? 128;
 }
 
-/** Pastille du numéro : au plus 30 % de la tuile, et plus petite que l'icône quand la tuile le permet. */
-function mesureNumero(taille: number, icone: number): { hauteur: number; fonte: number } {
-  const plafond = Math.floor(taille * 0.3);
-  const bord = 6;
-  let fonte = 40;
-  for (const cran of [64, 48, 40]) {
-    if (cran * 1.4 + bord <= plafond && (icone <= 0 || cran < icone)) {
-      fonte = cran;
-      break;
-    }
-  }
-  const ligne = Math.ceil(fonte * 1.4 + bord);
-  return { hauteur: plafond >= ligne ? ligne : Math.max(ligne, 0), fonte };
+/** Pastille du numéro : la hauteur de son chiffre, au plus 30 % de la tuile, collée au coin. */
+function mesureNumero(taille: number): { hauteur: number; fonte: number } {
+  const fonte = 24;
+  const contenu = Math.ceil(fonte * 1.4) + 4;
+  return { hauteur: Math.max(0, Math.min(Math.floor(taille * 0.3), contenu)), fonte };
 }
 
-function PseudoFiche({ pseudo }: { pseudo: string }) {
-  const ref = useRef<HTMLParagraphElement>(null);
+/** L'icône reste au moins deux fois plus haute que la pastille, sans que le chiffre soit rogné. */
+function mesureCase(taille: number): { numero: { hauteur: number; fonte: number }; icone: number } {
+  const numero = mesureNumero(taille);
+  const icone = coteIconeCase(taille, numero.hauteur);
+  if (icone === 0) return { numero, icone };
+  const hauteur = Math.max(Math.min(numero.hauteur, Math.floor(icone / 2)), numero.fonte + 4);
+  return { numero: { ...numero, hauteur }, icone };
+}
+
+/** Multiple de 64 le plus proche de 65 % de la tuile, sans dépasser l'espace sous le numéro. */
+function coteIconeCase(taille: number, badge: number): number {
+  const cible = taille * 0.65;
+  const max = Math.max(0, taille - badge - 4);
+  const candidats = [64, 128, 192].filter((cote) => cote <= max);
+  if (candidats.length === 0) return 0;
+  return candidats.reduce((retenu, cote) => (Math.abs(cote - cible) < Math.abs(retenu - cible) ? cote : retenu));
+}
+
+/** Coupe au trait d'union quand le pseudo ne tient pas à côté du numéro de case. */
+function useCoupurePseudo(pseudo: string, ref: { readonly current: HTMLElement | null }): boolean {
+  const [coupe, setCoupe] = useState(false);
   useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.whiteSpace = 'nowrap';
-    for (const taille of [48, 40]) {
-      el.style.fontSize = `${taille}px`;
-      if (el.scrollWidth <= el.clientWidth + 1) return;
-    }
-    el.style.whiteSpace = 'normal';
-    el.style.overflowWrap = 'anywhere';
-  }, [pseudo]);
-  return (
-    <p class="pseudo-fiche" ref={ref}>
-      {pseudo}
-    </p>
-  );
+    const ligne = ref.current?.querySelector('.fiche-haut .pseudo-fiche');
+    if (!(ligne instanceof HTMLElement)) return;
+    const sonde = document.createElement('span');
+    sonde.className = 'pseudo-fiche';
+    sonde.style.whiteSpace = 'nowrap';
+    sonde.style.position = 'absolute';
+    sonde.style.visibility = 'hidden';
+    sonde.textContent = pseudo;
+    document.body.appendChild(sonde);
+    const largeur = sonde.getBoundingClientRect().width;
+    sonde.remove();
+    const index = pseudo.indexOf('-');
+    setCoupe(largeur > ligne.clientWidth + 1 && index > 0 && index < pseudo.length - 1);
+  }, [pseudo, ref]);
+  return coupe;
 }
 
 function FicheJoueur({
@@ -242,6 +253,11 @@ function FicheJoueur({
   reduit: boolean;
 }) {
   const ref = useFlip(joueur.id, signature, animer);
+  const corpsRef = useRef<HTMLDivElement>(null);
+  const coupe = useCoupurePseudo(joueur.pseudo, corpsRef);
+  const index = coupe ? joueur.pseudo.indexOf('-') : -1;
+  const ligne1 = index > 0 ? joueur.pseudo.slice(0, index + 1) : joueur.pseudo;
+  const ligne2 = index > 0 ? joueur.pseudo.slice(index + 1) : '';
   return (
     <div ref={ref} class="socle-pixel fiche-socle">
     <div class={courant ? 'fiche-joueur courant' : 'fiche-joueur'} style={courant ? { borderColor: joueur.couleur } : undefined}>
@@ -252,13 +268,20 @@ function FicheJoueur({
       ) : null}
       <div class="fiche-ligne">
         <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={64} />
-        <PseudoFiche pseudo={joueur.pseudo} />
-        <p class="case-fiche">n°{position}</p>
-      </div>
-      <div class="fiche-gp">
-        <CompteurRouleaux valeur={joueur.gpVisibles} duree={reduit ? 150 : 700} taille={40} />
-        {ensuite ? <p class="ensuite">Ensuite</p> : null}
-        {rang !== null ? <p class="ensuite">Arrivé {libelleRang(rang)}</p> : null}
+        <div class="fiche-corps" ref={corpsRef}>
+          <div class="fiche-haut">
+            <p class="pseudo-fiche">{ligne1}</p>
+            <p class="case-fiche">n°{position}</p>
+          </div>
+          <div class="fiche-bas">
+            {ligne2 ? <p class="pseudo-fiche">{ligne2}</p> : <span class="fiche-vide" />}
+            <div class="fiche-gp">
+              <CompteurRouleaux valeur={joueur.gpVisibles} duree={reduit ? 150 : 700} taille={40} />
+            </div>
+            {ensuite && !ligne2 ? <p class="ensuite">Ensuite</p> : null}
+          </div>
+          {rang !== null ? <p class="ensuite ensuite-pose">Arrivé {libelleRang(rang)}</p> : null}
+        </div>
       </div>
     </div>
     </div>
@@ -280,7 +303,7 @@ function TuileCagnotte({ valeur, reduit }: { valeur: number; reduit: boolean }) 
       <Tuile>
         <p class="libelle-cagnotte">Cagnotte</p>
         <div class="cagnotte-ligne">
-          <CompteurRouleaux valeur={valeur} duree={reduit ? 150 : 700} taille={96} />
+          <CompteurRouleaux valeur={valeur} duree={reduit ? 150 : 700} taille={40} />
         </div>
       </Tuile>
       {vol ? (
@@ -317,14 +340,20 @@ export function PlateauTv({
     animerFiches.current = true;
   }, []);
   const zoneRef = useRef<HTMLDivElement>(null);
-  const [boite, setBoite] = useState({ largeur: 0, hauteur: 0 });
+  const [boite, setBoite] = useState({ largeur: 0, hauteur: 0, gauche: 0 });
   useEffect(() => {
     const zone = zoneRef.current;
     if (!zone) return;
     const lire = () => {
       const largeur = zone.clientWidth;
       const hauteur = zone.clientHeight;
-      setBoite((precedent) => (precedent.largeur === largeur && precedent.hauteur === hauteur ? precedent : { largeur, hauteur }));
+      // offsetLeft est relatif à .plateau-scene, calée sur le bord gauche de la scène de 1920 px.
+      const gauche = zone.offsetLeft;
+      setBoite((precedent) =>
+        precedent.largeur === largeur && precedent.hauteur === hauteur && precedent.gauche === gauche
+          ? precedent
+          : { largeur, hauteur, gauche },
+      );
     };
     lire();
     const observateur = new ResizeObserver(lire);
@@ -333,15 +362,15 @@ export function PlateauTv({
   }, []);
   const ordre = brassage ?? course.ordre;
   const signature = ordre.join('|');
-  const cadreL = Math.min(boite.largeur, Math.round(1920 * 0.6));
+  const cadreL = Math.min(boite.largeur, Math.round(1920 * 0.43));
   const cadreH = Math.min(boite.hauteur, Math.round(1080 * 0.8));
   const grille = meilleureGrille(course.disposition.length, cadreL, cadreH);
-  const decalageX = Math.max(0, (boite.largeur - cadreL) / 2);
+  const libreX = Math.max(0, boite.largeur - cadreL);
+  const decalageX = Math.min(libreX, Math.max(0, 960 - boite.gauche - cadreL / 2));
   const decalageY = Math.max(0, (boite.hauteur - cadreH) / 2);
-  const tailleIcone = grille.taille > 0
-    ? multipleIcone('case-depart', Math.round(grille.taille * 0.6), Math.floor(grille.taille * 0.72)) || 64
-    : 0;
-  const numeroCase = mesureNumero(grille.taille, tailleIcone);
+  const mesures = mesureCase(grille.taille);
+  const numeroCase = mesures.numero;
+  const tailleIcone = mesures.icone;
   const places = slotsPions(grille.taille, numeroCase.hauteur);
   const haloId = course.joueurCourantId;
   const joueurBandeau = nomJoueur(joueurs, course.joueurCourantId);
@@ -352,8 +381,8 @@ export function PlateauTv({
     ? miseVisible > 0
       ? `Mise : ${miseVisible} GP, dé boosté`
       : 'Mise : 0 GP'
-    : enDeplacement && course.etape === 'lancer' && !aLance && joueurBandeau
-      ? `${joueurBandeau} choisit sa mise…`
+    : enDeplacement && course.etape === 'lancer' && !aLance
+      ? 'choisit sa mise…'
       : null;
   const boost = spectacle?.type === 'de' && spectacle.miseMax > 0 ? spectacle.mise / spectacle.miseMax : 0;
   const suivantId = (() => {
@@ -417,8 +446,8 @@ export function PlateauTv({
                     data-case={index}
                     style={{ left: `${point.x}px`, top: `${point.y}px`, width: `${grille.taille}px`, height: `${grille.taille}px` }}
                   >
-                    <div class="pastille-case">
-                      {nomCase ? <Icone nom={nomCase} taille={tailleIcone} /> : null}
+                    <div class="pastille-case" style={{ paddingTop: `${numeroCase.hauteur}px` }}>
+                      {nomCase && tailleIcone > 0 ? <Icone nom={nomCase} taille={tailleIcone} /> : null}
                     </div>
                     <span
                       class="numero-case"

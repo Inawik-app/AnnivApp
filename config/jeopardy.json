@@ -1,0 +1,64 @@
+{
+  "valeurs": [1, 2, 4, 7],
+  "penaliteMauvaiseReponse": 0,
+  "themes": [
+    {
+      "nom": "Yanis",
+      "questions": [
+        { "question": "Quel est le nom de famille de Yanis ?" },
+        { "question": "Quel est l'animal préféré de Yanis ?" },
+        { "question": "Suite à quel accident Yanis a-t-il fini en béquilles pendant près de deux semaines ?" },
+        { "question": "Si ce n'était pas Yanis, quel aurait pu être son prénom ?" }
+      ]
+    },
+    {
+      "nom": "Espace",
+      "questions": [
+        { "question": "Quelle est la planète la plus proche du Soleil ?", "reponse": "Mercure" },
+        {
+          "question": "Avec quelle galaxie voisine la Voie lactée doit-elle entrer en collision dans quelques milliards d'années ?",
+          "reponse": "Andromède"
+        },
+        {
+          "question": "Quelle sonde spatiale, lancée en 1977, est l'objet humain le plus lointain, à près d'un jour-lumière de la Terre ?",
+          "reponse": "Voyager 1",
+          "accepte": ["Voyager"]
+        },
+        {
+          "question": "Quelle lune du système solaire est la seule à posséder une atmosphère dense ?",
+          "reponse": "Titan (lune de Saturne)",
+          "accepte": ["Titan"]
+        }
+      ]
+    },
+    {
+      "nom": "Jeux vidéo",
+      "questions": [
+        { "question": "Quel jeu de construction en blocs a été créé par Notch ?", "reponse": "Minecraft" },
+        { "question": "Quel éditeur français est derrière Rayman et Assassin's Creed ?", "reponse": "Ubisoft" },
+        {
+          "question": "Quel game designer japonais a créé à la fois Mario et Zelda ?",
+          "reponse": "Shigeru Miyamoto",
+          "accepte": ["Miyamoto"]
+        },
+        {
+          "question": "Dans quel jeu incarne-t-on un petit chevalier insecte qui explore le royaume déchu d'Hallownest ?",
+          "reponse": "Hollow Knight"
+        }
+      ]
+    },
+    {
+      "nom": "Culture G",
+      "questions": [
+        { "question": "Quel peintre s'est tranché une partie de l'oreille ?", "reponse": "Vincent van Gogh", "accepte": ["Van Gogh"] },
+        { "question": "Quelle est la capitale de l'Australie ?", "reponse": "Canberra" },
+        { "question": "Quel est le plus grand organe du corps humain ?", "reponse": "La peau", "accepte": ["Peau"] },
+        {
+          "question": "Quel pays compte le plus de fuseaux horaires, territoires d'outre-mer compris ?",
+          "reponse": "La France",
+          "accepte": ["France"]
+        }
+      ]
+    }
+  ]
+}

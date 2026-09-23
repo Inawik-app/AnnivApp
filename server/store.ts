@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { INTERVALLE_SAUVEGARDE_MS, LIMITE_ANNULATIONS } from '../shared/constantes';
 import type { Action, EtatJeu, Origine, ReponseAction, TypeCase } from '../shared/types';
 import { lireCartesChance, lireConfigPlateau } from './course-config';
-import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { libelleAction } from './libelles';
 import { creerPersistance, type Persistance } from './persistance';
 import { reduire, type Effet } from './reducteur';
@@ -70,6 +70,9 @@ export function creerStore(options: OptionsStore): Store {
   const cartes = lireCartesChance(racine);
   const catalogue = lireCatalogue(racine);
   const poker = lirePoker(racine);
+  const topten = lireTopTen(racine);
+  const jeopardy = lireJeopardy(racine);
+  const undercover = lireUndercover(racine);
   const alea = options.alea ?? ((max: number) => randomInt(0, Math.max(1, max)));
   const desForces = options.test ? [...(options.desForces ?? [])] : [];
   const tirerDe = options.test && options.desForces
@@ -222,6 +225,9 @@ export function creerStore(options: OptionsStore): Store {
         cartes,
         catalogue,
         poker,
+        topten,
+        jeopardy,
+        undercover,
       });
       if (!resultat.ok) {
         restaurerDes(desAvant);

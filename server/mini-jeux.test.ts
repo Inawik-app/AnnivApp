@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
-import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { lireCartesChance, lireConfigPlateau } from './course-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { solde } from '../shared/soldes';
@@ -34,6 +34,9 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     cartes: lireCartesChance(RACINE),
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
+    topten: lireTopTen(RACINE),
+    jeopardy: lireJeopardy(RACINE),
+    undercover: lireUndercover(RACINE),
     ...partiel,
   };
 }
@@ -133,8 +136,12 @@ describe('mini-jeux', () => {
     expect(dureeNiveauMs(poker)).toBe(600_000);
     expect(poker.regles.join(' ')).toMatch(/moitié/);
     expect(poker.regles.join(' ')).toMatch(/1 pour 1/);
-    expect(modulePret('jeopardy')).toBe(false);
-    expect(ecranPour('jeopardy')).toBe('regles');
+    expect(modulePret('jeopardy')).toBe(true);
+    expect(modulePret('undercover')).toBe(true);
+    expect(modulePret('inconnu')).toBe(false);
+    expect(ecranPour('inconnu')).toBe('regles');
+    expect(ecranPour('aucun')).toBe('regles');
+    expect(ecranPour('jeopardy')).toBe('jeopardy');
     expect(ecranPour('poker')).toBe('poker');
   });
 
@@ -155,9 +162,11 @@ describe('mini-jeux', () => {
   });
 
   it('enregistre un classement avec ex aequo et refuse un montant négatif', () => {
-    const ctx = contexte();
+    const catalogue = lireCatalogue(RACINE);
+    const libre = { ...catalogue.jeux[0]!, id: 'libre-test', nom: 'Libre', saisie: 'libre' as const, module: 'aucun' };
+    const ctx = contexte({ catalogue: { ...catalogue, jeux: [...catalogue.jeux, libre] } });
     let etat = partie(ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'jeopardy' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'libre-test' }, hote, ctx);
     expect(etat.course?.ecranMini).toBe('regles');
     const [mira, noe, lina, sacha] = etat.joueurs;
     if (!mira || !noe || !lina || !sacha) throw new Error('joueurs');

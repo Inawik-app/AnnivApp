@@ -1,0 +1,24 @@
+{
+  "nomHote": "Yanis",
+  "pointsParPaire": 1,
+  "bonusOrdreParfait": 4,
+  "bonusChiffresExacts": [0, 1, 2, 4, 6],
+  "themes": [
+    { "intitule": "Quel objet emporter sur une île déserte ?", "bas": "le moins utile", "haut": "le plus utile" },
+    { "intitule": "La pire excuse pour arriver en retard à un mariage", "bas": "la moins crédible", "haut": "la plus crédible" },
+    { "intitule": "Un plat pour un premier rendez-vous", "bas": "le moins romantique", "haut": "le plus romantique" },
+    { "intitule": "Un super-pouvoir", "bas": "le plus nul", "haut": "le plus cool" },
+    { "intitule": "Ce qu'on trouve dans un frigo d'étudiant", "bas": "le plus dégoûtant", "haut": "le plus appétissant" },
+    { "intitule": "Une arme pour survivre à une invasion de zombies", "bas": "la moins efficace", "haut": "la plus efficace" },
+    { "intitule": "Un cadeau d'anniversaire pour Yanis", "bas": "le plus nul", "haut": "le meilleur" },
+    { "intitule": "Un animal de compagnie en appartement", "bas": "le moins pratique", "haut": "le plus pratique" },
+    { "intitule": "Une phrase à dire à ses beaux-parents au premier repas", "bas": "la plus gênante", "haut": "la plus classe" },
+    { "intitule": "Une activité d'enterrement de vie de garçon ou de jeune fille", "bas": "la plus nulle", "haut": "la plus mémorable" },
+    { "intitule": "Une cachette pour une partie de cache-cache", "bas": "la pire", "haut": "la meilleure" },
+    { "intitule": "Un objet dans lequel se réincarner", "bas": "le pire", "haut": "le meilleur" },
+    { "intitule": "Un talent à montrer dans un casting", "bas": "le plus ridicule", "haut": "le plus impressionnant" },
+    { "intitule": "Une odeur", "bas": "la pire", "haut": "la meilleure" },
+    { "intitule": "Un film à regarder avec ses parents", "bas": "le plus gênant", "haut": "le plus confortable" },
+    { "intitule": "Quel objet fallait-il avoir lors du naufrage du Titanic ?", "bas": "le moins utile", "haut": "le plus utile" }
+  ]
+}

@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { esperanceDe, probabilitesDe, tirerDePondere } from '../shared/de';
 import { lireConfigPlateau } from './course-config';
-import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { etatInitial } from './etat-initial';
 import { reduire, type ContexteReduction } from './reducteur';
 import type { Action, EtatJeu, Origine } from '../shared/types';
@@ -26,6 +26,9 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     cartes: [{ id: 'de-dore', titre: 'Dé doré', texte: 'Le dé rapporte.', effet: { type: 'gainDe' } }],
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
+    topten: lireTopTen(RACINE),
+    jeopardy: lireJeopardy(RACINE),
+    undercover: lireUndercover(RACINE),
     ...partiel,
   };
 }

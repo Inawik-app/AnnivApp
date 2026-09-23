@@ -1,4 +1,7 @@
 import type { CatalogueMiniJeux, ConfigPoker } from './mini-jeux';
+import type { Devines, ScoreTopTen, ThemeTopTen } from './topten';
+import type { CouleurBuzzer, QuestionEnCours } from './jeopardy';
+import type { PaireUndercover, RoleUndercover } from './undercover';
 
 export type Joueur = {
   id: string;
@@ -145,6 +148,62 @@ export type PokerCourse = {
   niveau: number;
 };
 
+export type MancheTopTen = {
+  numero: number;
+  captenId: string;
+  indexTheme: number;
+  theme: ThemeTopTen;
+  /** Les autres joueurs dans l'ordre de passage, puis l'hôte (`REPONDANT_HOTE`). */
+  repondants: string[];
+  /** Numéro secret de chaque répondant, tiré sur le serveur. */
+  numeros: Record<string, number>;
+  etape: 'reponses' | 'revelee';
+  proposition: { ordre: string[]; devines: Devines } | null;
+  score: ScoreTopTen | null;
+};
+
+export type TopTenCourse = {
+  /** Cap'Ten dans l'ordre de passage : une manche par joueur. */
+  captens: string[];
+  manches: MancheTopTen[];
+  /** Index des thèmes déjà joués dans la soirée. */
+  themesJoues: number[];
+  recap: boolean;
+};
+
+export type CaseJoueeJeopardy = { theme: number; niveau: number; choisisseurId: string; gagnantId: string | null };
+
+export type JeopardyCourse = {
+  /** Choisisseur de la prochaine case (présélectionné, modifiable par l'hôte). */
+  choisisseurId: string | null;
+  jouees: CaseJoueeJeopardy[];
+  question: QuestionEnCours | null;
+  gains: Record<string, number>;
+  termine: boolean;
+};
+
+export type MancheUndercover = {
+  numero: number;
+  indexPaire: number;
+  paire: PaireUndercover;
+  undercoverId: string;
+  ordreParole: string[];
+  /** Éliminés, dans l'ordre. */
+  elimines: string[];
+  etape: 'indices' | 'devine' | 'finie';
+  issue: 'civils' | 'undercover' | null;
+  devine: boolean | null;
+  gains: Record<string, number>;
+};
+
+export type UndercoverCourse = {
+  nbManches: number;
+  manches: MancheUndercover[];
+  /** Index des paires déjà jouées dans la soirée. */
+  pairesJouees: number[];
+  recap: boolean;
+};
+
 export type Course = {
   active: boolean;
   disposition: TypeCase[];
@@ -169,6 +228,9 @@ export type Course = {
   resultatsSaisis: boolean;
   minuteur: Minuteur;
   poker: PokerCourse;
+  topten?: TopTenCourse | null;
+  jeopardy?: JeopardyCourse | null;
+  undercover?: UndercoverCourse | null;
   choisitId: string | null;
   carteCourante: { joueurId: string; carte: CarteChance } | null;
   dernierDe: { joueurId: string; valeur: number; usage: UsageDe } | null;
@@ -260,6 +322,19 @@ export type Action =
         | { mode: 'libre'; montants: Record<string, number> };
     }
   | { type: 'validerPoker'; tapis: Record<string, number>; tapisHote: number }
+  | { type: 'lancerMancheTopTen' }
+  | { type: 'validerOrdreTopTen'; ordre: string[]; devines: Devines }
+  | { type: 'recapTopTen' }
+  | { type: 'choisirChoisisseurJeopardy'; joueurId: string }
+  | { type: 'choisirCaseJeopardy'; theme: number; niveau: number }
+  | { type: 'buzzJeopardy' }
+  | { type: 'jugerJeopardy'; juste: boolean }
+  | { type: 'personneJeopardy' }
+  | { type: 'terminerJeopardy' }
+  | { type: 'lancerMancheUndercover' }
+  | { type: 'eliminerUndercover'; joueurId: string }
+  | { type: 'devinerUndercover'; trouve: boolean }
+  | { type: 'recapUndercover' }
   | { type: 'passerAuxDeplacements' }
   | { type: 'lancerDe'; mise: number }
   | { type: 'choisirBeneficiaire'; joueurId: string }
@@ -319,6 +394,80 @@ export type DuelVue = {
   mises: MiseVue[];
 };
 
+export type MancheTopTenVue = {
+  numero: number;
+  captenId: string;
+  theme: ThemeTopTen;
+  repondants: string[];
+  etape: 'reponses' | 'revelee';
+  /** Le numéro du répondant qui regarde (joueur ou hôte), sinon null. */
+  monNumero: number | null;
+  /** Tous les numéros : l'hôte toujours, les autres seulement après la révélation. */
+  numeros: Record<string, number> | null;
+  proposition: { ordre: string[]; devines: Devines } | null;
+  score: ScoreTopTen | null;
+};
+
+export type TopTenVue = {
+  nomHote: string;
+  pointsParPaire: number;
+  bonusOrdreParfait: number;
+  bonusChiffresExacts: number[];
+  captens: string[];
+  courante: MancheTopTenVue | null;
+  bilan: Array<{ numero: number; captenId: string; theme: string; total: number }>;
+  recap: boolean;
+};
+
+export type QuestionJeopardyVue = QuestionEnCours & {
+  valeur: number;
+  texte: string;
+  /** Hôte seulement ; null si l'hôte connaît la réponse sans qu'elle soit écrite. */
+  reponse?: string | null;
+  accepte?: string[];
+};
+
+export type JeopardyVue = {
+  valeurs: number[];
+  themes: string[];
+  jouees: CaseJoueeJeopardy[];
+  choisisseurId: string | null;
+  question: QuestionJeopardyVue | null;
+  /** Couleur du buzzer du joueur qui regarde, null ailleurs. */
+  monBuzzer: CouleurBuzzer | null;
+  gains: Record<string, number>;
+  penalite: number;
+  termine: boolean;
+};
+
+export type MancheUndercoverVue = {
+  numero: number;
+  ordreParole: string[];
+  elimines: Array<{ id: string; role: RoleUndercover }>;
+  tour: number;
+  etape: 'indices' | 'devine' | 'finie';
+  issue: 'civils' | 'undercover' | null;
+  devine: boolean | null;
+  /** Le mot du joueur qui regarde. */
+  monMot: string | null;
+  jeSuisElimine: boolean;
+  /** Hôte toujours, les autres une fois l'undercover éliminé ou la manche finie. */
+  undercoverId: string | null;
+  /** Hôte toujours, les autres à la fin de la manche. */
+  paire: PaireUndercover | null;
+  gains: Record<string, number>;
+};
+
+export type UndercoverVue = {
+  nbManches: number;
+  gainCivils: number;
+  gainUndercoverDevine: number;
+  gainUndercoverSurvit: number;
+  courante: MancheUndercoverVue | null;
+  bilan: Array<{ numero: number; issue: 'civils' | 'undercover' | null; gains: Record<string, number> }>;
+  recap: boolean;
+};
+
 export type CourseVue = {
   active: boolean;
   phase: PhaseCourse;
@@ -340,6 +489,9 @@ export type CourseVue = {
   resultatsSaisis: boolean;
   minuteur: Minuteur;
   poker: PokerCourse;
+  topten: TopTenVue | null;
+  jeopardy: JeopardyVue | null;
+  undercover: UndercoverVue | null;
   catalogue: CatalogueMiniJeux;
   pokerConfig: ConfigPoker;
   etape: 'lancer' | 'cadeau' | 'duel' | null;

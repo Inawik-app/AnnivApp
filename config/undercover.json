@@ -1,0 +1,24 @@
+{
+  "manches": 2,
+  "gainCivils": 6,
+  "gainUndercoverDevine": 8,
+  "gainUndercoverSurvit": 15,
+  "paires": [
+    { "civils": "Fondue", "undercover": "Raclette" },
+    { "civils": "Parfum", "undercover": "Déodorant" },
+    { "civils": "Moustique", "undercover": "Guêpe" },
+    { "civils": "Ascenseur", "undercover": "Escalator" },
+    { "civils": "Boulangerie", "undercover": "Pâtisserie" },
+    { "civils": "Fantôme", "undercover": "Zombie" },
+    { "civils": "Tatouage", "undercover": "Piercing" },
+    { "civils": "Pompier", "undercover": "Policier" },
+    { "civils": "Glacier", "undercover": "Banquise" },
+    { "civils": "Horoscope", "undercover": "Tarot" },
+    { "civils": "Podcast", "undercover": "Radio" },
+    { "civils": "Pirate", "undercover": "Viking" },
+    { "civils": "Volcan", "undercover": "Geyser" },
+    { "civils": "Échecs", "undercover": "Dames" },
+    { "civils": "Hôtel", "undercover": "Auberge de jeunesse" },
+    { "civils": "Selfie", "undercover": "Portrait" }
+  ]
+}

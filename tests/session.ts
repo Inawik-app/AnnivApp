@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { io, type Socket } from 'socket.io-client';
 import { solde } from '../shared/soldes';
-import type { Action, EtatJeu, ReponseAction, TypeCase, VueClient } from '../shared/types';
+import type { ConfigJeopardy } from '../shared/jeopardy';
+import type { Action, EtatJeu, MancheUndercover, ReponseAction, TypeCase, VueClient } from '../shared/types';
 import { demarrerServeur, type ConfigTest, type ServeurJeu } from '../server/demarrer';
 
 export const CODE_HOTE = 'change-moi';
@@ -51,10 +52,16 @@ function portLibre(): Promise<number> {
   });
 }
 
+// 3000 est réservé à la vraie partie ; les autres sont refusés par Chromium (net::ERR_UNSAFE_PORT).
+const PORTS_REFUSES = new Set([
+  1719, 1720, 1723, 2049, 3000, 3659, 4045, 4190, 5060, 5061, 6000, 6566,
+  6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+]);
+
 export async function portDisponible(): Promise<number> {
-  for (let essai = 0; essai < 5; essai += 1) {
+  for (let essai = 0; essai < 10; essai += 1) {
     const port = await portLibre();
-    if (port !== 3000 && port > 0) return port;
+    if (port > 0 && !PORTS_REFUSES.has(port)) return port;
   }
   throw new Error('Aucun port libre en dehors de 3000');
 }
@@ -144,7 +151,7 @@ export function verifierInvariants(etat: EtatJeu): void {
     if (visible < 0) throw new Error(`Solde négatif pour ${joueur.pseudo} : ${visible}`);
   }
   for (const transaction of etat.transactions) {
-    if (transaction.montant < 0 && transaction.source !== 'mise' && transaction.source !== 'manuel') {
+    if (transaction.montant < 0 && transaction.source !== 'mise' && transaction.source !== 'manuel' && transaction.source !== 'penalite') {
       throw new Error(`Transaction négative interdite (${transaction.source}) pour ${transaction.joueurId}`);
     }
   }
@@ -174,6 +181,67 @@ export function fuitesMises(vue: VueClient, joueurId: string | null): string[] {
     if ('montant' in evenement.donnees) fuites.push(`événement ${evenement.type}`);
   }
   if (contientCle(vue, 'pioche') || contientCle(vue, 'defausse')) fuites.push('pioche');
+  return fuites;
+}
+
+/**
+ * Avant la révélation, une page ne voit que son propre numéro (`repondant`), aucun autre,
+ * où qu'il soit caché dans le message.
+ */
+export function fuitesTopTen(vue: VueClient, repondant: string | null, numeros: Record<string, number>): string[] {
+  const courante = vue.course?.topten?.courante;
+  if (!courante || courante.etape !== 'reponses') return [];
+  const fuites: string[] = [];
+  const attendu = repondant ? (numeros[repondant] ?? null) : null;
+  const parcourir = (valeur: unknown, chemin: string) => {
+    if (Array.isArray(valeur)) {
+      valeur.forEach((item, index) => parcourir(item, `${chemin}[${index}]`));
+      return;
+    }
+    if (!valeur || typeof valeur !== 'object') return;
+    for (const [cle, item] of Object.entries(valeur as Record<string, unknown>)) {
+      if (cle === 'numeros' && item !== null) fuites.push(`${chemin}.numeros`);
+      if (cle === 'monNumero' && item !== attendu) fuites.push(`${chemin}.monNumero = ${String(item)}`);
+      if (cle === 'score' && item !== null) fuites.push(`${chemin}.score`);
+      if (cle === 'proposition' && item !== null) fuites.push(`${chemin}.proposition`);
+      parcourir(item, `${chemin}.${cle}`);
+    }
+  };
+  parcourir(vue, 'vue');
+  return fuites;
+}
+
+/** Les questions non choisies et toutes les réponses restent hors du message, où qu'elles soient. */
+export function fuitesJeopardy(vue: VueClient, config: ConfigJeopardy, courante: { theme: number; niveau: number } | null): string[] {
+  if (!vue.course?.jeopardy) return [];
+  const texte = JSON.stringify(vue);
+  const fuites: string[] = [];
+  if (contientCle(vue, 'reponse') || contientCle(vue, 'accepte')) fuites.push('champ de réponse');
+  config.themes.forEach((theme, indexTheme) => {
+    theme.questions.forEach((question, niveau) => {
+      const actuelle = courante?.theme === indexTheme && courante.niveau === niveau;
+      if (!actuelle && texte.includes(question.question)) fuites.push(`question ${theme.nom} ${niveau + 1}`);
+      for (const reponse of [question.reponse, ...question.accepte]) {
+        if (reponse && texte.includes(reponse)) fuites.push(`réponse « ${reponse} »`);
+      }
+    });
+  });
+  return fuites;
+}
+
+/** Avant la fin de la manche : le mot de chacun ne va qu'à lui, le rôle d'un joueur n'est public qu'une fois éliminé. */
+export function fuitesUndercover(vue: VueClient, joueurId: string | null, manche: MancheUndercover): string[] {
+  const courante = vue.course?.undercover?.courante;
+  if (!courante || manche.etape === 'finie') return [];
+  const texte = JSON.stringify(vue);
+  const civils = JSON.stringify(manche.paire.civils);
+  const intrus = JSON.stringify(manche.paire.undercover);
+  const monMot = joueurId && manche.ordreParole.includes(joueurId) ? (joueurId === manche.undercoverId ? intrus : civils) : null;
+  const fuites: string[] = [];
+  for (const mot of [civils, intrus]) if (mot !== monMot && texte.includes(mot)) fuites.push(`mot ${mot}`);
+  if (courante.paire !== null) fuites.push('paire');
+  if (!manche.elimines.includes(manche.undercoverId) && courante.undercoverId !== null) fuites.push('undercover désigné');
+  for (const entree of courante.elimines) if (!manche.elimines.includes(entree.id)) fuites.push(`rôle de ${entree.id}`);
   return fuites;
 }
 

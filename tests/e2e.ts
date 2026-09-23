@@ -1,8 +1,11 @@
 import { esperanceDe, probabilitesDe } from '../shared/de';
 import { repartirTapisHote } from '../shared/mini-jeux';
 import { solde } from '../shared/soldes';
+import { REPONDANT_HOTE, scoreTopTen, type Devines } from '../shared/topten';
+import type { CouleurBuzzer } from '../shared/jeopardy';
 import type { Action, VueClient } from '../shared/types';
 import { demarrerServeur, type ServeurJeu } from '../server/demarrer';
+import { lireJeopardy } from '../server/mini-jeux-config';
 import {
   CODE_HOTE,
   DISPOSITION,
@@ -10,7 +13,10 @@ import {
   attendreVue,
   connecter,
   fermerSession,
+  fuitesJeopardy,
   fuitesMises,
+  fuitesTopTen,
+  fuitesUndercover,
   memeVue,
   ouvrirServeur,
   stabiliser,
@@ -29,6 +35,8 @@ const DES = [
   6, 1, 1, 1,
   1, 1, 1, 1,
 ];
+
+const CONFIG_JEOPARDY = lireJeopardy(process.cwd());
 
 type Monde = {
   serveur: ServeurJeu;
@@ -59,7 +67,328 @@ async function jouer(monde: Monde, acteur: Participant, action: Action, nom: str
       if (fuites.length > 0) throw new Error(`Mise visible pour ${joueur.pseudo} (${nom}) : ${fuites.join(', ')}`);
     }
   }
+  verifierSecretsTopTen(monde, nom);
+  verifierSecretsJeopardy(monde, nom);
+  verifierSecretsUndercover(monde, nom);
   console.log(`OK     ${nom}`);
+}
+
+function verifierSecretsTopTen(monde: Monde, nom: string): void {
+  const manches = monde.serveur.etat().course?.topten?.manches ?? [];
+  const manche = manches[manches.length - 1];
+  if (!manche || manche.etape !== 'reponses') return;
+  const fuitesTv = fuitesTopTen(monde.tv.vue as VueClient, null, manche.numeros);
+  if (fuitesTv.length > 0) throw new Error(`Numéro visible sur la TV (${nom}) : ${fuitesTv.join(', ')}`);
+  for (const joueur of monde.joueurs) {
+    const repondant = manche.repondants.includes(joueur.joueurId) ? joueur.joueurId : null;
+    const fuites = fuitesTopTen(joueur.vue as VueClient, repondant, manche.numeros);
+    if (fuites.length > 0) throw new Error(`Numéro visible pour ${joueur.pseudo} (${nom}) : ${fuites.join(', ')}`);
+    const monNumero = joueur.vue?.course?.topten?.courante?.monNumero ?? null;
+    if (repondant && monNumero !== manche.numeros[repondant]) throw new Error(`${joueur.pseudo} ne voit pas son numéro`);
+  }
+  const hote = monde.hote.vue?.course?.topten?.courante;
+  if (JSON.stringify(hote?.numeros) !== JSON.stringify(manche.numeros)) throw new Error("L'hôte ne voit pas tous les numéros");
+  if (hote?.monNumero !== manche.numeros[REPONDANT_HOTE]) throw new Error("L'hôte ne voit pas son numéro");
+}
+
+async function jouerTopTen(monde: Monde): Promise<void> {
+  await annulerPuisRejouer(monde, 'le choix du Top Ten', async () => {
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'top-ten' }, 'Top Ten choisi');
+  });
+  const ordre = monde.serveur.etat().course?.ordre ?? [];
+  const propositions: Array<(numeros: Record<string, number>, repondants: string[]) => { ordre: string[]; devines: Devines }> = [
+    (numeros, repondants) => ({ ordre: [...repondants].sort((a, b) => (numeros[a] ?? 0) - (numeros[b] ?? 0)), devines: {} }),
+    (numeros, repondants) => ({ ordre: [...repondants].sort((a, b) => (numeros[b] ?? 0) - (numeros[a] ?? 0)), devines: {} }),
+    (numeros, repondants) => {
+      const trie = [...repondants].sort((a, b) => (numeros[a] ?? 0) - (numeros[b] ?? 0));
+      const [a, b, ...reste] = trie;
+      const devines: Devines = { [trie[3]!]: numeros[trie[3]!] ?? null, [trie[2]!]: null };
+      return { ordre: [b!, a!, ...reste], devines };
+    },
+    (numeros, repondants) => {
+      const devines: Devines = {};
+      for (const id of repondants) devines[id] = numeros[id] ?? null;
+      return { ordre: [...repondants].sort((a, b) => (numeros[a] ?? 0) - (numeros[b] ?? 0)), devines };
+    },
+  ];
+  const attendus = [10, 0, 6, 16];
+  for (let index = 0; index < 4; index += 1) {
+    await annulerPuisRejouer(monde, `le lancement de la manche ${index + 1} du Top Ten`, async () => {
+      await jouer(monde, monde.hote, { type: 'lancerMancheTopTen' }, `Top Ten, manche ${index + 1}`);
+    });
+    const manches = monde.serveur.etat().course?.topten?.manches ?? [];
+    const manche = manches[manches.length - 1];
+    if (!manche) throw new Error('Manche de Top Ten absente');
+    if (manche.captenId !== ordre[index]) throw new Error(`Cap'Ten inattendu pour la manche ${index + 1}`);
+    if (manche.repondants.length !== 4 || manche.repondants[3] !== REPONDANT_HOTE) throw new Error("L'hôte doit être répondant");
+    const valeurs = manche.repondants.map((id) => manche.numeros[id]);
+    if (new Set(valeurs).size !== 4 || valeurs.some((valeur) => !valeur || valeur < 1 || valeur > 10)) {
+      throw new Error(`Numéros invalides : ${valeurs.join(', ')}`);
+    }
+    const capten = monde.joueurs.find((joueur) => joueur.joueurId === manche.captenId);
+    if (!capten) throw new Error("Cap'Ten introuvable");
+    const autre = monde.joueurs.find((joueur) => joueur.joueurId !== manche.captenId);
+    const proposition = propositions[index]!(manche.numeros, manche.repondants);
+    if (autre) {
+      const refus = await agir(autre, { type: 'validerOrdreTopTen', ...proposition });
+      if (refus.ok) throw new Error("Un répondant ne doit pas pouvoir classer à la place du Cap'Ten");
+    }
+    const acteur = index === 3 ? monde.hote : capten;
+    const avant = new Map(monde.joueurs.map((joueur) => [joueur.joueurId, solde(monde.serveur.etat().transactions, joueur.joueurId, 'visibles')]));
+    await annulerPuisRejouer(monde, `l'ordre de la manche ${index + 1} du Top Ten`, async () => {
+      await jouer(monde, acteur, { type: 'validerOrdreTopTen', ...proposition }, `Ordre du Cap'Ten ${capten.pseudo}`);
+    });
+    const attendu = scoreTopTen(proposition.ordre, manche.numeros, proposition.devines, {
+      pointsParPaire: 1,
+      bonusOrdreParfait: 4,
+      bonusChiffresExacts: [0, 1, 2, 4, 6],
+    }).total;
+    if (attendu !== attendus[index]) throw new Error(`Score calculé inattendu : ${attendu}`);
+    for (const joueur of monde.joueurs) {
+      const gain = solde(monde.serveur.etat().transactions, joueur.joueurId, 'visibles') - (avant.get(joueur.joueurId) ?? 0);
+      const voulu = joueur.joueurId === manche.captenId ? attendu : 0;
+      if (gain !== voulu) throw new Error(`${joueur.pseudo} gagne ${gain} GP au lieu de ${voulu}`);
+    }
+    const revelee = monde.tv.vue?.course?.topten?.courante;
+    if (revelee?.etape !== 'revelee' || revelee.score?.total !== attendu || !revelee.numeros) {
+      throw new Error('La TV ne reçoit pas la révélation');
+    }
+  }
+  if (monde.serveur.etat().transactions.some((transaction) => transaction.joueurId === REPONDANT_HOTE)) {
+    throw new Error("L'hôte ne doit jamais recevoir de GP");
+  }
+  const encore = await agir(monde.hote, { type: 'lancerMancheTopTen' });
+  if (encore.ok) throw new Error('Une cinquième manche ne doit pas démarrer');
+  await annulerPuisRejouer(monde, 'le récapitulatif du Top Ten', async () => {
+    await jouer(monde, monde.hote, { type: 'recapTopTen' }, 'Récapitulatif du Top Ten');
+  });
+  const bilan = monde.tv.vue?.course?.topten?.bilan.map((ligne) => ligne.total) ?? [];
+  if (bilan.join(',') !== attendus.join(',')) throw new Error(`Récapitulatif inattendu : ${bilan.join(', ')}`);
+  console.log("OK     Top Ten : Cap'Ten dans l'ordre, hôte répondant sans GP, numéros secrets jusqu'à la révélation");
+}
+
+function verifierSecretsJeopardy(monde: Monde, nom: string): void {
+  const jeu = monde.serveur.etat().course?.jeopardy;
+  if (!jeu || monde.serveur.etat().course?.ecranMini !== 'jeopardy') return;
+  const courante = jeu.question ? { theme: jeu.question.theme, niveau: jeu.question.niveau } : null;
+  for (const page of [monde.tv, ...monde.joueurs]) {
+    const fuites = fuitesJeopardy(page.vue as VueClient, CONFIG_JEOPARDY, courante);
+    if (fuites.length > 0) throw new Error(`Secret du Jeopardy visible pour ${page.pseudo} (${nom}) : ${fuites.join(', ')}`);
+  }
+  if (courante) {
+    const source = CONFIG_JEOPARDY.themes[courante.theme]?.questions[courante.niveau];
+    const vueHote = monde.hote.vue?.course?.jeopardy?.question;
+    if (!source || vueHote?.reponse !== source.reponse) throw new Error(`L'hôte ne voit pas la réponse (${nom})`);
+    if (monde.tv.vue?.course?.jeopardy?.question?.texte !== source.question) throw new Error(`La TV ne voit pas la question (${nom})`);
+  }
+}
+
+function verifierSecretsUndercover(monde: Monde, nom: string): void {
+  const course = monde.serveur.etat().course;
+  const manches = course?.undercover?.manches ?? [];
+  const manche = manches[manches.length - 1];
+  if (!manche || course?.ecranMini !== 'undercover') return;
+  const fuitesTv = fuitesUndercover(monde.tv.vue as VueClient, null, manche);
+  if (fuitesTv.length > 0) throw new Error(`Secret de l'Undercover visible sur la TV (${nom}) : ${fuitesTv.join(', ')}`);
+  for (const joueur of monde.joueurs) {
+    const fuites = fuitesUndercover(joueur.vue as VueClient, joueur.joueurId, manche);
+    if (fuites.length > 0) throw new Error(`Secret de l'Undercover visible pour ${joueur.pseudo} (${nom}) : ${fuites.join(', ')}`);
+    const attendu = joueur.joueurId === manche.undercoverId ? manche.paire.undercover : manche.paire.civils;
+    if (joueur.vue?.course?.undercover?.courante?.monMot !== attendu) throw new Error(`${joueur.pseudo} ne voit pas son mot (${nom})`);
+  }
+  const hote = monde.hote.vue?.course?.undercover?.courante;
+  if (hote?.undercoverId !== manche.undercoverId || hote.paire?.civils !== manche.paire.civils) {
+    throw new Error(`L'hôte ne voit pas les rôles et les mots (${nom})`);
+  }
+}
+
+function verifierBuzzers(monde: Monde, attendus: Record<string, CouleurBuzzer>, etape: string): void {
+  for (const joueur of monde.joueurs) {
+    const couleur = joueur.vue?.course?.jeopardy?.monBuzzer;
+    if (couleur !== attendus[joueur.joueurId]) {
+      throw new Error(`Buzzer de ${joueur.pseudo} ${String(couleur)} au lieu de ${attendus[joueur.joueurId]} (${etape})`);
+    }
+  }
+  if (monde.tv.vue?.course?.jeopardy?.monBuzzer !== null || monde.hote.vue?.course?.jeopardy?.monBuzzer !== null) {
+    throw new Error(`Seuls les joueurs ont un buzzer (${etape})`);
+  }
+  console.log(`OK     Buzzers ${etape} : ${monde.joueurs.map((joueur) => `${joueur.pseudo} ${attendus[joueur.joueurId]}`).join(', ')}`);
+}
+
+function gainsDe(monde: Monde, libelle: string): Record<string, number> {
+  const gains: Record<string, number> = {};
+  for (const transaction of monde.serveur.etat().transactions) {
+    if (transaction.libelle !== libelle) continue;
+    gains[transaction.joueurId] = (gains[transaction.joueurId] ?? 0) + transaction.montant;
+  }
+  return gains;
+}
+
+async function jouerJeopardy(monde: Monde): Promise<void> {
+  await annulerPuisRejouer(monde, 'le choix du Jeopardy', async () => {
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'jeopardy' }, 'Jeopardy choisi');
+  });
+  const ordre = monde.serveur.etat().course?.ordre ?? [];
+  const participant = (id: string) => {
+    const joueur = monde.joueurs.find((candidat) => candidat.joueurId === id);
+    if (!joueur) throw new Error('Joueur introuvable');
+    return joueur;
+  };
+  const couleurs = (liste: CouleurBuzzer[]) => Object.fromEntries(ordre.map((id, index) => [id, liste[index]!]));
+  const jeu = () => monde.serveur.etat().course?.jeopardy;
+  verifierBuzzers(monde, couleurs(['rouge', 'rouge', 'rouge', 'rouge']), 'avant la question');
+  const attendus: Record<string, number> = {};
+  const crediter = (id: string, niveau: number) => {
+    attendus[id] = (attendus[id] ?? 0) + (CONFIG_JEOPARDY.valeurs[niveau] ?? 0);
+  };
+  let prochain = ordre[0]!;
+
+  // Question 1 : chaque étape, chaque couleur, chaque annulation.
+  if (jeu()?.choisisseurId !== prochain) throw new Error('Le premier choisisseur doit être le premier de l\'ordre');
+  await annulerPuisRejouer(monde, 'le choix du choisisseur', async () => {
+    await jouer(monde, monde.hote, { type: 'choisirChoisisseurJeopardy', joueurId: ordre[0]! }, `${participant(ordre[0]!).pseudo} choisit`);
+  });
+  await annulerPuisRejouer(monde, 'le choix d\'une case', async () => {
+    await jouer(monde, monde.hote, { type: 'choisirCaseJeopardy', theme: 1, niveau: 0 }, 'Case Espace pour 1');
+  });
+  verifierBuzzers(monde, couleurs(['bleu', 'rouge', 'rouge', 'rouge']), 'priorité du choisisseur');
+  const tropTot = await agir(participant(ordre[1]!), { type: 'buzzJeopardy' });
+  if (tropTot.ok) throw new Error('Un buzz pendant la priorité doit être refusé');
+  await annulerPuisRejouer(monde, 'une mauvaise réponse', async () => {
+    await jouer(monde, monde.hote, { type: 'jugerJeopardy', juste: false }, 'Faux du choisisseur');
+  });
+  verifierBuzzers(monde, couleurs(['gris', 'vert', 'vert', 'vert']), 'buzzers ouverts');
+  const grise = await agir(participant(ordre[0]!), { type: 'buzzJeopardy' });
+  if (grise.ok) throw new Error('Un joueur qui s\'est trompé ne doit pas rebuzzer');
+  await annulerPuisRejouer(monde, 'un buzz', async () => {
+    await jouer(monde, participant(ordre[2]!), { type: 'buzzJeopardy' }, `Buzz de ${participant(ordre[2]!).pseudo}`);
+  });
+  if (jeu()?.question?.mainId !== ordre[2]) throw new Error('Le premier buzz doit prendre la main');
+  verifierBuzzers(monde, couleurs(['gris', 'rouge', 'bleu', 'rouge']), 'main au premier buzz');
+  for (const retard of [ordre[1]!, ordre[2]!, ordre[3]!]) {
+    const refus = await agir(participant(retard), { type: 'buzzJeopardy' });
+    if (refus.ok) throw new Error('Un second buzz doit être refusé');
+  }
+  await jouer(monde, monde.hote, { type: 'jugerJeopardy', juste: false }, 'Faux après le buzz');
+  verifierBuzzers(monde, couleurs(['gris', 'vert', 'gris', 'vert']), 'réouverture après un faux');
+  await jouer(monde, participant(ordre[3]!), { type: 'buzzJeopardy' }, `Buzz de ${participant(ordre[3]!).pseudo}`);
+  verifierBuzzers(monde, couleurs(['gris', 'rouge', 'gris', 'bleu']), 'second buzz');
+  await annulerPuisRejouer(monde, 'une bonne réponse', async () => {
+    await jouer(monde, monde.hote, { type: 'jugerJeopardy', juste: true }, 'Juste après le buzz');
+  });
+  crediter(ordre[3]!, 0);
+  verifierBuzzers(monde, couleurs(['rouge', 'rouge', 'rouge', 'rouge']), 'question close');
+  prochain = ordre[1]!;
+
+  // Question 2 : le choisisseur suivant répond juste, personne n'est plus grisé.
+  if (jeu()?.choisisseurId !== prochain) throw new Error('Le choisisseur suivant doit être présélectionné');
+  await jouer(monde, monde.hote, { type: 'choisirCaseJeopardy', theme: 2, niveau: 3 }, 'Case Jeux vidéo pour 7');
+  verifierBuzzers(monde, couleurs(['rouge', 'bleu', 'rouge', 'rouge']), 'nouvelle question');
+  await jouer(monde, monde.hote, { type: 'jugerJeopardy', juste: true }, 'Juste du choisisseur');
+  crediter(ordre[1]!, 3);
+
+  // Question 3 : personne.
+  await jouer(monde, monde.hote, { type: 'choisirCaseJeopardy', theme: 0, niveau: 0 }, 'Case Yanis pour 1');
+  const vueHote = monde.hote.vue?.course?.jeopardy?.question;
+  if (vueHote?.reponse !== null) throw new Error('Une question sans réponse écrite doit envoyer null à l\'hôte');
+  await annulerPuisRejouer(monde, 'une question sans gagnant', async () => {
+    await jouer(monde, monde.hote, { type: 'personneJeopardy' }, 'Personne');
+  });
+
+  // Le reste de la grille, sauf la dernière case, en alternant juste et personne.
+  let restantes = 0;
+  for (let theme = 0; theme < CONFIG_JEOPARDY.themes.length; theme += 1) {
+    for (let niveau = 0; niveau < CONFIG_JEOPARDY.valeurs.length; niveau += 1) {
+      if (jeu()?.jouees.some((entree) => entree.theme === theme && entree.niveau === niveau)) continue;
+      restantes += 1;
+      if (theme === 3 && niveau === 3) continue;
+      const choisisseur = jeu()?.choisisseurId ?? '';
+      await jouer(monde, monde.hote, { type: 'choisirCaseJeopardy', theme, niveau }, `Case ${theme + 1}-${niveau + 1}`);
+      if (restantes % 2 === 0) {
+        await jouer(monde, monde.hote, { type: 'jugerJeopardy', juste: true }, `Juste ${theme + 1}-${niveau + 1}`);
+        crediter(choisisseur, niveau);
+      } else {
+        await jouer(monde, monde.hote, { type: 'personneJeopardy' }, `Personne ${theme + 1}-${niveau + 1}`);
+      }
+    }
+  }
+  if (jeu()?.termine) throw new Error('Le Jeopardy ne doit pas finir avant la dernière case');
+  await annulerPuisRejouer(monde, 'l\'arrêt du Jeopardy', async () => {
+    await jouer(monde, monde.hote, { type: 'terminerJeopardy' }, 'Arrêt du Jeopardy');
+  });
+  if (!jeu()?.termine || !monde.serveur.etat().course?.resultatsSaisis) throw new Error('Le Jeopardy devrait être terminé');
+  const recus = gainsDe(monde, 'Jeopardy');
+  for (const id of ordre) {
+    if ((recus[id] ?? 0) !== (attendus[id] ?? 0) || (jeu()?.gains[id] ?? 0) !== (attendus[id] ?? 0)) {
+      throw new Error(`Gains du Jeopardy inattendus pour ${participant(id).pseudo} : ${recus[id] ?? 0} au lieu de ${attendus[id] ?? 0}`);
+    }
+  }
+  if (JSON.stringify(monde.tv.vue?.course?.jeopardy?.gains) !== JSON.stringify(jeu()?.gains)) throw new Error('La TV n\'a pas le récapitulatif');
+  console.log('OK     Jeopardy : rotation, priorité, buzzers, valeurs 1/2/4/7 et secrets tenus');
+}
+
+async function jouerUndercover(monde: Monde): Promise<void> {
+  await annulerPuisRejouer(monde, 'le choix de l\'Undercover', async () => {
+    await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'undercover' }, 'Undercover choisi');
+  });
+  const manche = () => {
+    const manches = monde.serveur.etat().course?.undercover?.manches ?? [];
+    const derniere = manches[manches.length - 1];
+    if (!derniere) throw new Error('Manche d\'Undercover absente');
+    return derniere;
+  };
+  const avant = gainsDe(monde, 'Undercover');
+  if (Object.keys(avant).length > 0) throw new Error('Aucun gain d\'Undercover attendu avant la partie');
+
+  await annulerPuisRejouer(monde, 'le lancement d\'une manche d\'Undercover', async () => {
+    await jouer(monde, monde.hote, { type: 'lancerMancheUndercover' }, 'Undercover, manche 1');
+  });
+  const premiere = manche();
+  if (premiere.ordreParole[0] === premiere.undercoverId) throw new Error('L\'undercover ne doit pas parler en premier');
+  const civils1 = premiere.ordreParole.filter((id) => id !== premiere.undercoverId);
+  if (JSON.stringify(monde.tv.vue?.course?.undercover?.courante?.ordreParole) !== JSON.stringify(premiere.ordreParole)) {
+    throw new Error('La TV n\'affiche pas l\'ordre de parole');
+  }
+  await annulerPuisRejouer(monde, 'l\'élimination d\'un civil', async () => {
+    await jouer(monde, monde.hote, { type: 'eliminerUndercover', joueurId: civils1[0]! }, 'Élimination d\'un civil');
+  });
+  const revele = monde.tv.vue?.course?.undercover?.courante?.elimines;
+  if (JSON.stringify(revele) !== JSON.stringify([{ id: civils1[0], role: 'civil' }])) throw new Error('La TV ne révèle pas le civil');
+  const elimine = monde.joueurs.find((joueur) => joueur.joueurId === civils1[0]);
+  if (elimine?.vue?.course?.undercover?.courante?.jeSuisElimine !== true) throw new Error('Le civil éliminé ne le voit pas');
+  await annulerPuisRejouer(monde, 'l\'élimination de l\'undercover', async () => {
+    await jouer(monde, monde.hote, { type: 'eliminerUndercover', joueurId: premiere.undercoverId }, 'Élimination de l\'undercover');
+  });
+  if (monde.tv.vue?.course?.undercover?.courante?.undercoverId !== premiere.undercoverId) throw new Error('La TV ne révèle pas l\'undercover');
+  await annulerPuisRejouer(monde, 'la devinette de l\'undercover', async () => {
+    await jouer(monde, monde.hote, { type: 'devinerUndercover', trouve: true }, 'Mot trouvé');
+  });
+  const paireTv = monde.tv.vue?.course?.undercover?.courante?.paire;
+  if (paireTv?.civils !== premiere.paire.civils || paireTv.undercover !== premiere.paire.undercover) {
+    throw new Error('La TV ne révèle pas les deux mots');
+  }
+  const apres1 = gainsDe(monde, 'Undercover');
+  for (const id of civils1) if (apres1[id] !== 6) throw new Error(`Un civil devrait avoir 6 GP (${apres1[id] ?? 0})`);
+  if (apres1[premiere.undercoverId] !== 8) throw new Error('L\'undercover qui devine devrait avoir 8 GP');
+
+  await jouer(monde, monde.hote, { type: 'lancerMancheUndercover' }, 'Undercover, manche 2');
+  const seconde = manche();
+  if (seconde.undercoverId === premiere.undercoverId) throw new Error('L\'undercover doit changer à chaque manche');
+  if (seconde.indexPaire === premiere.indexPaire) throw new Error('Une paire ne doit pas être rejouée');
+  const civils2 = seconde.ordreParole.filter((id) => id !== seconde.undercoverId);
+  await jouer(monde, monde.hote, { type: 'eliminerUndercover', joueurId: civils2[0]! }, 'Premier civil éliminé');
+  await jouer(monde, monde.hote, { type: 'eliminerUndercover', joueurId: civils2[1]! }, 'Second civil éliminé');
+  if (manche().issue !== 'undercover' || manche().etape !== 'finie') throw new Error('L\'undercover devrait survivre');
+  const apres2 = gainsDe(monde, 'Undercover');
+  if ((apres2[seconde.undercoverId] ?? 0) - (apres1[seconde.undercoverId] ?? 0) !== 15) throw new Error('L\'undercover survivant devrait avoir 15 GP');
+  for (const id of civils2) {
+    if ((apres2[id] ?? 0) !== (apres1[id] ?? 0)) throw new Error('Les civils ne gagnent rien si l\'undercover survit');
+  }
+  await annulerPuisRejouer(monde, 'le récapitulatif de l\'Undercover', async () => {
+    await jouer(monde, monde.hote, { type: 'recapUndercover' }, 'Récapitulatif de l\'Undercover');
+  });
+  if (!monde.serveur.etat().course?.resultatsSaisis) throw new Error('L\'Undercover devrait être clos');
+  console.log('OK     Undercover : ordre de parole, révélations, gains 6/8/15 et mots secrets');
 }
 
 async function annulerPuisRejouer(monde: Monde, nom: string, refaire: () => Promise<void>): Promise<void> {
@@ -328,6 +657,12 @@ async function main(): Promise<void> {
         const montant = (id: string) => equipe.find((transaction) => transaction.joueurId === id)?.montant;
         if (montant(ines2.joueurId) !== 8 || montant(noe2.joueurId) !== 8) throw new Error('Les gagnants devraient recevoir 8 GP');
         if (montant(lina2.joueurId) !== 2 || montant(leo2.joueurId) !== 2) throw new Error('Les perdants devraient recevoir 2 GP');
+      } else if (tour === 4) {
+        await jouerTopTen(monde);
+      } else if (tour === 5) {
+        await jouerJeopardy(monde);
+      } else if (tour === 6) {
+        await jouerUndercover(monde);
       } else {
         await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, `Mini-jeu du tour ${tour}`);
       }

@@ -192,7 +192,8 @@ function PageJoueur() {
               setErreur(null);
               const reponse = await session.current.envoyer(action);
               setEnvoi(false);
-              if (!reponse.ok) setErreur(reponse.erreur);
+              // Un buzz arrivé après celui d'un autre n'est pas une erreur à afficher.
+              if (!reponse.ok && action.type !== 'buzzJeopardy') setErreur(reponse.erreur);
             }}
           />
           {gain ? <GainFlottant key={gain.cle} montant={gain.montant} /> : null}

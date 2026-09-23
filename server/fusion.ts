@@ -48,6 +48,36 @@ function normaliserCourse(valeur: unknown): Course | null {
   if (!course.poker || typeof course.poker.actif !== 'boolean' || typeof course.poker.niveau !== 'number') {
     course.poker = { actif: false, niveau: 0 };
   }
+  const topten = course.topten;
+  if (
+    !topten ||
+    !Array.isArray(topten.captens) ||
+    !Array.isArray(topten.manches) ||
+    !Array.isArray(topten.themesJoues) ||
+    typeof topten.recap !== 'boolean'
+  ) {
+    course.topten = null;
+  }
+  const jeopardy = course.jeopardy;
+  if (
+    !jeopardy ||
+    !Array.isArray(jeopardy.jouees) ||
+    !estObjet(jeopardy.gains) ||
+    typeof jeopardy.termine !== 'boolean' ||
+    (jeopardy.question !== null && (!estObjet(jeopardy.question) || !Array.isArray(jeopardy.question.elimines)))
+  ) {
+    course.jeopardy = null;
+  }
+  const undercover = course.undercover;
+  if (
+    !undercover ||
+    typeof undercover.nbManches !== 'number' ||
+    !Array.isArray(undercover.manches) ||
+    !Array.isArray(undercover.pairesJouees) ||
+    typeof undercover.recap !== 'boolean'
+  ) {
+    course.undercover = null;
+  }
   const choix = course.regles.choixMiniJeu as string;
   if (choix === 'premier' || choix !== 'dernierAuClassement') course.regles.choixMiniJeu = 'rotation';
   if (choix === 'dernier') course.regles.choixMiniJeu = 'dernierAuClassement';

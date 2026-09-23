@@ -23,7 +23,13 @@ import {
 } from './plateau';
 import { esperanceDe, probabilitesDe, tirerDePondere } from '../shared/de';
 import type { CatalogueMiniJeux, ConfigPoker } from '../shared/mini-jeux';
+import type { ConfigTopTen } from '../shared/topten';
+import type { ConfigJeopardy } from '../shared/jeopardy';
+import type { ConfigUndercover } from '../shared/undercover';
 import { appliquerActivite, appliquerChoix, refuserActivite, refuserChoix } from './mini-jeux';
+import { ACTIONS_TOPTEN, appliquerTopTen, oublierJoueurTopTen, refuserTopTen } from './topten';
+import { ACTIONS_JEOPARDY, appliquerJeopardy, oublierJoueurJeopardy, refuserJeopardy } from './jeopardy';
+import { ACTIONS_UNDERCOVER, appliquerUndercover, refuserUndercover, undercoverInitial } from './undercover';
 
 export type ContexteCourse = {
   maintenant: number;
@@ -35,6 +41,9 @@ export type ContexteCourse = {
   cartes: CarteChance[];
   catalogue: CatalogueMiniJeux;
   poker: ConfigPoker;
+  topten: ConfigTopTen;
+  jeopardy: ConfigJeopardy;
+  undercover: ConfigUndercover;
   dev: boolean;
 };
 
@@ -87,7 +96,7 @@ const ACTIONS = new Set<Action['type']>([
 ]);
 
 export function estActionCourse(action: Action): boolean {
-  return ACTIONS.has(action.type);
+  return ACTIONS.has(action.type) || ACTIONS_TOPTEN.has(action.type) || ACTIONS_JEOPARDY.has(action.type) || ACTIONS_UNDERCOVER.has(action.type);
 }
 
 function pseudo(etat: EtatJeu, joueurId: string): string {
@@ -425,6 +434,8 @@ export function oublierJoueurCourse(draft: EtatJeu, joueurId: string): void {
   if (course.etape?.genre === 'duel' && (course.etape.duel.joueurId === joueurId || course.etape.duel.adversaireId === joueurId)) {
     course.etape = { genre: 'lancer' };
   }
+  oublierJoueurTopTen(course, joueurId);
+  oublierJoueurJeopardy(course, joueurId);
 }
 
 export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteCourse): string | null {
@@ -556,6 +567,9 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
     case 'terminerCourse':
       return null;
     default: {
+      if (ACTIONS_TOPTEN.has(action.type)) return refuserTopTen(etat, action, origine, ctx);
+      if (ACTIONS_JEOPARDY.has(action.type)) return refuserJeopardy(etat, action, origine, ctx);
+      if (ACTIONS_UNDERCOVER.has(action.type)) return refuserUndercover(etat, action, origine, ctx);
       const erreur = refuserActivite(etat, action, origine, ctx);
       return erreur === undefined ? null : erreur;
     }
@@ -578,6 +592,8 @@ export function appliquerCourse(
     const disposition = genererDisposition(ctx.plateau, ctx.alea);
     const positions: Record<string, number> = {};
     for (const joueur of draft.joueurs) positions[joueur.id] = 0;
+    const themesJoues = draft.course?.topten?.themesJoues ?? [];
+    const pairesJouees = draft.course?.undercover?.pairesJouees ?? [];
     draft.course = {
       active: true,
       disposition,
@@ -599,6 +615,8 @@ export function appliquerCourse(
       resultatsSaisis: false,
       minuteur: { etat: 'arrete', finA: null, resteMs: 0, libelle: '' },
       poker: { actif: false, niveau: 0 },
+      topten: themesJoues.length > 0 ? { captens: [], manches: [], themesJoues: [...themesJoues], recap: false } : null,
+      undercover: pairesJouees.length > 0 ? undercoverInitial(ctx.undercover.manches, pairesJouees) : null,
       choisitId: null,
       carteCourante: null,
       dernierDe: null,
@@ -829,7 +847,10 @@ export function appliquerCourse(
       figerClassement(draft, ctx, ajouter);
       break;
     default:
-      appliquerActivite(draft, action, ctx, ajouter);
+      if (ACTIONS_TOPTEN.has(action.type)) appliquerTopTen(draft, action, ctx, ajouter);
+      else if (ACTIONS_JEOPARDY.has(action.type)) appliquerJeopardy(draft, action, ctx, ajouter, origine);
+      else if (ACTIONS_UNDERCOVER.has(action.type)) appliquerUndercover(draft, action, ctx, ajouter);
+      else appliquerActivite(draft, action, ctx, ajouter);
       break;
   }
 }

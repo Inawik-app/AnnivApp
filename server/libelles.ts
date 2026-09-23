@@ -68,6 +68,32 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return 'Résultats du mini-jeu';
     case 'validerPoker':
       return 'Conversion du poker';
+    case 'lancerMancheTopTen':
+      return 'Manche de Top Ten';
+    case 'validerOrdreTopTen':
+      return "Ordre du Cap'Ten";
+    case 'recapTopTen':
+      return 'Récapitulatif du Top Ten';
+    case 'choisirChoisisseurJeopardy':
+      return 'Choisisseur du Jeopardy';
+    case 'choisirCaseJeopardy':
+      return 'Case du Jeopardy';
+    case 'buzzJeopardy':
+      return 'Buzz';
+    case 'jugerJeopardy':
+      return action.juste ? 'Bonne réponse' : 'Mauvaise réponse';
+    case 'personneJeopardy':
+      return 'Question sans gagnant';
+    case 'terminerJeopardy':
+      return 'Fin du Jeopardy';
+    case 'lancerMancheUndercover':
+      return "Manche d'Undercover";
+    case 'eliminerUndercover':
+      return 'Élimination';
+    case 'devinerUndercover':
+      return action.trouve ? 'Mot trouvé' : 'Mot raté';
+    case 'recapUndercover':
+      return "Récapitulatif de l'Undercover";
     case 'passerAuxDeplacements':
       return 'Déplacements';
     case 'lancerDe':

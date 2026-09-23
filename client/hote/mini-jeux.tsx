@@ -2,6 +2,9 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Action, VueHote } from '../../shared/types';
 import { Bouton } from '../commun/composants';
 import { IconeMiniJeu } from '../commun/icones';
+import { PanneauTopTen } from './topten';
+import { PanneauJeopardy } from './jeopardy';
+import { PanneauUndercover } from './undercover';
 import {
   baremeClassement,
   dureeNiveauMs,
@@ -13,6 +16,9 @@ import {
   texteMinuteur,
   resteMinuteur,
 } from '../../shared/mini-jeux';
+
+/** Modules arbitrés depuis leur propre panneau, sans saisie de résultats. */
+const ARBITRES = new Set(['topten', 'jeopardy', 'undercover']);
 
 function entier(valeur: string): number {
   const nombre = Number(valeur);
@@ -194,8 +200,17 @@ export function PanneauMiniJeux({
       {course.phase === 'miniJeu' && jeu ? (
         <div class="pile">
           <h3>{jeu.nom}</h3>
-          <p>{libelleBareme(jeu, course.catalogue)}</p>
+          {!ARBITRES.has(jeu.module) ? <p>{libelleBareme(jeu, course.catalogue)}</p> : null}
           {!modulePret(jeu.module) ? <p>Module disponible à la prochaine étape</p> : null}
+          {jeu.module === 'topten' && course.topten ? (
+            <PanneauTopTen topten={course.topten} pseudos={pseudos} envoi={envoi} agir={agir} />
+          ) : null}
+          {jeu.module === 'jeopardy' && course.jeopardy ? (
+            <PanneauJeopardy jeopardy={course.jeopardy} ordre={course.ordre} pseudos={pseudos} envoi={envoi} agir={agir} />
+          ) : null}
+          {jeu.module === 'undercover' && course.undercover ? (
+            <PanneauUndercover undercover={course.undercover} pseudos={pseudos} envoi={envoi} agir={agir} />
+          ) : null}
           {jeu.duree ? (
             <Bouton
               disabled={envoi}
@@ -233,7 +248,7 @@ export function PanneauMiniJeux({
                 Terminer
               </Bouton>
             </div>
-          ) : (
+          ) : ARBITRES.has(jeu.module) ? null : (
             <Bouton variante="secondaire" disabled={envoi || course.resultatsSaisis} onClick={() => setSaisieOuverte(true)}>
               Saisir les résultats
             </Bouton>

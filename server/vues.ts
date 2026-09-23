@@ -1,7 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lireCatalogue, lirePoker } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { couleurBuzzer } from '../shared/jeopardy';
 import { solde } from '../shared/soldes';
+import { REPONDANT_HOTE } from '../shared/topten';
 import type {
   AppareilVue,
   Course,
@@ -10,8 +12,14 @@ import type {
   DuelVue,
   EtatJeu,
   Evenement,
+  JeopardyVue,
   JoueurPublic,
+  MancheTopTenVue,
+  MancheUndercoverVue,
+  QuestionJeopardyVue,
+  UndercoverVue,
   MiseVue,
+  TopTenVue,
   ReseauVue,
   VueHote,
   VueJoueur,
@@ -43,6 +51,119 @@ function visibles(evenements: Evenement[], cible: 'tv' | 'joueur' | 'hote', joue
 function miseVue(joueurId: string, montant: number | null, voirMontant: boolean): MiseVue {
   if (voirMontant && montant !== null) return { joueurId, aMise: true, montant };
   return { joueurId, aMise: montant !== null };
+}
+
+/** Les numéros ne partent qu'à leur répondant et à l'hôte, puis à tout le monde une fois la manche révélée. */
+export function projeterTopTen(course: Course, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): TopTenVue | null {
+  const topten = course.topten;
+  if (!topten) return null;
+  const config = lireTopTen(RACINE);
+  const manche = topten.manches[topten.manches.length - 1];
+  let courante: MancheTopTenVue | null = null;
+  if (manche) {
+    const revelee = manche.etape === 'revelee';
+    const cle = cible === 'hote' ? REPONDANT_HOTE : cible === 'joueur' ? joueurId : null;
+    const monNumero = cle && manche.repondants.includes(cle) ? (manche.numeros[cle] ?? null) : null;
+    courante = {
+      numero: manche.numero,
+      captenId: manche.captenId,
+      theme: { ...manche.theme },
+      repondants: [...manche.repondants],
+      etape: manche.etape,
+      monNumero,
+      numeros: revelee || cible === 'hote' ? { ...manche.numeros } : null,
+      proposition: revelee && manche.proposition
+        ? { ordre: [...manche.proposition.ordre], devines: { ...manche.proposition.devines } }
+        : null,
+      score: revelee && manche.score ? manche.score : null,
+    };
+  }
+  return {
+    nomHote: config.nomHote,
+    pointsParPaire: config.pointsParPaire,
+    bonusOrdreParfait: config.bonusOrdreParfait,
+    bonusChiffresExacts: [...config.bonusChiffresExacts],
+    captens: [...topten.captens],
+    courante,
+    bilan: topten.manches
+      .filter((passee) => passee.etape === 'revelee')
+      .map((passee) => ({
+        numero: passee.numero,
+        captenId: passee.captenId,
+        theme: passee.theme.intitule,
+        total: passee.score?.total ?? 0,
+      })),
+    recap: topten.recap,
+  };
+}
+
+/** La question ne part qu'une fois la case choisie ; la réponse ne part qu'à l'hôte. */
+export function projeterJeopardy(course: Course, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): JeopardyVue | null {
+  const jeu = course.jeopardy;
+  if (!jeu) return null;
+  const config = lireJeopardy(RACINE);
+  let question: QuestionJeopardyVue | null = null;
+  if (jeu.question) {
+    const source = config.themes[jeu.question.theme]?.questions[jeu.question.niveau];
+    question = {
+      ...jeu.question,
+      elimines: [...jeu.question.elimines],
+      valeur: config.valeurs[jeu.question.niveau] ?? 0,
+      texte: source?.question ?? '',
+      ...(cible === 'hote' ? { reponse: source?.reponse ?? null, accepte: [...(source?.accepte ?? [])] } : {}),
+    };
+  }
+  return {
+    valeurs: [...config.valeurs],
+    themes: config.themes.map((theme) => theme.nom),
+    jouees: jeu.jouees.map((jouee) => ({ ...jouee })),
+    choisisseurId: jeu.choisisseurId,
+    question,
+    monBuzzer: cible === 'joueur' && joueurId ? couleurBuzzer(jeu.question, joueurId) : null,
+    gains: { ...jeu.gains },
+    penalite: config.penaliteMauvaiseReponse,
+    termine: jeu.termine,
+  };
+}
+
+/** Chaque mot ne part qu'à son joueur ; le rôle d'un joueur n'est public qu'une fois éliminé. */
+export function projeterUndercover(course: Course, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): UndercoverVue | null {
+  const jeu = course.undercover;
+  if (!jeu) return null;
+  const config = lireUndercover(RACINE);
+  const manche = jeu.manches[jeu.manches.length - 1];
+  let courante: MancheUndercoverVue | null = null;
+  if (manche) {
+    const hote = cible === 'hote';
+    const finie = manche.etape === 'finie';
+    const demasque = manche.elimines.includes(manche.undercoverId);
+    const joue = cible === 'joueur' && !!joueurId && manche.ordreParole.includes(joueurId);
+    courante = {
+      numero: manche.numero,
+      ordreParole: [...manche.ordreParole],
+      elimines: manche.elimines.map((id) => ({ id, role: id === manche.undercoverId ? 'undercover' : 'civil' })),
+      tour: manche.elimines.length + 1,
+      etape: manche.etape,
+      issue: manche.issue,
+      devine: manche.devine,
+      monMot: joue ? (joueurId === manche.undercoverId ? manche.paire.undercover : manche.paire.civils) : null,
+      jeSuisElimine: joue && manche.elimines.includes(joueurId as string),
+      undercoverId: hote || finie || demasque ? manche.undercoverId : null,
+      paire: hote || finie ? { ...manche.paire } : null,
+      gains: { ...manche.gains },
+    };
+  }
+  return {
+    nbManches: jeu.nbManches,
+    gainCivils: config.gainCivils,
+    gainUndercoverDevine: config.gainUndercoverDevine,
+    gainUndercoverSurvit: config.gainUndercoverSurvit,
+    courante,
+    bilan: jeu.manches
+      .filter((passee) => passee.etape === 'finie')
+      .map((passee) => ({ numero: passee.numero, issue: passee.issue, gains: { ...passee.gains } })),
+    recap: jeu.recap,
+  };
 }
 
 export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): CourseVue | null {
@@ -86,6 +207,9 @@ export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | '
     resultatsSaisis: course.resultatsSaisis === true,
     minuteur: course.minuteur ?? { etat: 'arrete', finA: null, resteMs: 0, libelle: '' },
     poker: course.poker ?? { actif: false, niveau: 0 },
+    topten: course.ecranMini === 'topten' ? projeterTopTen(course, cible, joueurId) : null,
+    jeopardy: course.ecranMini === 'jeopardy' ? projeterJeopardy(course, cible, joueurId) : null,
+    undercover: course.ecranMini === 'undercover' ? projeterUndercover(course, cible, joueurId) : null,
     catalogue: lireCatalogue(RACINE),
     pokerConfig: lirePoker(RACINE),
     etape,

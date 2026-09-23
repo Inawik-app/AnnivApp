@@ -20,6 +20,10 @@ import {
 import '../commun/base.css';
 import { animerPlateau, PlateauTv, type Spectacle } from './plateau';
 import { GrilleTv, PodiumMini, PokerTv, ReglesTv } from './mini-jeux';
+import { TopTenTv, dureeRevelationTopTen } from './topten';
+import { JeopardyTv } from './jeopardy';
+import { UndercoverTv } from './undercover';
+import { REPONDANT_HOTE } from '../../shared/topten';
 import './tv.css';
 
 type Gain = { id: string; montant: number; cle: number };
@@ -66,6 +70,11 @@ function collerPresence(affiches: JoueurPublic[], source: JoueurPublic[]): Joueu
 
 function ajouterSolde(liste: JoueurPublic[], id: string, montant: number): JoueurPublic[] {
   return liste.map((joueur) => (joueur.id === id ? { ...joueur, gpVisibles: joueur.gpVisibles + montant } : joueur));
+}
+
+function etatModules(course: CourseVue | null | undefined): Partial<CourseVue> {
+  if (!course) return {};
+  return { ecranMini: course.ecranMini, topten: course.topten, jeopardy: course.jeopardy, undercover: course.undercover, resultatsSaisis: course.resultatsSaisis };
 }
 
 function patchCourse(course: CourseVue | null, partiel: Partial<CourseVue>): CourseVue | null {
@@ -384,6 +393,45 @@ function EcranTv() {
     await attendreAnime(duree);
   }
 
+  async function jouerModule(evenement: VueTv['evenements'][number], recue: VueTv) {
+    const reduit = reduitRef.current;
+    const poser = () => memoriserCourse(patchCourse(courseRef.current, { phase: recue.course?.phase ?? 'miniJeu', ...etatModules(recue.course) }));
+    const tenir = async (etape: string, son: string | null, ms: number) => {
+      await segment(etape, async () => {
+        poser();
+        if (son) sons().jouer(son);
+        await attendreAnime(reduit ? 150 : ms);
+      });
+    };
+    switch (evenement.type) {
+      case 'jeopardy.case':
+        await tenir('question', 'transition', 900);
+        return;
+      case 'jeopardy.buzz':
+        await tenir('buzz', 'buzzer', 1200);
+        return;
+      case 'undercover.manche':
+        await tenir('ordre', 'transition', 900);
+        return;
+      case 'undercover.elimine':
+        await tenir('revelation', 'revelation', 2000);
+        return;
+      case 'undercover.fin':
+        await tenir('mots', 'revelation', 1500);
+        return;
+      case 'topten.revelation': {
+        const cartes = recue.course?.topten?.courante?.repondants.length ?? 0;
+        await segment('revelation', async () => {
+          poser();
+          await attendreAnime(dureeRevelationTopTen(cartes, reduit));
+        });
+        return;
+      }
+      default:
+        poser();
+    }
+  }
+
   async function jouer(
     evenement: VueTv['evenements'][number],
     frais: VueTv['evenements'],
@@ -490,6 +538,10 @@ function EcranTv() {
       });
       return;
     }
+    if (/^(jeopardy|undercover|topten)\./.test(evenement.type)) {
+      await jouerModule(evenement, recue);
+      return;
+    }
     const pseudo = (idJoueur: string) => joueursRef.current.find((joueur) => joueur.id === idJoueur)?.pseudo ?? 'Un joueur';
     if (evenement.type === 'tour.nouveau') {
       const tour = typeof evenement.donnees.tour === 'number' ? evenement.donnees.tour : (courseRef.current?.tour ?? 0) + 1;
@@ -504,7 +556,7 @@ function EcranTv() {
       memoriserCourse(patchCourse(courseRef.current, { phase: 'choixMiniJeu', choisitId: idJoueur }));
     } else if (evenement.type === 'minijeu.choisi') {
       const nom = typeof evenement.donnees.nom === 'string' ? evenement.donnees.nom : null;
-      memoriserCourse(patchCourse(courseRef.current, { phase: 'miniJeu', miniJeu: nom }));
+      memoriserCourse(patchCourse(courseRef.current, { phase: 'miniJeu', miniJeu: nom, ...etatModules(recue.course) }));
     } else if (evenement.type === 'deplacements.commences') {
       memoriserCourse(patchCourse(courseRef.current, {
         phase: 'deplacements',
@@ -658,6 +710,16 @@ function EcranTv() {
   const grille = ecran === 'plateau' && !podiumVisible && live?.grilleVisible === true;
   const poker = ecran === 'plateau' && !podiumVisible && !grille && live?.phase === 'miniJeu' && live.ecranMini === 'poker';
   const regles = ecran === 'plateau' && !podiumVisible && !grille && live?.phase === 'miniJeu' && live.ecranMini === 'regles';
+  const affichee = courseAffichee;
+  const moduleAffiche = (module: string) =>
+    ecran === 'plateau' && !podiumVisible && !grille && affichee?.phase === 'miniJeu' && affichee.ecranMini === module;
+  const topten = moduleAffiche('topten') && !!affichee?.topten;
+  const jeopardy = moduleAffiche('jeopardy') && !!affichee?.jeopardy;
+  const undercover = moduleAffiche('undercover') && !!affichee?.undercover;
+  const moduleVisible = topten || jeopardy || undercover;
+  const pseudosTv = new Map((vue?.joueurs ?? []).map((joueur) => [joueur.id, joueur.pseudo]));
+  const nomTv = (id: string) => pseudosTv.get(id) ?? 'Joueur';
+  const nomTopTen = (id: string) => (id === REPONDANT_HOTE ? affichee?.topten?.nomHote ?? 'Hôte' : nomTv(id));
 
   return (
     <div class={`${reduit ? 'scene animations-reduites' : 'scene'}${ecran === 'plateau' ? ' scene-plateau' : ''}`} ref={scene}>
@@ -665,26 +727,32 @@ function EcranTv() {
       {grille && live ? <GrilleTv course={live} /> : null}
       {poker && live ? <PokerTv course={live} /> : null}
       {regles && live ? <ReglesTv course={live} /> : null}
-      {ecran === 'plateau' && courseAffichee && !grille && !poker && !regles && !podiumVisible ? (
-        <PlateauTv
-          course={courseAffichee}
-          joueurs={joueurs}
-          positions={positions}
-          cagnotte={cagnotte}
-          spectacle={spectacle}
-          brassage={brassage}
-          reduit={reduit}
-          aLance={lanceId !== null && lanceId === courseAffichee.joueurCourantId}
-        />
+      {topten && affichee?.topten ? (
+        <TopTenTv course={affichee} topten={affichee.topten} nom={nomTopTen} vitesse={vitesseDemandee} reduit={reduit} />
       ) : null}
+      {jeopardy && affichee?.jeopardy ? <JeopardyTv jeopardy={affichee.jeopardy} ordre={affichee.ordre} nom={nomTv} /> : null}
+      {undercover && affichee?.undercover ? <UndercoverTv course={affichee} undercover={affichee.undercover} nom={nomTv} /> : null}
       {spectacle?.type === 'podium' ? <PodiumMini lignes={spectacle.lignes} /> : null}
-      {(grille || poker || regles) && spectacle?.type === 'annonce' ? <p class="annonce-flottante">{spectacle.texte}</p> : null}
+      {(grille || poker || regles || moduleVisible) && spectacle?.type === 'annonce' ? <p class="annonce-flottante">{spectacle.texte}</p> : null}
       <div class="contenu">
         <span class={connecte ? 'point-lien' : 'point-lien coupe'} data-connecte={connecte ? '1' : '0'} />
         {!connecte ? <p class="bandeau-hors-ligne">Hors ligne</p> : null}
         {sonOk || ecran === 'plateau' ? null : <p class="bandeau-son">Appuie sur OK pour activer le son</p>}
         <div class={`plan ${phase}${poseAnime ? '' : ' sans-transition'}`} style={sonOk || ecran === 'plateau' ? undefined : { height: 'calc(100% - 96px)' }}>
-          {ecran === 'plateau' ? null : ecran === 'scores' ? (
+          {ecran === 'plateau' ? (
+            courseAffichee && !grille && !poker && !regles && !moduleVisible && !podiumVisible ? (
+              <PlateauTv
+                course={courseAffichee}
+                joueurs={joueurs}
+                positions={positions}
+                cagnotte={cagnotte}
+                spectacle={spectacle}
+                brassage={brassage}
+                reduit={reduit}
+                aLance={lanceId !== null && lanceId === courseAffichee.joueurCourantId}
+              />
+            ) : null
+          ) : ecran === 'scores' ? (
             <section class="podium" data-ecran="scores" data-panneau="principal">
               {joueurs.length === 0 ? <p class="texte-tv">Aucun joueur pour l'instant</p> : null}
               {joueurs.map((joueur) => (

@@ -1,0 +1,176 @@
+.ecran-jeopardy {
+  justify-content: space-between;
+}
+
+.jeopardy-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex: 0 0 auto;
+}
+
+.jeopardy-tete h2 {
+  margin: 0;
+}
+
+.jeopardy-prochain,
+.jeopardy-theme-question {
+  margin: 0;
+  font-family: var(--police-pixel);
+  font-size: var(--px-48);
+  line-height: 1.4;
+  color: var(--or);
+}
+
+.jeopardy-grille {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 16px;
+  gap: 24px;
+}
+
+.jeopardy-colonne {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.jeopardy-theme {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  margin: 0 0 12px;
+  font-family: var(--police-pixel);
+  font-size: var(--px-40);
+  line-height: 1.4;
+  text-align: center;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.jeopardy-case {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  margin-top: 12px;
+  background: var(--tapis);
+  color: var(--or);
+  border: 4px solid var(--encre);
+  box-shadow: inset 0 0 0 3px #b9d4ff;
+  clip-path: var(--escalier);
+  font-family: var(--police-chiffres);
+  font-size: var(--px-96);
+  line-height: 1.4;
+}
+
+.jeopardy-case.jouee {
+  background: #4a4a58;
+  box-shadow: none;
+  opacity: 0.45;
+}
+
+.jeopardy-valeur {
+  margin: 0;
+}
+
+.jeopardy-unite {
+  font-family: var(--police-pixel);
+  font-size: var(--px-48);
+  line-height: 1.4;
+}
+
+.jeopardy-question {
+  margin: 0;
+  padding: 24px 32px;
+  background: var(--carton);
+  color: var(--encre);
+  border: 4px solid var(--encre);
+  clip-path: var(--escalier);
+  font-family: var(--police-texte);
+  font-size: var(--px-64);
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.jeopardy-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 24px;
+  border: 4px solid var(--encre);
+  background: var(--tapis);
+  clip-path: var(--escalier);
+}
+
+.jeopardy-main .icone,
+.jeopardy-main img {
+  margin-right: 32px;
+}
+
+.main-buzz {
+  background: #2c6fd6;
+  animation: jeopardy-buzz calc(400ms / var(--vitesse, 1)) ease-out;
+}
+
+.main-ouvert {
+  background: #1f9d4c;
+}
+
+.animations-reduites .main-buzz {
+  animation: none;
+}
+
+@keyframes jeopardy-buzz {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.jeopardy-qui {
+  min-width: 0;
+}
+
+.jeopardy-annonce {
+  margin: 0;
+  font-family: var(--police-pixel);
+  font-size: var(--px-48);
+  line-height: 1.4;
+}
+
+.jeopardy-nom {
+  margin: 0;
+  font-family: var(--police-pixel);
+  font-size: var(--px-96);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.jeopardy-elimines {
+  margin: 0;
+  font-family: var(--police-texte);
+  font-size: var(--px-40);
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.jeopardy-bilan {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  min-height: 0;
+}
+
+.jeopardy-bilan li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}

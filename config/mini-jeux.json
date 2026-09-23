@@ -68,13 +68,13 @@
     {
       "id": "jeopardy",
       "nom": "Jeopardy",
-      "resume": "Des catégories, des valeurs, des réponses.",
+      "resume": "Une grille de questions, des buzzers, des GP.",
       "icone": "buzzer",
       "regles": [
-        "On choisit une catégorie et une valeur.",
-        "Une bonne réponse rapporte cette valeur.",
-        "Une mauvaise réponse ne retire rien.",
-        "L'hôte saisit les GP à la fin."
+        "Chacun à son tour choisit une case de la grille.",
+        "Il répond en premier, à voix haute.",
+        "S'il se trompe, les autres buzzent sur leur téléphone.",
+        "Une bonne réponse rapporte la valeur de la case."
       ],
       "saisie": "libre",
       "module": "jeopardy"
@@ -82,13 +82,13 @@
     {
       "id": "top-ten",
       "nom": "Top Ten",
-      "resume": "Trouver les dix réponses d'un thème.",
+      "resume": "Classer les réponses des autres selon leur numéro secret.",
       "icone": "pouvoir-pari",
       "regles": [
-        "Un thème, dix bonnes réponses.",
-        "Les équipes proposent à tour de rôle.",
-        "Chaque bonne réponse marque des points.",
-        "L'hôte saisit les GP à la fin."
+        "Chaque répondant reçoit un numéro secret de 1 à 10.",
+        "Il répond au thème à voix haute selon son numéro.",
+        "Le Cap'Ten classe les réponses du plus petit au plus grand.",
+        "Chaque paire dans le bon ordre rapporte 1 GP au Cap'Ten."
       ],
       "saisie": "libre",
       "module": "topten"
@@ -96,13 +96,13 @@
     {
       "id": "undercover",
       "nom": "Undercover",
-      "resume": "Un mot secret, un mot proche, un vote.",
+      "resume": "Un mot secret, un mot proche, un intrus à démasquer.",
       "icone": "enveloppe",
       "regles": [
         "Tous ont le même mot, sauf l'undercover.",
-        "Chacun donne un indice à voix haute.",
-        "On vote pour éliminer un joueur.",
-        "L'hôte saisit les GP à la fin."
+        "Chacun donne un indice à voix haute, dans l'ordre.",
+        "Après chaque tour, on élimine un joueur à l'oral.",
+        "Démasqué, l'undercover peut encore deviner le mot."
       ],
       "saisie": "libre",
       "module": "undercover"
