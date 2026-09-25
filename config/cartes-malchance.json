@@ -1,0 +1,8 @@
+[
+  { "id": "glissade", "titre": "Glissade", "texte": "Recule de 2 cases.", "icone": "peau-banane", "poids": 3, "effet": { "type": "reculer", "cases": 2 } },
+  { "id": "eboulement", "titre": "Éboulement", "texte": "Recule de 4 cases.", "icone": "eboulement", "poids": 1, "effet": { "type": "reculer", "cases": 4 } },
+  { "id": "trou", "titre": "Trou dans la poche", "texte": "Tu perds 3 GP, qui vont à la cagnotte.", "icone": "poche-trouee", "poids": 3, "effet": { "type": "perte", "montant": 3 } },
+  { "id": "pickpocket", "titre": "Pickpocket", "texte": "Tu perds 6 GP, qui vont à la cagnotte.", "icone": "masque-voleur", "poids": 1, "effet": { "type": "perte", "montant": 6 } },
+  { "id": "tournee", "titre": "Tournée générale", "texte": "Tu donnes 6 GP, répartis entre les autres joueurs.", "icone": "chopes", "poids": 2, "effet": { "type": "tournee", "montant": 6 } },
+  { "id": "faux-raccourci", "titre": "Faux raccourci", "texte": "Recule jusqu'à la cagnotte précédente, sans rien toucher.", "icone": "panneau-casse", "poids": 1, "effet": { "type": "cagnotte", "sens": "arriere", "part": 0 } }
+]

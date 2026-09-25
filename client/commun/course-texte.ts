@@ -11,15 +11,14 @@ export function textePhase(course: CourseVue, pseudos: ReadonlyMap<string, strin
   if (course.phase === 'miniJeu') return course.miniJeu ?? 'Mini-jeu';
   if (course.phase === 'finTour') return 'Fin du tour';
   if (course.phase === 'terminee') return 'Course terminée';
-  if (course.etape === 'duel') return 'Duel !';
-  if (course.etape === 'cadeau') return `${pseudoDe(pseudos, course.joueurCourantId)} choisit un cadeau`;
-  if (course.joueurCourantId) return `${pseudoDe(pseudos, course.joueurCourantId)} lance le dé`;
+  if (course.etape === 'roue') return `${pseudoDe(pseudos, course.joueurCourantId)} mise à la roue`;
+  if (course.joueurCourantId) return `${pseudoDe(pseudos, course.joueurCourantId)} choisit son dé`;
   return 'Déplacements';
 }
 
 export function etapeSuivante(course: CourseVue): { libelle: string; action: Action } | null {
   if (course.phase === 'preparation') return { libelle: 'Commencer le tour 1', action: { type: 'nouveauTour' } };
   if (course.phase === 'miniJeu') return { libelle: 'Passer aux déplacements', action: { type: 'passerAuxDeplacements' } };
-  if (course.phase === 'finTour') return { libelle: 'Nouveau tour', action: { type: 'nouveauTour' } };
+  if (course.phase === 'finTour' && !course.dernierTour) return { libelle: 'Nouveau tour', action: { type: 'nouveauTour' } };
   return null;
 }

@@ -8,6 +8,9 @@ const dossierIcones = path.join(racine, 'client', 'public', 'assets', 'icones');
 const fichierListe = path.join(racine, 'shared', 'icones.ts');
 const plancheControle = path.join(racine, 'test-results', 'icones', 'verification.png');
 const DEBORDEMENT_MAX = 40;
+const COTE_ICONE = 64;
+/** Le dessin tient dans 56 px : 4 px de marge de chaque côté, pour rentrer dans les cadres. */
+const BORD_CADRE = 4;
 
 const PLANCHES = [
   {
@@ -30,6 +33,17 @@ const PLANCHES = [
       'trophee-malchanceux', 'trophee-dernier-pingpong', 'trophee-genereux', 'trophee-prudent',
       'trophee-audacieux', 'trophee-touriste', 'medaille', 'confettis',
       'manette', 'musique', 'megaphone', 'masques',
+    ],
+  },
+  {
+    fichier: path.join(racine, 'docs', 'ressources', 'planche-3.png'),
+    colonnes: 6,
+    rangees: 4,
+    noms: [
+      'roue', 'chat-noir', 'de-dore', 'super-de', 'machine-a-sous', 'sac-argent',
+      'botte-ailee', 'ressort', 'tirelire', 'fleche-doree', 'fleche-retour', 'parchemin-pacte',
+      'peau-banane', 'eboulement', 'poche-trouee', 'masque-voleur', 'chopes', 'panneau-casse',
+      'fleche-montante', 'couronne-flammes', 'manette-cassee', 'ecrevisse', 'podium', 'deguisement',
     ],
   },
 ];
@@ -76,6 +90,29 @@ const GLYPHES = {
 
 function echec(message) {
   throw new Error(message);
+}
+
+function attendre(ms) {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin) {
+    /* Le disque Windows peut garder un PNG verrouillé juste après l'écriture. */
+  }
+}
+
+function ecrireFichier(fichier, contenu) {
+  let dernier;
+  for (let essai = 0; essai < 12; essai += 1) {
+    try {
+      fs.writeFileSync(fichier, contenu);
+      return;
+    } catch (erreur) {
+      const code = erreur && erreur.code;
+      if (code !== 'UNKNOWN' && code !== 'EBUSY' && code !== 'EPERM') throw erreur;
+      dernier = erreur;
+      attendre(250 * (essai + 1));
+    }
+  }
+  throw dernier;
 }
 
 function index(largeur, x, y) {
@@ -327,7 +364,7 @@ function decouperPlanche(planche) {
       sprite = marge(reduire(contenu, facteur), 2);
     } else {
       replis.push(nom);
-      sprite = versCarre(marge(contenu, 2), 64);
+      sprite = marge(versCarre(contenu, COTE_ICONE - BORD_CADRE * 2), BORD_CADRE);
     }
     sprites.push({ nom, sprite, taille: sprite.width });
   });
@@ -352,7 +389,7 @@ export type NomIcone = keyof typeof TAILLES_ICONES;
 
 export const NOMS_ICONES = Object.keys(TAILLES_ICONES) as NomIcone[];
 `;
-  fs.writeFileSync(fichierListe, contenu);
+  ecrireFichier(fichierListe, contenu);
 }
 
 function pixel(image, x, y, r, g, b) {
@@ -414,7 +451,7 @@ function plancheDeControle(sprites) {
     dessinerTexte(image, entree.nom, colonne * caseL + 8, rangee * caseH + caseH - 14);
   });
   fs.mkdirSync(path.dirname(plancheControle), { recursive: true });
-  fs.writeFileSync(plancheControle, PNG.sync.write(image));
+  ecrireFichier(plancheControle, PNG.sync.write(image));
 }
 
 export function decouperIcones() {
@@ -426,7 +463,7 @@ export function decouperIcones() {
     sprites.push(...resultat.sprites);
     replis.push(...resultat.replis);
   }
-  if (sprites.length !== 40) echec(`${sprites.length} icônes au lieu de 40`);
+  if (sprites.length !== 64) echec(`${sprites.length} icônes au lieu de 64`);
   const noms = new Set(sprites.map((sprite) => sprite.nom));
   if (noms.size !== sprites.length) echec('Deux icônes portent le même nom');
   for (const entree of fs.readdirSync(dossierIcones)) {
@@ -435,7 +472,7 @@ export function decouperIcones() {
     }
   }
   for (const entree of sprites) {
-    fs.writeFileSync(path.join(dossierIcones, `${entree.nom}.png`), PNG.sync.write(entree.sprite));
+    ecrireFichier(path.join(dossierIcones, `${entree.nom}.png`), PNG.sync.write(entree.sprite));
   }
   ecrireListe(sprites);
   plancheDeControle(sprites);

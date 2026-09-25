@@ -97,49 +97,29 @@ function titreCourse(course: CourseVue, joueurs: readonly JoueurPublic[]): strin
   if (course.phase === 'finTour') return 'Fin du tour';
   if (course.phase === 'terminee') return 'Course terminée';
   const courant = nomJoueur(joueurs, course.joueurCourantId);
-  if (courant && course.etape === 'cadeau') return `${courant} choisit un cadeau`;
-  if (courant && course.etape === 'duel') return `${courant} est en duel`;
+  if (courant && course.etape === 'roue') return `À ${courant} de jouer`;
   if (courant) return `À ${courant} de jouer`;
   return 'Déplacements';
 }
 
-const ICONE_CASE: Record<string, NomIcone> = {
-  bonus: 'case-bonus',
-  chance: 'case-chance',
-  cagnotte: 'case-cagnotte',
-  duel: 'case-duel',
-  depart: 'case-depart',
-  arrivee: 'case-arrivee',
-};
-
-function FaceDe({ valeur }: { valeur: number }) {
-  const points: Record<number, Array<[number, number]>> = {
-    1: [[32, 32]],
-    2: [[18, 18], [46, 46]],
-    3: [[18, 18], [32, 32], [46, 46]],
-    4: [[18, 18], [46, 18], [18, 46], [46, 46]],
-    5: [[18, 18], [46, 18], [32, 32], [18, 46], [46, 46]],
-    6: [[18, 16], [46, 16], [18, 32], [46, 32], [18, 48], [46, 48]],
-  };
-  return (
-    <svg viewBox="0 0 64 64" width="140" height="140" aria-hidden="true">
-      {(points[valeur] ?? points[1]!).map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="6" fill="#1C1633" />
-      ))}
-    </svg>
-  );
+function nomIcone(valeur: string | undefined): NomIcone | undefined {
+  return valeur && estNomIcone(valeur) ? valeur : undefined;
 }
 
-const ROTATION: Record<number, string> = {
-  1: 'rotateX(0deg) rotateY(0deg)',
-  2: 'rotateY(90deg)',
-  3: 'rotateX(-90deg)',
-  4: 'rotateX(90deg)',
-  5: 'rotateY(-90deg)',
-  6: 'rotateY(180deg)',
-};
-
-function De3D({ valeur, reduit, boost }: { valeur: number; reduit: boolean; boost: number }) {
+function DePixel({
+  valeur,
+  faces,
+  option,
+  reduit,
+}: {
+  valeur: number;
+  faces: number;
+  option: string;
+  reduit: boolean;
+}) {
+  const tours = Math.max(faces, 8);
+  const bande = Array.from({ length: tours + 1 }, (_, index) => (index % faces) + 1);
+  bande[bande.length - 1] = valeur;
   const [pose, setPose] = useState(reduit);
   useEffect(() => {
     if (reduit) {
@@ -149,34 +129,111 @@ function De3D({ valeur, reduit, boost }: { valeur: number; reduit: boolean; boos
     setPose(false);
     const cadre = requestAnimationFrame(() => setPose(true));
     return () => cancelAnimationFrame(cadre);
-  }, [reduit, valeur]);
-  const faces = [
-    { valeur: 1, transform: 'rotateY(0deg) translateZ(90px)' },
-    { valeur: 6, transform: 'rotateY(180deg) translateZ(90px)' },
-    { valeur: 2, transform: 'rotateY(-90deg) translateZ(90px)' },
-    { valeur: 5, transform: 'rotateY(90deg) translateZ(90px)' },
-    { valeur: 3, transform: 'rotateX(90deg) translateZ(90px)' },
-    { valeur: 4, transform: 'rotateX(-90deg) translateZ(90px)' },
-  ];
+  }, [reduit, valeur, faces]);
   return (
-    <div class="de-scene">
-      {boost > 0 ? <div class="de-halo" style={{ opacity: boost }} /> : null}
-      <div class={reduit ? 'de pose' : 'de'} style={{ transform: pose ? (ROTATION[valeur] ?? ROTATION[1]) : 'rotateX(540deg) rotateY(540deg)' }}>
-        {faces.map((face) => (
-          <div key={face.valeur} class="de-face" style={{ transform: face.transform }}>
-            <FaceDe valeur={face.valeur} />
-          </div>
-        ))}
+    <div class="de-pixel" data-de={option} data-faces={faces}>
+      <div class="de-rangee">
+        {Array.from({ length: faces }, (_, index) => {
+          const face = index + 1;
+          return (
+            <span key={face} class={face >= 7 ? 'face-doree' : undefined} data-dore={face >= 7 ? '1' : undefined}>
+              {face}
+            </span>
+          );
+        })}
+      </div>
+      <div class="de-fenetre">
+        <div
+          class={reduit ? 'de-bande pose' : 'de-bande'}
+          style={{
+            transform: pose ? `translateY(-${(bande.length - 1) * 160}px)` : 'translateY(0px)',
+            ['--pas' as string]: String(bande.length - 1),
+          }}
+        >
+          {bande.map((face, index) => (
+            <span key={index} class={face >= 7 ? 'face-doree' : undefined}>
+              {face}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
+type OptionRoueVue = { id: string; nom: string; probabilite: number; couleur: string; texte: string; icone?: string };
+
+function pointRoue(angle: number, rayon: number): [number, number] {
+  const radians = ((angle - 90) * Math.PI) / 180;
+  return [200 + rayon * Math.cos(radians), 200 + rayon * Math.sin(radians)];
+}
+
+function RoueTv({
+  rotation,
+  options,
+  reduit,
+}: {
+  rotation: number;
+  options: OptionRoueVue[];
+  reduit: boolean;
+}) {
+  const [pose, setPose] = useState(false);
+  useEffect(() => {
+    setPose(false);
+    const cadre = requestAnimationFrame(() => setPose(true));
+    return () => cancelAnimationFrame(cadre);
+  }, [rotation]);
+  let debut = 0;
+  return (
+    <div class={reduit ? 'roue-scene reduit' : 'roue-scene'} data-roue="1">
+      <div class="roue-colonne">
+        <div class="roue-pointeur" />
+        <svg class="roue-disque" viewBox="0 0 400 400" width="520" height="520" style={{ transform: pose ? `rotate(${rotation}deg)` : 'rotate(0deg)' }}>
+          {options.map((option) => {
+            const angle = (option.probabilite / 100) * 360;
+            const [x0, y0] = pointRoue(debut, 180);
+            const [x1, y1] = pointRoue(debut + angle, 180);
+            const grand = angle > 180 ? 1 : 0;
+            const trace = `M 200 200 L ${x0} ${y0} A 180 180 0 ${grand} 1 ${x1} ${y1} Z`;
+            const milieu = debut + angle / 2;
+            const [lx, ly] = pointRoue(milieu, 110);
+            debut += angle;
+            return (
+              <g key={option.id}>
+                <path d={trace} fill={option.couleur} data-option={option.id} data-angle={angle} />
+                {angle >= 48 ? (
+                  <text x={lx} y={ly} fill="#fff4dc" fontSize="40" textAnchor="middle" dominantBaseline="middle">
+                    {option.nom}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <ul class="roue-legende">
+        {options.map((option) => {
+          const dessin = nomIcone(option.icone);
+          return (
+            <li key={option.id}>
+              {dessin ? <Icone nom={dessin} taille={64} /> : null}
+              <span class="roue-couleur" style={{ background: option.couleur }} />
+              <span>{option.nom}</span>
+              <span>{option.texte}</span>
+              <span>{option.probabilite} %</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export type Spectacle =
-  | { type: 'de'; valeur: number; mise: number; miseMax: number }
-  | { type: 'effet'; titre: string; texte: string; icone?: NomIcone }
+  | { type: 'de'; valeur: number; faces: number; mise: number; option: string; nom: string }
+  | { type: 'effet'; titre: string; texte: string; icone?: NomIcone; sombre?: boolean }
   | { type: 'arrivee'; pseudo: string; rang: number }
-  | { type: 'duel'; titre: string; texte: string }
+  | { type: 'roue'; rotation: number; options: OptionRoueVue[]; reduit: boolean }
   | { type: 'annonce'; texte: string }
   | { type: 'podium'; lignes: Array<{ joueurId: string; pseudo: string; montant: number; rang: number | null }> };
 
@@ -375,16 +432,26 @@ export function PlateauTv({
   const haloId = course.joueurCourantId;
   const joueurBandeau = nomJoueur(joueurs, course.joueurCourantId);
   const enDeplacement = course.phase === 'deplacements' && joueurBandeau !== null;
-  const miseVisible = spectacle?.type === 'de' ? spectacle.mise : null;
   const titre = titreCourse(course, joueurs);
-  const detail = miseVisible !== null
-    ? miseVisible > 0
-      ? `Mise : ${miseVisible} GP, dé boosté`
-      : 'Mise : 0 GP'
-    : enDeplacement && course.etape === 'lancer' && !aLance
-      ? 'choisit sa mise…'
-      : null;
-  const boost = spectacle?.type === 'de' && spectacle.miseMax > 0 ? spectacle.mise / spectacle.miseMax : 0;
+  const detail = spectacle?.type === 'de'
+    ? spectacle.mise > 0
+      ? `lance le ${spectacle.nom} (${spectacle.mise} GP)`
+      : `lance le ${spectacle.nom}`
+    : enDeplacement && course.etape === 'roue'
+      ? 'choisit sa mise à la roue'
+      : enDeplacement && course.etape === 'lancer' && !aLance
+        ? 'choisit son dé'
+        : null;
+  const iconesEntete: NomIcone[] = [];
+  if (spectacle?.type === 'de') {
+    const lancee = nomIcone(course.optionsDe.find((option) => option.id === spectacle.option)?.icone);
+    if (lancee) iconesEntete.push(lancee);
+  } else if (detail === 'choisit son dé') {
+    for (const option of course.optionsDe) {
+      const dessin = nomIcone(option.icone);
+      if (dessin) iconesEntete.push(dessin);
+    }
+  }
   const suivantId = (() => {
     if (course.phase !== 'deplacements') return null;
     for (let index = course.indexCourant + 1; index < course.ordre.length; index += 1) {
@@ -396,6 +463,9 @@ export function PlateauTv({
 
   return (
     <section class="plateau-scene" data-ecran="plateau">
+      {course.dernierTour && course.phase !== 'terminee' ? (
+        <p class="bandeau-dernier-tour" data-bandeau="dernier-tour">Dernier tour !</p>
+      ) : null}
       <div class="colonne-fiches" data-zone="fiches">
         {ordre.map((id) => {
           const joueur = joueurs.find((candidat) => candidat.id === id);
@@ -421,6 +491,13 @@ export function PlateauTv({
 
       <div class="milieu">
         <header class="entete-plateau" data-zone="entete">
+          {iconesEntete.length > 0 ? (
+            <span class="entete-des">
+              {iconesEntete.map((nom) => (
+                <Icone key={nom} nom={nom} taille={64} />
+              ))}
+            </span>
+          ) : null}
           <h2>{titre}</h2>
           {detail ? <p>{detail}</p> : null}
         </header>
@@ -437,7 +514,7 @@ export function PlateauTv({
               </svg>
               {course.disposition.map((type, index) => {
                 const point = grille.cases[index];
-                const nomCase = ICONE_CASE[type];
+                const nomCase = nomIcone(course.iconesCases[type]);
                 if (!point) return null;
                 return (
                   <div
@@ -501,9 +578,12 @@ export function PlateauTv({
           ) : null}
           {spectacle ? (
             <div class="spectacle">
-              {spectacle.type === 'de' ? <De3D valeur={spectacle.valeur} reduit={reduit} boost={boost} /> : null}
+              {spectacle.type === 'de' ? (
+                <DePixel valeur={spectacle.valeur} faces={spectacle.faces} option={spectacle.option} reduit={reduit} />
+              ) : null}
+              {spectacle.type === 'roue' ? <RoueTv rotation={spectacle.rotation} options={spectacle.options} reduit={reduit} /> : null}
               {spectacle.type === 'effet' ? (
-                <div class="carte-effet">
+                <div class={spectacle.sombre ? 'carte-effet carte-malchance' : 'carte-effet'}>
                   {spectacle.icone ? <Icone nom={spectacle.icone} taille={128} /> : null}
                   <h2>{spectacle.titre}</h2>
                   <p>{spectacle.texte}</p>
@@ -513,12 +593,6 @@ export function PlateauTv({
                 <div class="annonce-arrivee">
                   <h2>{spectacle.pseudo}</h2>
                   <p>arrive {libelleRang(spectacle.rang)}</p>
-                </div>
-              ) : null}
-              {spectacle.type === 'duel' ? (
-                <div class="panneau-duel">
-                  <h2>{spectacle.titre}</h2>
-                  {spectacle.texte ? <p>{spectacle.texte}</p> : null}
                 </div>
               ) : null}
               {spectacle.type === 'annonce' ? (
@@ -550,7 +624,6 @@ type ApiPlateau = {
   attendre: (ms: number) => Promise<void>;
   segment: (etape: string, travail: () => Promise<void>) => Promise<void>;
   marquer: (etape: string) => void;
-  miseMax: number;
 };
 
 function nombre(valeur: unknown): number | null {
@@ -561,12 +634,31 @@ function texte(valeur: unknown): string | null {
   return typeof valeur === 'string' ? valeur : null;
 }
 
-function carteEffet(api: ApiPlateau, titre: string, texteCarte: string, duree: number, icone?: NomIcone): Promise<void> {
+function carteEffet(
+  api: ApiPlateau,
+  titre: string,
+  texteCarte: string,
+  duree: number,
+  icone?: NomIcone,
+  sombre = false,
+): Promise<void> {
   return api.segment('effet', async () => {
-    api.setSpectacle({ type: 'effet', titre, texte: texteCarte, icone });
+    api.setSpectacle({ type: 'effet', titre, texte: texteCarte, icone, sombre });
     await api.attendre(duree);
     api.setSpectacle(null);
   });
+}
+
+function appliquerPaiements(api: ApiPlateau, donnees: Record<string, unknown>): void {
+  const paiements = donnees.paiements;
+  if (!Array.isArray(paiements)) return;
+  for (const entree of paiements) {
+    if (!entree || typeof entree !== 'object') continue;
+    const ligne = entree as { id?: unknown; montant?: unknown };
+    if (typeof ligne.id === 'string' && typeof ligne.montant === 'number') api.ajusterSolde(ligne.id, ligne.montant);
+  }
+  const cagnotte = nombre(donnees.cagnotte);
+  if (cagnotte !== null) api.setCagnotte(cagnotte);
 }
 
 export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): Promise<boolean> {
@@ -592,6 +684,9 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
     const valeur = nombre(evenement.donnees.valeur);
     if (valeur === null) return true;
     const mise = nombre(evenement.donnees.mise) ?? 0;
+    const faces = nombre(evenement.donnees.faces) ?? 6;
+    const option = texte(evenement.donnees.option) ?? 'normal';
+    const nom = texte(evenement.donnees.nom) ?? 'dé normal';
     await api.segment('de', async () => {
       sons().jouer('de');
       api.marquer('de');
@@ -599,15 +694,15 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
         api.ajusterSolde(id, -mise);
         api.ajouterCagnotte(mise);
       }
-      api.setSpectacle({ type: 'de', valeur, mise, miseMax: api.miseMax });
-      await api.attendre(api.reduit ? 150 : 1000);
+      api.setSpectacle({ type: 'de', valeur, faces, mise, option, nom });
+      await api.attendre(api.reduit ? 150 : 1200);
       api.marquer('de-arrete');
-      await api.attendre(api.reduit ? 40 : 800);
+      await api.attendre(api.reduit ? 40 : 400);
       api.setSpectacle(null);
     });
     return true;
   }
-  if (evenement.type === 'pion.avance' && id) {
+  if ((evenement.type === 'pion.avance' || evenement.type === 'pion.recule') && id) {
     const cases = Array.isArray(evenement.donnees.cases) ? evenement.donnees.cases.filter((item): item is number => typeof item === 'number') : [];
     await api.segment('sauts', async () => {
       api.setSpectacle(null);
@@ -638,14 +733,58 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
     }
     return true;
   }
-  if (evenement.type === 'case.chance') {
-    await carteEffet(
-      api,
-      texte(evenement.donnees.titre) ?? 'Chance',
-      texte(evenement.donnees.texte) ?? '',
-      duree,
-      evenement.donnees.effet === 'cadeau' ? 'cadeau' : undefined,
-    );
+  if (evenement.type === 'case.chance' || evenement.type === 'case.malchance') {
+    const malchance = evenement.type === 'case.malchance' || evenement.donnees.famille === 'malchance';
+    const iconeCarte = nomIcone(texte(evenement.donnees.icone) ?? undefined);
+    await api.segment('effet', async () => {
+      appliquerPaiements(api, evenement.donnees);
+      api.setSpectacle({
+        type: 'effet',
+        titre: texte(evenement.donnees.titre) ?? (malchance ? 'Malchance' : 'Chance'),
+        texte: texte(evenement.donnees.texte) ?? '',
+        ...(iconeCarte ? { icone: iconeCarte } : {}),
+        sombre: malchance,
+      });
+      await api.attendre(duree);
+      api.setSpectacle(null);
+    });
+    return true;
+  }
+  if (evenement.type === 'roue.tournee') {
+    const options = Array.isArray(evenement.donnees.options)
+      ? evenement.donnees.options.flatMap((entree) => {
+          if (!entree || typeof entree !== 'object') return [];
+          const option = entree as { id?: unknown; nom?: unknown; probabilite?: unknown; couleur?: unknown; texte?: unknown; icone?: unknown };
+          if (typeof option.id !== 'string' || typeof option.nom !== 'string' || typeof option.probabilite !== 'number' || typeof option.couleur !== 'string') {
+            return [];
+          }
+          return [{
+            id: option.id,
+            nom: option.nom,
+            probabilite: option.probabilite,
+            couleur: option.couleur,
+            texte: typeof option.texte === 'string' ? option.texte : '',
+            ...(typeof option.icone === 'string' ? { icone: option.icone } : {}),
+          }];
+        })
+      : [];
+    const mise = nombre(evenement.donnees.mise) ?? 0;
+    const cagnotte = nombre(evenement.donnees.cagnotte);
+    await api.segment('roue', async () => {
+      if (id && mise > 0) api.ajusterSolde(id, -mise);
+      if (cagnotte !== null) api.setCagnotte(cagnotte);
+      api.setSpectacle({ type: 'roue', rotation: nombre(evenement.donnees.rotation) ?? 0, options, reduit: api.reduit });
+      await api.attendre(api.reduit ? 150 : 4000);
+      const iconeRoue = nomIcone(texte(evenement.donnees.icone) ?? undefined);
+      api.setSpectacle({
+        type: 'effet',
+        titre: texte(evenement.donnees.nom) ?? 'Roue',
+        texte: evenement.libelle,
+        ...(iconeRoue ? { icone: iconeRoue } : {}),
+      });
+      await api.attendre(duree);
+      api.setSpectacle(null);
+    });
     return true;
   }
   if (evenement.type === 'joueur.arrive') {
@@ -654,34 +793,6 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
       api.setSpectacle({ type: 'arrivee', pseudo: api.pseudo(id ?? ''), rang: nombre(evenement.donnees.rang) ?? 1 });
       await api.attendre(duree);
       api.setSpectacle(null);
-    });
-    return true;
-  }
-  if (evenement.type === 'duel.annonce' || evenement.type === 'duel.adversaire' || evenement.type === 'duel.resultat') {
-    await api.segment('duel', async () => {
-      api.setSpectacle({ type: 'duel', titre: evenement.libelle, texte: texte(evenement.donnees.defi) ?? '' });
-      await api.attendre(duree);
-      api.setSpectacle(null);
-    });
-    return true;
-  }
-  if (evenement.type === 'duel.reveles') {
-    const brut = evenement.donnees.mises;
-    await api.segment('duel', async () => {
-      sons().jouer('revelation');
-      api.setSpectacle({ type: 'duel', titre: 'Les mises du duel', texte: evenement.libelle });
-      await api.attendre(duree);
-      api.setSpectacle(null);
-    });
-    await api.segment('gp', async () => {
-      if (Array.isArray(brut)) {
-        for (const entree of brut) {
-          if (!entree || typeof entree !== 'object') continue;
-          const mise = entree as { joueurId?: unknown; montant?: unknown };
-          if (typeof mise.joueurId === 'string' && typeof mise.montant === 'number') api.ajusterSolde(mise.joueurId, -mise.montant);
-        }
-      }
-      await api.attendre(duree);
     });
     return true;
   }
@@ -694,11 +805,10 @@ export async function animerPlateau(evenement: EvenementVue, api: ApiPlateau): P
     evenement.type === 'deplacements.commences' ||
     evenement.type === 'tour.fini' ||
     evenement.type === 'course.terminee' ||
-    evenement.type === 'cadeau.donne' ||
     evenement.type === 'joueur.passe' ||
     evenement.type === 'position.corrigee' ||
-    evenement.type === 'duel.mise' ||
-    evenement.type === 'duel.defi'
+    evenement.type === 'roue.annonce' ||
+    evenement.type === 'roue.passe'
   ) {
     if (evenement.type === 'position.corrigee' && id) {
       const vers = nombre(evenement.donnees.vers);

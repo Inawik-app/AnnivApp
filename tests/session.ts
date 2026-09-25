@@ -15,12 +15,14 @@ export const DISPOSITION: TypeCase[] = [
   'bonus',
   'chance',
   'bonus',
-  'duel',
+  'malchance',
   'bonus',
   'cagnotte',
   'bonus',
-  'duel',
-  ...Array.from({ length: 29 }, () => 'bonus' as const),
+  'gamble',
+  ...Array.from({ length: 6 }, () => 'bonus' as const),
+  'gamble',
+  ...Array.from({ length: 22 }, () => 'bonus' as const),
   'arrivee',
 ];
 
@@ -151,7 +153,14 @@ export function verifierInvariants(etat: EtatJeu): void {
     if (visible < 0) throw new Error(`Solde négatif pour ${joueur.pseudo} : ${visible}`);
   }
   for (const transaction of etat.transactions) {
-    if (transaction.montant < 0 && transaction.source !== 'mise' && transaction.source !== 'manuel' && transaction.source !== 'penalite') {
+    if (
+      transaction.montant < 0 &&
+      transaction.source !== 'mise' &&
+      transaction.source !== 'roue' &&
+      transaction.source !== 'carte' &&
+      transaction.source !== 'manuel' &&
+      transaction.source !== 'penalite'
+    ) {
       throw new Error(`Transaction négative interdite (${transaction.source}) pour ${transaction.joueurId}`);
     }
   }
@@ -165,23 +174,11 @@ export function verifierInvariants(etat: EtatJeu): void {
   }
 }
 
-export function fuitesMises(vue: VueClient, joueurId: string | null): string[] {
-  const course = vue.course;
-  if (!course) return [];
-  const fuites: string[] = [];
-  const secret = (mises: Array<{ joueurId: string; montant?: number }>) => {
-    for (const mise of mises) {
-      if (mise.joueurId === joueurId) continue;
-      if (mise.montant !== undefined) fuites.push(`${mise.joueurId}:${mise.montant}`);
-    }
-  };
-  if (course.duel?.etape === 'mises') secret(course.duel.mises);
-  for (const evenement of vue.evenements) {
-    if (evenement.type !== 'mise.posee' && evenement.type !== 'duel.mise') continue;
-    if ('montant' in evenement.donnees) fuites.push(`événement ${evenement.type}`);
+export function fuitesMises(vue: VueClient): string[] {
+  if (contientCle(vue, 'pioche') || contientCle(vue, 'defausse') || contientCle(vue, 'pioches') || contientCle(vue, 'defausses')) {
+    return ['pioche'];
   }
-  if (contientCle(vue, 'pioche') || contientCle(vue, 'defausse')) fuites.push('pioche');
-  return fuites;
+  return [];
 }
 
 /**

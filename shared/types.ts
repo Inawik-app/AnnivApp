@@ -37,7 +37,7 @@ export type Evenement = {
 
 export type EcranTv = 'accueil' | 'scores' | 'plateau';
 
-export type TypeCase = 'depart' | 'bonus' | 'chance' | 'cagnotte' | 'duel' | 'arrivee';
+export type TypeCase = 'depart' | 'bonus' | 'chance' | 'malchance' | 'cagnotte' | 'gamble' | 'arrivee';
 
 export type PhaseCourse =
   | 'preparation'
@@ -49,16 +49,33 @@ export type PhaseCourse =
 
 export type EffetCarte =
   | { type: 'gain'; montant: number }
-  | { type: 'gainTous'; montant: number }
-  | { type: 'cadeau'; montant: number }
   | { type: 'gainDe' }
+  | { type: 'avancer'; cases: number }
+  | { type: 'reculer'; cases: number }
+  | { type: 'cotisation'; montant: number }
+  | { type: 'cagnotte'; sens: 'avant' | 'arriere'; part: number }
+  | { type: 'perte'; montant: number }
+  | { type: 'tournee'; montant: number }
   | { type: 'neutre' };
+
+export type FamilleCarte = 'chance' | 'malchance';
 
 export type CarteChance = {
   id: string;
   titre: string;
   texte: string;
+  icone: string;
+  famille: FamilleCarte;
+  poids: number;
   effet: EffetCarte;
+};
+
+export type OptionDe = {
+  id: string;
+  nom: string;
+  faces: number;
+  mise: number;
+  icone: string;
 };
 
 export type UsageDe = 'deplacement' | 'chance';
@@ -68,50 +85,59 @@ export type LancerDe = {
   joueurId: string;
   valeur: number;
   usage: UsageDe;
-  /** Mise de tour associée. 0 pour un dé normal (mise nulle ou dé de carte chance). */
+  /** Nombre de faces du dé lancé. 6 pour le dé d'une carte. */
+  faces: number;
+  /** Mise associée. 0 pour le dé gratuit ou le dé d'une carte. */
   mise: number;
-  /** Espérance de la distribution utilisée pour ce lancer. */
+  /** Espérance du dé : (faces + 1) / 2. */
   esperance: number;
+  /** Identifiant de l'option, absent pour le dé d'une carte. */
+  option: string | null;
 };
 
 export type ReglesCourse = {
   longueur: number;
   gainBonus: number;
-  miseMax: number;
-  /** Distribution des faces 1 à 6 lorsque la mise atteint miseMax. */
-  probasMiseMax: number[];
   /** `rotation` : le choix tourne dans l'ordre de passage. `dernierAuClassement` : le moins de GP visibles choisit. */
   choixMiniJeu: 'rotation' | 'dernierAuClassement';
-  duel: { miseMax: number; bonusVainqueur: number; defis: string[] };
+  optionsDe: OptionDe[];
 };
 
-export type DuelEnCours = {
+export type EtapeDeplacement = { genre: 'lancer' } | { genre: 'roue' };
+
+export type ContrepartiePlateau = {
+  /** Montant reçu (positif) ou payé (négatif) par un autre joueur. */
+  joueurs: Array<{ id: string; montant: number }>;
+  /** Variation de la cagnotte : positif si elle grossit. */
+  cagnotte: number;
+};
+
+export type EffetPlateau = {
+  tour: number;
   joueurId: string;
-  etape: 'adversaire' | 'mises' | 'resultat';
-  adversaireId: string | null;
-  defi: string | null;
-  mises: Record<string, number | null>;
-  revelees: boolean;
+  type: string;
+  /** Cases avancées (positif) ou reculées (négatif). */
+  cases: number;
+  gpGagnes: number;
+  gpPerdus: number;
+  gpDonnes: number;
+  gpRecus: number;
+  contrepartie: ContrepartiePlateau;
+  miseDe?: { option: string; faces: number; mise: number; valeur: number; esperance: number };
+  roue?: { option: string; mise: number; rendu: number };
 };
 
-export type EtapeDeplacement =
-  | { genre: 'lancer' }
-  | { genre: 'cadeau'; carteId: string }
-  | { genre: 'duel'; duel: DuelEnCours };
+export type InstantaneTour = {
+  tour: number;
+  /** Cases restantes entre le joueur le plus avancé et l'arrivée. */
+  distanceLeader: number;
+  joueurs: Array<{ id: string; position: number; rang: number; gpVisibles: number }>;
+};
 
 export type HistoriqueCourse = {
   lancers: LancerDe[];
-  mises: Array<{ tour: number; joueurId: string; montant: number; duel: boolean }>;
-  effets: Array<{ tour: number; joueurId: string; caseIndex: number; type: string; detail: Record<string, unknown> }>;
-  duels: Array<{
-    tour: number;
-    joueurId: string;
-    adversaireId: string;
-    defi: string;
-    miseJoueur: number;
-    miseAdversaire: number;
-    resultat: 'joueur' | 'adversaire' | 'egalite';
-  }>;
+  effets: EffetPlateau[];
+  instantanes: InstantaneTour[];
 };
 
 export type SaisieMiniJeu = 'classement' | 'equipes' | 'libre';
@@ -210,8 +236,8 @@ export type Course = {
   positions: Record<string, number>;
   arrivees: string[];
   cagnotte: number;
-  pioche: string[];
-  defausse: string[];
+  pioches: Record<FamilleCarte, string[]>;
+  defausses: Record<FamilleCarte, string[]>;
   tour: number;
   phase: PhaseCourse;
   /** Ordre de passage, tiré une fois au démarrage de la course. */
@@ -233,21 +259,41 @@ export type Course = {
   undercover?: UndercoverCourse | null;
   choisitId: string | null;
   carteCourante: { joueurId: string; carte: CarteChance } | null;
-  dernierDe: { joueurId: string; valeur: number; usage: UsageDe } | null;
+  dernierDe: { joueurId: string; valeur: number; faces: number; usage: UsageDe; option: string | null } | null;
   classement: string[] | null;
+  /** Vrai dès la première arrivée : le tour en cours va au bout, puis la course s'arrête. */
+  dernierTour: boolean;
+  ceremonie: Ceremonie | null;
   regles: ReglesCourse;
   historique: HistoriqueCourse;
 };
 
+export type TropheeTire = {
+  id: string;
+  nom: string;
+  description: string;
+  icone: string;
+  montant: number;
+  gagnants: string[];
+  phrase: string;
+};
+
+export type Ceremonie = {
+  masqueesIgnorees: boolean;
+  etape: 'podium' | 'trophees' | 'classement' | 'gagnant';
+  tirage: TropheeTire[];
+  reveles: number;
+  classementRevele: boolean;
+  gagnantRevele: boolean;
+};
+
 export type ConfigPlateau = {
   longueur: number;
-  repartition: { bonus: number; chance: number; cagnotte: number; duel: number };
+  repartition: { bonus: number; chance: number; malchance: number; cagnotte: number; gamble: number };
   gainBonus: number;
-  miseMax: number;
-  /** Distribution des faces 1 à 6 lorsque la mise atteint miseMax. La somme vaut 1. */
-  probasMiseMax: number[];
   choixMiniJeu: 'rotation' | 'dernierAuClassement';
-  duel: { miseMax: number; bonusVainqueur: number; defis: string[] };
+  optionsDe: OptionDe[];
+  iconesCases: Record<TypeCase, string>;
   disposition?: TypeCase[];
 };
 
@@ -287,6 +333,8 @@ export type Action =
       libelle: string;
       masquee?: boolean;
       groupeRevelation?: string;
+      /** Défaut `manuel`. `ping-pong` et `apero` alimentent les statistiques. */
+      source?: string;
     }
   | { type: 'revelerMasquees'; groupe?: string }
   | { type: 'renommerJoueur'; joueurId: string; pseudo: string }
@@ -336,16 +384,16 @@ export type Action =
   | { type: 'devinerUndercover'; trouve: boolean }
   | { type: 'recapUndercover' }
   | { type: 'passerAuxDeplacements' }
-  | { type: 'lancerDe'; mise: number }
-  | { type: 'choisirBeneficiaire'; joueurId: string }
-  | { type: 'choisirAdversaire'; joueurId: string }
-  | { type: 'miserDuel'; montant: number }
-  | { type: 'cloreMisesDuel' }
-  | { type: 'autreDefi' }
-  | { type: 'resultatDuel'; resultat: 'joueur' | 'adversaire' | 'egalite' }
+  | { type: 'lancerDe'; option: string }
+  | { type: 'miserRoue'; montant: number }
   | { type: 'definirPosition'; joueurId: string; position: number }
   | { type: 'passerJoueur' }
   | { type: 'terminerCourse' }
+  | { type: 'ouvrirPodium'; forcer?: boolean }
+  | { type: 'tirerTrophees' }
+  | { type: 'revelerTrophee' }
+  | { type: 'revelerClassement' }
+  | { type: 'revelerGagnant' }
   | { type: 'basculerBots' };
 
 export type Origine =
@@ -379,20 +427,6 @@ export type JoueurPublic = {
 };
 
 export type EvenementVue = Evenement;
-
-export type MiseVue = {
-  joueurId: string;
-  aMise: boolean;
-  montant?: number;
-};
-
-export type DuelVue = {
-  joueurId: string;
-  etape: 'adversaire' | 'mises' | 'resultat';
-  adversaireId: string | null;
-  defi: string | null;
-  mises: MiseVue[];
-};
 
 export type MancheTopTenVue = {
   numero: number;
@@ -494,16 +528,15 @@ export type CourseVue = {
   undercover: UndercoverVue | null;
   catalogue: CatalogueMiniJeux;
   pokerConfig: ConfigPoker;
-  etape: 'lancer' | 'cadeau' | 'duel' | null;
+  etape: 'lancer' | 'roue' | null;
   carte: CarteChance | null;
-  duel: DuelVue | null;
-  dernierDe: { joueurId: string; valeur: number; usage: UsageDe } | null;
+  dernierDe: { joueurId: string; valeur: number; faces: number; usage: UsageDe; option: string | null } | null;
   classement: string[] | null;
+  dernierTour: boolean;
+  ceremonie: CeremonieVue | null;
   gainBonus: number;
-  miseMax: number;
-  probasMiseMax: number[];
-  miseMaxDuel: number;
-  bonusDuel: number;
+  optionsDe: OptionDe[];
+  iconesCases: Record<TypeCase, string>;
 };
 
 export type VueTv = {
@@ -591,6 +624,58 @@ export type ReseauVue = {
   urlDiag: string;
 };
 
+export type StatistiquesJoueur = {
+  lancers: number;
+  indiceChance: number | null;
+  misesDe: number;
+  misesRoue: number;
+  misesTotales: number;
+  resultatRoue: number;
+  jackpots: number;
+  cartesMalchance: number;
+  gpMalchance: number;
+  casesReculees: number;
+  casesReculeesCartes: number;
+  casesReculeesPacte: number;
+  casesAvanceesHorsDe: number;
+  gpDonnes: number;
+  gpRecus: number;
+  gpParJeu: Record<string, number>;
+  gpHorsPlateau: number;
+  rangs: number[];
+  pireRang: number | null;
+  retardMax: number;
+  rangArrivee: number | null;
+  rangGpMi: number | null;
+  rangGpFinal: number | null;
+  remontee: number | null;
+  retardRattrape: number;
+  placesGp: number | null;
+  legendaire: boolean;
+};
+
+export type CeremonieVue = {
+  etape: Ceremonie['etape'];
+  /** Trophées déjà révélés. La télé et les joueurs ne reçoivent que ceux-là. */
+  reveles: TropheeTire[];
+  /** Reste du tirage. Réservé à l'hôte : tableau vide pour les autres. */
+  suivants: TropheeTire[];
+  classementRevele: boolean;
+  gagnantRevele: boolean;
+};
+
+export type TropheeVue = {
+  id: string;
+  nom: string;
+  description: string;
+  icone: string;
+  montant: number;
+  attribuable: boolean;
+  gagnants: string[];
+  valeurs: Record<string, number | null>;
+  phrase: string;
+};
+
 export type VueHote = {
   role: 'hote';
   version: number;
@@ -614,7 +699,11 @@ export type VueHote = {
   diagnostic: DiagnosticTv | null;
   volume: number;
   course: CourseVue | null;
+  /** Icônes de config inconnues. Vide quand tout correspond. */
+  erreursConfig: string[];
   bots: boolean;
+  statistiques: Record<string, StatistiquesJoueur>;
+  trophees: TropheeVue[];
 };
 
 export type VueClient = VueTv | VueJoueur | VueHote;

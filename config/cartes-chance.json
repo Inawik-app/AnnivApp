@@ -1,16 +1,14 @@
 [
-  { "id": "bourse", "titre": "Bourse trouvée", "texte": "Tu ramasses une bourse oubliée sur le tapis.", "effet": { "type": "gain", "montant": 5 } },
-  { "id": "fan-club", "titre": "Fan club", "texte": "La table t'applaudit.", "effet": { "type": "gain", "montant": 8 } },
-  { "id": "petite-piece", "titre": "Petite pièce", "texte": "Une pièce brille entre deux cases.", "effet": { "type": "gain", "montant": 3 } },
-  { "id": "jackpot", "titre": "Jackpot de poche", "texte": "Ton porte-monnaie déborde.", "effet": { "type": "gain", "montant": 10 } },
-  { "id": "pourboire", "titre": "Pourboire", "texte": "Quelqu'un te laisse un pourboire.", "effet": { "type": "gain", "montant": 6 } },
-  { "id": "tournee", "titre": "Tournée générale", "texte": "Tout le monde gagne un peu.", "effet": { "type": "gainTous", "montant": 3 } },
-  { "id": "cadeau", "titre": "Cadeau", "texte": "Tu offres un cadeau. Toi, tu ne perds rien.", "effet": { "type": "cadeau", "montant": 5 } },
-  { "id": "generosite", "titre": "Générosité", "texte": "Tu choisis qui reçoit ces GP. Toi, tu ne perds rien.", "effet": { "type": "cadeau", "montant": 8 } },
-  { "id": "de-dore", "titre": "Dé doré", "texte": "Lance un dé et gagne le double.", "effet": { "type": "gainDe" } },
-  { "id": "musique", "titre": "Prochaine musique", "texte": "Tu choisis la prochaine musique.", "effet": { "type": "neutre" } },
-  { "id": "compliment", "titre": "Compliment", "texte": "Fais un compliment à la personne à ta gauche.", "effet": { "type": "neutre" } },
-  { "id": "trinquer", "titre": "On trinque", "texte": "Tout le monde trinque.", "effet": { "type": "neutre" } },
-  { "id": "animal", "titre": "Animal", "texte": "Imite un animal jusqu'au prochain tour.", "effet": { "type": "neutre" } },
-  { "id": "gage", "titre": "Prochain gage", "texte": "Tu choisis le prochain gage.", "effet": { "type": "neutre" } }
+  { "id": "gain-5", "titre": "Gain", "texte": "Tu gagnes 5 GP.", "icone": "gp-piece", "poids": 3, "effet": { "type": "gain", "montant": 5 } },
+  { "id": "gain-8", "titre": "Gain", "texte": "Tu gagnes 8 GP.", "icone": "gp-piece", "poids": 2, "effet": { "type": "gain", "montant": 8 } },
+  { "id": "gain-12", "titre": "Gain", "texte": "Tu gagnes 12 GP.", "icone": "gp-piece", "poids": 1, "effet": { "type": "gain", "montant": 12 } },
+  { "id": "coup-de-des", "titre": "Coup de dés", "texte": "Lance un dé normal et gagne le double.", "icone": "de", "poids": 2, "effet": { "type": "gainDe" } },
+  { "id": "en-avant", "titre": "En avant", "texte": "Avance de 2 cases.", "icone": "botte-ailee", "poids": 2, "effet": { "type": "avancer", "cases": 2 } },
+  { "id": "grand-bond", "titre": "Grand bond", "texte": "Avance de 4 cases.", "icone": "ressort", "poids": 1, "effet": { "type": "avancer", "cases": 4 } },
+  { "id": "cotisation", "titre": "Cotisation", "texte": "Chaque autre joueur te donne 2 GP.", "icone": "tirelire", "poids": 2, "effet": { "type": "cotisation", "montant": 2 } },
+  { "id": "raccourci-dore", "titre": "Raccourci doré", "texte": "Avance jusqu'à la prochaine cagnotte, et n'en touche qu'un quart.", "icone": "fleche-doree", "poids": 1, "effet": { "type": "cagnotte", "sens": "avant", "part": 0.25 } },
+  { "id": "retour-aux-sources", "titre": "Retour aux sources", "texte": "Recule jusqu'à la cagnotte précédente, et empoche la moitié.", "icone": "fleche-retour", "poids": 1, "effet": { "type": "cagnotte", "sens": "arriere", "part": 0.5 } },
+  { "id": "musique", "titre": "Choisis la prochaine musique", "texte": "Tu choisis la prochaine musique.", "icone": "masques", "poids": 1, "effet": { "type": "neutre" } },
+  { "id": "toast", "titre": "Porte un toast à l'hôte", "texte": "Porte un toast à l'hôte.", "icone": "masques", "poids": 1, "effet": { "type": "neutre" } },
+  { "id": "anecdote", "titre": "Raconte ta pire anecdote de soirée", "texte": "Raconte ta pire anecdote de soirée.", "icone": "masques", "poids": 1, "effet": { "type": "neutre" } }
 ]

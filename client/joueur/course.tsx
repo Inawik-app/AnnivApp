@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
-import { esperanceDe, probabilitesDe } from '../../shared/de';
-import type { Action, CourseVue, JoueurPublic, VueJoueur } from '../../shared/types';
+import type { Action, CourseVue, JoueurPublic, OptionDe, VueJoueur } from '../../shared/types';
 import { Bouton, CompteurRouleaux } from '../commun/composants';
+import { Icone, estNomIcone } from '../commun/icones';
 import { textePhase } from '../commun/course-texte';
 import { libelleRang } from '../commun/spectacle';
 import { TopTenJoueur } from '../commun/topten';
@@ -16,31 +16,22 @@ function vibrer(ms: number): void {
   navigation.vibrate?.(ms);
 }
 
-function Histogramme({
-  montant,
-  miseMax,
-  probasMiseMax,
-}: {
-  montant: number;
-  miseMax: number;
-  probasMiseMax: number[];
-}) {
-  const probas = probabilitesDe(montant, miseMax, probasMiseMax);
-  const moyenne = esperanceDe(probas);
-  const texte = moyenne.toFixed(1).replace('.', ',');
+function prixOption(option: OptionDe): string {
+  return option.mise <= 0 ? 'gratuit' : `${option.mise} GP`;
+}
+
+function FacesDe({ faces }: { faces: number }) {
   return (
-    <div class="histogramme" aria-label={`En moyenne ${texte} cases`}>
-      <div class="histogramme-barres">
-        {probas.map((probabilite, index) => (
-          <div key={index + 1} class="histogramme-colonne">
-            <div class="histogramme-barre" style={{ height: `${Math.max(8, probabilite * 220)}px` }} />
-            <span>{index + 1}</span>
-            <span>{Math.round(probabilite * 100)} %</span>
-          </div>
-        ))}
-      </div>
-      <p>En moyenne {texte} cases</p>
-    </div>
+    <span class="faces-de" aria-hidden="true">
+      {Array.from({ length: faces }, (_, index) => {
+        const valeur = index + 1;
+        return (
+          <span key={valeur} class={valeur >= 7 ? 'face-doree' : undefined}>
+            {valeur}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -51,7 +42,6 @@ function Selecteur({
   onValider,
   libelle,
   occupe,
-  apercu,
 }: {
   montant: number;
   maximum: number;
@@ -59,9 +49,9 @@ function Selecteur({
   onValider: () => void;
   libelle: string;
   occupe: boolean;
-  apercu?: { miseMax: number; probasMiseMax: number[] };
 }) {
   const fixer = (valeur: number) => onChange(Math.max(0, Math.min(maximum, valeur)));
+  const moitie = Math.floor(maximum / 2);
   return (
     <div>
       <div class="selecteur-mise">
@@ -79,23 +69,22 @@ function Selecteur({
         <Bouton variante="secondaire" disabled={occupe} onClick={() => fixer(0)}>
           0
         </Bouton>
-        <Bouton variante="secondaire" disabled={occupe} onClick={() => fixer(Math.min(5, maximum))}>
+        <Bouton variante="secondaire" disabled={occupe || maximum < 5} onClick={() => fixer(5)}>
           5
         </Bouton>
+        <Bouton variante="secondaire" disabled={occupe || maximum < 10} onClick={() => fixer(10)}>
+          10
+        </Bouton>
+        <Bouton variante="secondaire" disabled={occupe} onClick={() => fixer(moitie)}>
+          Moitié
+        </Bouton>
         <Bouton variante="secondaire" disabled={occupe} onClick={() => fixer(maximum)}>
-          Max
+          Tout
         </Bouton>
       </div>
-      {apercu ? <Histogramme montant={montant} miseMax={apercu.miseMax} probasMiseMax={apercu.probasMiseMax} /> : null}
-      {libelle.startsWith('Lancer le dé') ? (
-        <button type="button" class="lancer-plein" disabled={occupe} onPointerDown={(event) => { event.preventDefault(); onValider(); }}>
-          {libelle}
-        </button>
-      ) : (
-        <Bouton plein disabled={occupe} onClick={onValider}>
-          {libelle}
-        </Bouton>
-      )}
+      <Bouton plein disabled={occupe} onClick={onValider}>
+        {libelle}
+      </Bouton>
     </div>
   );
 }
@@ -116,12 +105,13 @@ export function CourseJoueur({
   occupe: boolean;
 }) {
   const [montant, setMontant] = useState(0);
-  const [modifie, setModifie] = useState(false);
+  const [optionId, setOptionId] = useState('normal');
   const [parti, setParti] = useState(false);
-  const cleMise = `${course?.phase ?? ''}|${course?.tour ?? 0}|${course?.duel?.etape ?? ''}`;
+  const cleMise = `${course?.phase ?? ''}|${course?.tour ?? 0}|${course?.etape ?? ''}|${course?.joueurCourantId ?? ''}`;
   useEffect(() => {
     setMontant(0);
-    setModifie(false);
+    setOptionId('normal');
+    setParti(false);
   }, [cleMise]);
   if (!course || !course.active) return <p style={{ marginTop: '16px' }}>En attente de la suite.</p>;
 
@@ -129,8 +119,8 @@ export function CourseJoueur({
   const nom = (id: string) => (id === moi.id ? 'toi' : pseudos.get(id) ?? 'Joueur');
   const position = course.positions[moi.id];
   const rangPassage = course.ordre.indexOf(moi.id);
-  const plafond = Math.max(0, Math.min(course.miseMax, solde));
   const aMoiDeLancer = course.phase === 'deplacements' && course.etape === 'lancer' && course.joueurCourantId === moi.id;
+  const aMoiLaRoue = course.phase === 'deplacements' && course.etape === 'roue' && course.joueurCourantId === moi.id;
   const debut = course.phase === 'deplacements' ? Math.max(0, course.indexCourant) : 0;
   let joueursAvant = 0;
   if (rangPassage >= 0) {
@@ -149,12 +139,34 @@ export function CourseJoueur({
         : joueursAvant === 1
           ? 'Encore 1 joueur avant toi'
           : `Encore ${joueursAvant} joueurs avant toi`;
-  const cadeau = course.phase === 'deplacements' && course.etape === 'cadeau' && course.joueurCourantId === moi.id;
-  const duel = course.duel;
-  const jeDuelliste = duel !== null && (duel.joueurId === moi.id || duel.adversaireId === moi.id);
-  const choisisAdversaire = duel !== null && duel.etape === 'adversaire' && duel.joueurId === moi.id;
-  const maMiseDuel = duel?.mises.find((entree) => entree.joueurId === moi.id);
-  const autres = joueurs.filter((joueur) => joueur.id !== moi.id && course.positions[joueur.id] !== undefined);
+  const option = course.optionsDe.find((candidat) => candidat.id === optionId) ?? course.optionsDe[0];
+
+  if (course.ceremonie) {
+    const fiche = joueurs.find((joueur) => joueur.id === moi.id);
+    const rang = fiche ? libelleRang(fiche.place) : '';
+    if (!course.ceremonie.classementRevele) {
+      return (
+        <p class="regarde-tv" data-ceremonie="telephone">
+          Regarde la télé !
+        </p>
+      );
+    }
+    const celebration = course.ceremonie.gagnantRevele && fiche?.place === 1;
+    return (
+      <div class="pile" data-ceremonie="telephone" style={{ marginTop: '12px' }}>
+        {!course.ceremonie.gagnantRevele ? <p class="regarde-tv">Regarde la télé !</p> : null}
+        <p>
+          Tu es {rang} avec {solde} GP.
+        </p>
+        {celebration ? (
+          <div data-celebration="1">
+            <Icone nom="trophee" taille={128} />
+            <p>Tu remportes le bon de 20 €.</p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div class="pile" style={{ marginTop: '12px' }}>
@@ -174,7 +186,7 @@ export function CourseJoueur({
       ) : null}
       {course.phase === 'miniJeu' && course.undercover ? <UndercoverJoueur undercover={course.undercover} nom={nom} /> : null}
       {course.dernierDe?.joueurId === moi.id ? <p>Tu as fait {course.dernierDe.valeur}.</p> : null}
-      {!aMoiDeLancer && rangPassage >= 0 ? (
+      {!aMoiDeLancer && !aMoiLaRoue && rangPassage >= 0 ? (
         <div>
           <p>{attente}</p>
           <ol class="ordre-joueur">
@@ -188,70 +200,60 @@ export function CourseJoueur({
           </ol>
         </div>
       ) : null}
-      {cadeau ? (
-        <div>
-          <p>{course.carte ? `${course.carte.titre}. ${course.carte.texte}` : 'Choisis qui reçoit le cadeau.'}</p>
-          <div class="grille-choix">
-            {autres.map((joueur) => (
-              <Bouton key={joueur.id} disabled={occupe} onClick={() => void envoyer({ type: 'choisirBeneficiaire', joueurId: joueur.id })}>
-                {joueur.pseudo}
-              </Bouton>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {choisisAdversaire ? (
-        <div>
-          <p>Choisis ton adversaire.</p>
-          <div class="grille-choix">
-            {autres.map((joueur) => (
-              <Bouton key={joueur.id} disabled={occupe} onClick={() => void envoyer({ type: 'choisirAdversaire', joueurId: joueur.id })}>
-                {joueur.pseudo}
-              </Bouton>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {duel && jeDuelliste && duel.etape === 'mises' && maMiseDuel && (!maMiseDuel.aMise || modifie) ? (
-        <div>
-          <p>{duel.defi ?? 'Duel'}</p>
-          <Selecteur
-            montant={montant}
-            maximum={Math.max(0, Math.min(course.miseMaxDuel, solde))}
-            onChange={setMontant}
-            occupe={occupe}
-            libelle="Valider ma mise"
-            onValider={() => {
-              setModifie(false);
-              void envoyer({ type: 'miserDuel', montant });
+      {aMoiDeLancer ? (
+        <div class="pile" data-choix-de="1">
+          {course.optionsDe.map((candidat) => {
+            const cher = candidat.mise > solde;
+            return (
+              <button
+                key={candidat.id}
+                type="button"
+                class={optionId === candidat.id ? 'tuile-de choisie' : 'tuile-de'}
+                data-option={candidat.id}
+                disabled={occupe || parti || cher}
+                onClick={() => setOptionId(candidat.id)}
+              >
+                {estNomIcone(candidat.icone) ? <Icone nom={candidat.icone} taille={64} /> : null}
+                <span class="tuile-de-corps">
+                  <span>
+                    {candidat.nom} · 1 à {candidat.faces} · {prixOption(candidat)}
+                  </span>
+                  <FacesDe faces={candidat.faces} />
+                </span>
+              </button>
+            );
+          })}
+          <Bouton
+            plein
+            disabled={occupe || parti || !option || option.mise > solde}
+            onClick={() => {
+              if (parti || occupe || !option) return;
+              setParti(true);
+              vibrer(40);
+              void envoyer({ type: 'lancerDe', option: option.id }).finally(() => setParti(false));
             }}
-          />
-        </div>
-      ) : null}
-      {duel && jeDuelliste && duel.etape === 'mises' && maMiseDuel?.aMise && maMiseDuel.montant !== undefined && !modifie ? (
-        <div class="pile">
-          <p>{duel.defi}</p>
-          <p>Mise enregistrée : {maMiseDuel.montant} GP</p>
-          <Bouton variante="secondaire" disabled={occupe} onClick={() => { setMontant(maMiseDuel.montant ?? 0); setModifie(true); }}>
-            Modifier
+          >
+            Lancer
           </Bouton>
         </div>
       ) : null}
-      {aMoiDeLancer ? (
-        <Selecteur
-          montant={montant}
-          maximum={plafond}
-          onChange={setMontant}
-          occupe={occupe || parti}
-          libelle={montant > 0 ? `Lancer le dé (mise : ${montant} GP)` : 'Lancer le dé'}
-          apercu={{ miseMax: course.miseMax, probasMiseMax: course.probasMiseMax }}
-          onValider={() => {
-            if (parti || occupe) return;
-            setParti(true);
-            vibrer(40);
-            void envoyer({ type: 'lancerDe', mise: montant }).finally(() => setParti(false));
-          }}
-        />
+      {aMoiLaRoue ? (
+        <div class="pile">
+          <p>Choisis ta mise. 0 passe la roue.</p>
+          <Selecteur
+            montant={montant}
+            maximum={Math.max(0, solde)}
+            onChange={setMontant}
+            occupe={occupe || parti}
+            libelle="Faire tourner la roue"
+            onValider={() => {
+              if (parti || occupe) return;
+              setParti(true);
+              vibrer(40);
+              void envoyer({ type: 'miserRoue', montant }).finally(() => setParti(false));
+            }}
+          />
+        </div>
       ) : null}
     </div>
   );

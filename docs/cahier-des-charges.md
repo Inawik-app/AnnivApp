@@ -50,18 +50,18 @@ Je suis développeur et j'organise mon anniversaire le **samedi 26 septembre** c
 
 Les GP servent à la fois de monnaie (pour miser) et de score (pour gagner le bon).
 
-### Règle d'or : aucune interaction négative
+### Règle d'or : aucun affrontement direct
 
-**On ne peut jamais retirer des GP à un autre joueur.** Si quelqu'un a été très bon dans les activités, les autres ne doivent pas pouvoir s'acharner sur lui pour lui faire perdre le lot. Un joueur peut perdre ses propres GP par ses propres choix (miser), et des GP peuvent être redistribués pour faire gagner les autres, mais aucune mécanique ne permet de toucher aux points d'autrui.
+**Aucun joueur ne peut, par ses choix, retirer des GP à un autre joueur ou le faire reculer.** Il n'y a aucun affrontement direct. Si quelqu'un a été très bon dans les activités, les autres ne doivent pas pouvoir s'acharner sur lui pour lui faire perdre le lot.
 
-Toute carte, case ou effet doit respecter cette règle.
+Un joueur ne peut perdre des GP ou reculer que par ses propres choix (mise du dé, roue) ou par le hasard du plateau (cartes malchance, événements). Une carte tirée au hasard peut, elle, faire payer ou avancer quelqu'un : ce n'est pas un choix du joueur qui est tombé dessus.
 
 ## Le plateau
 
 - Course qui dure toute la soirée. Des tours de plateau ont lieu entre les activités. Le chemin est une grille en zigzag qui monte : départ en bas à gauche, arrivée en haut. Tout le plateau tient à l'écran, sans caméra ni défilement.
 - La télé découpe l'écran en zones fixes qui ne se recouvrent pas : fiches des joueurs dans l'ordre de passage, en-tête qui nomme le joueur concerné, zone du plateau, cagnotte. Le dé, la carte d'effet et les annonces apparaissent au centre de la zone plateau, puis disparaissent. Rien de tout cela n'est visible pendant les sauts.
-- Longueur à calibrer d'après le nombre de tours prévus. Un dé normal moyenne 3,5. Avec le bonus de mise, la moyenne monte vers 4,1. La configuration actuelle est de 38 cases. **La longueur doit être configurable.**
-- Déplacement : **1 dé à 6 faces tiré par le serveur**. Enregistrer chaque lancer avec sa valeur, la mise associée et l'espérance de sa distribution (utile pour les trophées de fin).
+- Longueur à calibrer d'après le nombre de tours prévus. Un dé normal (1 à 6) moyenne 3,5. Le dé boosté (1 à 7) moyenne 4. Le super dé (1 à 8) moyenne 4,5. La configuration actuelle est de 38 cases. **La longueur doit être configurable.**
+- Déplacement : **un dé tiré par le serveur**, à 6, 7 ou 8 faces selon l'option choisie. Chaque face est équiprobable. Enregistrer chaque lancer avec sa valeur, le nombre de faces, la mise et l'espérance du dé, soit (faces + 1) / 2 (utile pour les trophées de fin).
 
 ### Ordre de passage
 
@@ -71,25 +71,30 @@ L'ordre est tiré au sort une seule fois, au démarrage de la course, côté ser
 
 1. **Choix du mini-jeu** : un joueur choisit le mini-jeu du tour parmi ceux encore disponibles (voir plus bas). Au tour N, c'est le joueur à la position (N − 1) modulo le nombre de joueurs dans l'ordre de passage. Le réglage `choixMiniJeu` vaut `rotation` (par défaut) ou `dernierAuClassement` (le joueur qui a le moins de GP visibles choisit).
 2. **Mini-jeu** : les joueurs s'affrontent, les GP sont attribués.
-3. **Déplacements**, dans l'ordre de passage. Quand c'est son tour, le joueur choisit une mise entre 0 et le minimum entre la mise maximale et son solde visible, puis lance.
-   - La mise et le lancer forment une seule action. Elle débite la mise, l'ajoute à la cagnotte, tire le dé avec les probabilités boostées, déplace le pion et applique l'effet de la case. Une seule annulation remet tout en place.
-   - Plus la mise est haute, plus les grandes valeurs sont probables. Une mise de 0 donne un dé normal.
-   - Mise maximale : **10 GP** (configurable). Mise de 0 autorisée.
-   - L'hôte peut lancer à la place d'un joueur absent, avec la mise de son choix, 0 par défaut.
-   - La mise n'est pas secrète : la télé affiche le montant au moment du lancer.
-
-Les duels gardent leurs mises secrètes et simultanées entre les deux adversaires.
+3. **Déplacements**, dans l'ordre de passage. Quand c'est son tour, le joueur choisit un dé, puis lance.
+   - Dé normal : 1 à 6, gratuit.
+   - Dé boosté : 1 à 7, 5 GP.
+   - Super dé : 1 à 8, 10 GP.
+   - Le choix et le lancer forment une seule action. Elle débite la mise, l'ajoute à la cagnotte, tire le dé uniformément, déplace le pion et applique l'effet de la case. Une seule annulation remet tout en place.
+   - Une option trop chère pour le solde visible est refusée.
+   - L'hôte peut lancer à la place d'un joueur absent, avec le dé normal par défaut.
+   - La mise n'est pas secrète : la télé annonce le dé choisi.
 
 ### Types de cases
 
-- **Bonus** : gain de quelques GP (autour de 5).
-- **Cagnotte** : le joueur récupère la moitié de la cagnotte.
-- **Chance** : carte événement, **uniquement positive ou neutre**.
-- **Duel** : défi en vrai contre un autre joueur (pierre-feuille-ciseaux, un point de ping-pong…), chacun ne mise que ses propres GP. L'hôte saisit le résultat.
+Cinq types, sur les cases 1 à 37 :
+
+- **Bonus** (11) : +5 GP.
+- **Chance** (9) : une carte chance, piochée au hasard.
+- **Malchance** (5) : une carte malchance. Plus rare que ce qui fait gagner. Jamais sur les cases 1 à 3, jamais deux d'affilée.
+- **Cagnotte** (6) : le joueur récupère la moitié de la cagnotte (arrondi à l'entier inférieur).
+- **Gamble** (6) : la roue. Le joueur mise entre 0 et son solde visible, puis le serveur tire un résultat. 0 passe le tour. Jamais sur les cases 1 à 3, jamais deux d'affilée.
+
+Il n'y a plus de duel.
 
 ### Boutique du tour (à confirmer, secondaire)
 
-Idée discutée pour donner de la valeur à l'ordre de passage : à chaque tour, une boutique propose (nombre de joueurs − 1) offres, choisies dans l'ordre de passage. Les offres ne touchent jamais au déplacement et n'affectent que celui qui les prend : coffre mystère (0 à 15 GP), multiplicateur ×2 sur la prochaine activité, carte pouvoir supplémentaire pour la finale, petit gain garanti. **À ne développer que si le reste est terminé.**
+Idée discutée pour donner de la valeur à l'ordre de passage : à chaque tour, une boutique propose (nombre de joueurs − 1) offres, choisies dans l'ordre de passage. Les offres ne touchent jamais au déplacement et n'affectent que celui qui les prend : coffre mystère (0 à 15 GP), multiplicateur ×2 sur la prochaine activité, petit gain garanti. **À ne développer que si le reste est terminé.**
 
 ## Les mini-jeux
 
@@ -143,33 +148,23 @@ Ping-pong : 40 à 80 GP par joueur environ. Poker : 0 à 40. Apéro : 20 à 40. 
 
 ## La phase finale
 
-### Draft des pouvoirs
+Dès qu'un joueur atteint l'arrivée, le tour en cours va jusqu'au bout : les autres jouent encore, et plusieurs peuvent donc arriver. Aucun nouveau tour ne commence ensuite. L'hôte peut toujours terminer la course plus tôt.
 
-Quand la course se termine, chaque joueur choisit une carte pouvoir **dans l'ordre d'arrivée sur le plateau** (le premier arrivé choisit en premier). C'est ce qui donne de l'intérêt à arriver en premier, sans que l'arrivée soit un simple gros bonus de points. Pouvoirs, tous uniquement sur soi :
+La cérémonie, pilotée par l'hôte et annulable étape par étape :
 
-- **Doublé** : gains du défi final ×2.
-- **Pari sur soi** : on mise des GP sur sa victoire au défi final ; si victoire, triplés, sinon perdus.
-- **Assurance** : au moins 10 GP au défi final quoi qu'il arrive.
-- **Tout ou rien** : lancer de dé ; sur 5 ou 6, gros gain, sinon rien.
+1. **Fin de la course** : la télé affiche le podium, dans l'ordre d'arrivée.
+2. **Trophées de rattrapage** : le serveur en tire 4 parmi ceux qui sont attribuables (`nombreCeremonie` dans `config/trophees.json`). S'il y en a moins, ils sont tous décernés. L'hôte voit la liste à l'avance. La télé révèle chaque trophée à son tour : le nom, un moment de suspense, puis les gagnants. En cas d'égalité, tous le reçoivent. La remontée depuis la dernière place jusqu'à l'arrivée s'appelle Remontada légendaire et rapporte un bonus.
+3. **Classement final** : les joueurs du dernier au deuxième, avec leur total.
+4. **Gagnant** : il apparaît en grand et remporte le bon de 20 €.
 
-*Le défi final reste à définir.*
+### Trophées de rattrapage
 
-### Trophées de rattrapage (façon Mario Party)
-
-- Une liste de 6 à 8 trophées, dont **seulement 3 ou 4 tirés au hasard** sont révélés à la fin (personne ne sait lesquels à l'avance).
-- Valeur : environ 10 à 15 GP chacun (à peu près 10 % du score moyen attendu).
-- Calcul automatique quand c'est possible :
-  - **Le plus malchanceux** : somme des dés la plus en dessous de la moyenne attendue.
-  - **Trophée du dernier** : dernier au tournoi de ping-pong.
-  - **Le plus généreux** : celui qui a le plus alimenté la cagnotte.
-  - **Le prudent** : celui qui a le moins misé.
-  - **L'audacieux** : le plus de choix risqués.
-  - **Le touriste** : dernier arrivé sur le plateau.
-- Révélation une par une sur la télé, puis **classement final** et annonce du gagnant du bon.
+- Le catalogue est dans `config/trophees.json`. Les critères tiennent compte de la taille du dé lancé, des cartes malchance, des cases reculées, des GP donnés, des GP gagnés hors plateau, du ping-pong, des mises à la roue, du total misé, de l'arrivée, de la remontée dans la course et du classement GP.
+- Valeur : environ 10 à 15 GP chacun (à peu près 10 % du score moyen attendu), plus le bonus de la Remontada légendaire.
 
 ## Écrans de la télé (résumé)
 
-Accueil avec QR code et joueurs connectés · plateau et tableau des scores · tirage de l'ordre de passage · grille des mini-jeux et règles du jeu en cours · Jeopardy (grille, question, buzzer) · minuteur du poker · révélation des GP du ping-pong · draft des pouvoirs · cérémonie des trophées · classement final.
+Accueil avec QR code et joueurs connectés · plateau et tableau des scores · tirage de l'ordre de passage · grille des mini-jeux et règles du jeu en cours · Jeopardy (grille, question, buzzer) · minuteur du poker · révélation des GP du ping-pong · dernier tour · podium de la course · trophées de rattrapage · classement final · gagnant.
 
 ## Priorités de développement
 
@@ -177,7 +172,7 @@ Accueil avec QR code et joueurs connectés · plateau et tableau des scores · t
 2. **Plateau** : ordre de passage tiré une fois, mise au moment de lancer le dé, cases, cagnotte.
 3. **Mini-jeux** : grille chez l'hôte, affichage télé, Jeopardy avec buzzers.
 4. **Activités** : révélation différée du ping-pong, minuteur du poker.
-5. **Finale** : draft des pouvoirs, trophées, classement.
+5. **Finale** : fin de la course, trophées de rattrapage, classement final et gagnant.
 6. **Bonus** : boutique du tour, animations.
 
 **Tester avant samedi** avec la télé et au moins 2 ou 3 téléphones, idéalement une partie complète.

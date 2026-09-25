@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { nanoid } from 'nanoid';
 import { INTERVALLE_SAUVEGARDE_MS, LIMITE_ANNULATIONS } from '../shared/constantes';
 import type { Action, EtatJeu, Origine, ReponseAction, TypeCase } from '../shared/types';
-import { lireCartesChance, lireConfigPlateau } from './course-config';
+import { lireCartesChance, lireCartesMalchance, lireCatalogueTrophees, lireConfigPlateau, lireRoue } from './course-config';
 import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { libelleAction } from './libelles';
 import { creerPersistance, type Persistance } from './persistance';
@@ -19,8 +19,10 @@ type Instantane = {
   etat: EtatJeu;
   jetons: Record<string, string>;
   suivis: Array<[string, string]>;
-  /** File de dés du mode test, pour qu'une annulation rejoue la même valeur. */
+  /** Files du mode test, pour qu'une annulation rejoue les mêmes tirages. */
   desForces: number[];
+  cartesForcees: string[];
+  roueForcees: string[];
 };
 
 export type OptionsStore = {
@@ -36,10 +38,14 @@ export type OptionsStore = {
   sauvegardesAuto?: boolean;
   intervalleSauvegardeMs?: number;
   alea?: (max: number) => number;
-  /** Mode test : dés imposés et disposition explicite. Ignoré hors test. */
+  /** Mode test : dés imposés, cartes, roue et disposition explicite. Ignoré hors test. */
   test?: boolean;
   desForces?: number[];
+  cartesForcees?: string[];
+  roueForcees?: string[];
   disposition?: TypeCase[];
+  /** Partie jouée en mémoire : pas de pile d'annulation, pas d'écriture disque. */
+  simulation?: boolean;
 };
 
 export type Store = {
@@ -68,20 +74,27 @@ export function creerStore(options: OptionsStore): Store {
     plateau.disposition = options.disposition;
   }
   const cartes = lireCartesChance(racine);
+  const cartesMalchance = lireCartesMalchance(racine);
+  const roue = lireRoue(racine);
   const catalogue = lireCatalogue(racine);
   const poker = lirePoker(racine);
   const topten = lireTopTen(racine);
   const jeopardy = lireJeopardy(racine);
   const undercover = lireUndercover(racine);
+  const trophees = lireCatalogueTrophees(racine);
+  const simulation = options.simulation === true;
   const alea = options.alea ?? ((max: number) => randomInt(0, Math.max(1, max)));
   const desForces = options.test ? [...(options.desForces ?? [])] : [];
-  const tirerDe = options.test && options.desForces
+  const cartesForcees = options.test ? [...(options.cartesForcees ?? [])] : [];
+  const roueForcees = options.test ? [...(options.roueForcees ?? [])] : [];
+  const tirerDe = options.test
     ? () => {
         const force = desForces.shift();
-        if (force === undefined || !Number.isInteger(force) || force < 1 || force > 6) return alea(6) + 1;
         return force;
       }
     : undefined;
+  const tirerCarte = options.test ? () => cartesForcees.shift() : undefined;
+  const tirerRoue = options.test ? () => roueForcees.shift() : undefined;
   const charge = creerPersistance(options.dossierData, options.titre, {
     sauvegardesAuto: options.sauvegardesAuto ?? true,
     intervalleMs: options.intervalleSauvegardeMs ?? INTERVALLE_SAUVEGARDE_MS,
@@ -140,17 +153,21 @@ export function creerStore(options: OptionsStore): Store {
     return reponse;
   };
 
-  const restaurerDes = (valeurs: number[]) => {
-    desForces.splice(0, desForces.length, ...valeurs);
+  const restaurerFiles = (instantane: Instantane) => {
+    desForces.splice(0, desForces.length, ...instantane.desForces);
+    cartesForcees.splice(0, cartesForcees.length, ...instantane.cartesForcees);
+    roueForcees.splice(0, roueForcees.length, ...instantane.roueForcees);
   };
 
-  const empiler = (action: Action, desAvant: number[]) => {
+  const empiler = (action: Action, files: Pick<Instantane, 'desForces' | 'cartesForcees' | 'roueForcees'>) => {
     pile.push({
       libelle: libelleAction(action, etat),
       etat: cloner(etat),
       jetons: { ...jetons },
       suivis: [...suivis.entries()],
-      desForces: desAvant,
+      desForces: files.desForces,
+      cartesForcees: files.cartesForcees,
+      roueForcees: files.roueForcees,
     });
     if (pile.length > LIMITE_ANNULATIONS) pile.shift();
   };
@@ -179,7 +196,7 @@ export function creerStore(options: OptionsStore): Store {
         etat = cloner(instantane.etat);
         etat.version = version;
         jetons = { ...instantane.jetons };
-        restaurerDes(instantane.desForces);
+        restaurerFiles(instantane);
         suivis.clear();
         for (const [demandeId, suiviSocket] of instantane.suivis) suivis.set(demandeId, suiviSocket);
         taillerSuivis();
@@ -211,7 +228,15 @@ export function creerStore(options: OptionsStore): Store {
         }
       }
 
-      const desAvant = [...desForces];
+      const filesAvant: Instantane = {
+        libelle: '',
+        etat,
+        jetons,
+        suivis: [],
+        desForces: [...desForces],
+        cartesForcees: [...cartesForcees],
+        roueForcees: [...roueForcees],
+      };
       const resultat = reduire(etat, action, origine, {
         maintenant: maintenant(),
         id: nouvelId,
@@ -221,24 +246,31 @@ export function creerStore(options: OptionsStore): Store {
         estEnLigne,
         alea,
         tirerDe,
+        tirerCarte,
+        tirerRoue,
         plateau,
         cartes,
+        cartesMalchance,
+        roue,
         catalogue,
         poker,
         topten,
         jeopardy,
         undercover,
+        trophees: trophees.trophees,
+        nombreCeremonie: trophees.nombreCeremonie,
+        simulation,
       });
       if (!resultat.ok) {
-        restaurerDes(desAvant);
+        restaurerFiles(filesAvant);
         return resultat;
       }
 
-      empiler(action, desAvant);
+      if (!simulation) empiler(action, filesAvant);
       etat = resultat.etat;
       prochainIdEvenement = Math.max(prochainIdEvenement, resultat.prochainIdEvenement);
       const extra = appliquerEffets(resultat.effets, socketId);
-      persister();
+      if (!simulation) persister();
       return { ok: true, ...extra };
     },
   };

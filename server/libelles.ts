@@ -98,24 +98,24 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return 'Déplacements';
     case 'lancerDe':
       return 'Lancer de dé';
-    case 'choisirBeneficiaire':
-      return 'Cadeau';
-    case 'choisirAdversaire':
-      return 'Adversaire du duel';
-    case 'miserDuel':
-      return 'Mise de duel';
-    case 'cloreMisesDuel':
-      return 'Clôture du duel';
-    case 'autreDefi':
-      return 'Nouveau défi';
-    case 'resultatDuel':
-      return 'Résultat du duel';
+    case 'miserRoue':
+      return action.montant > 0 ? `Roue : ${action.montant} GP` : 'Roue passée';
     case 'definirPosition':
       return `Position de ${pseudoDe(etat, action.joueurId)}`;
     case 'passerJoueur':
       return 'Tour passé';
     case 'terminerCourse':
       return 'Fin de la course';
+    case 'ouvrirPodium':
+      return 'Podium de la course';
+    case 'tirerTrophees':
+      return 'Tirage des trophées';
+    case 'revelerTrophee':
+      return 'Trophée suivant';
+    case 'revelerClassement':
+      return 'Classement final';
+    case 'revelerGagnant':
+      return 'Gagnant';
     case 'basculerBots':
       return 'Bots';
     default:

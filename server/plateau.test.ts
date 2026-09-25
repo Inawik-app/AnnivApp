@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
-import { lireCartesChance, lireConfigPlateau } from './course-config';
+import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { creerStore } from './store';
-import { vueJoueur, vueTv } from './vues';
-import { esperanceDe, probabilitesDe } from '../shared/de';
+import { vueTv } from './vues';
+import { esperanceDe } from '../shared/de';
 import { solde } from '../shared/soldes';
 import type { Action, ConfigPlateau, EtatJeu, Origine } from '../shared/types';
-import { creditsDuel, genererDisposition } from './plateau';
+import { genererDisposition } from './plateau';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -34,6 +34,8 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     alea: aleaFixe(0),
     plateau,
     cartes: lireCartesChance(RACINE),
+    cartesMalchance: lireCartesMalchance(RACINE),
+    roue: lireRoue(RACINE),
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
     topten: lireTopTen(RACINE),
@@ -60,7 +62,7 @@ function partie(ctx: ContexteReduction, pseudos = ['Mira', 'Noé', 'Lina', 'Sach
 }
 
 describe('plateau', () => {
-  it('répartit les cases sans cagnottes ni duels collés, ni au début', () => {
+  it('répartit les cases sans malchance ni gamble collés, ni au début', () => {
     const config = lireConfigPlateau(RACINE);
     for (let graine = 0; graine < 30; graine += 1) {
       let n = graine + 1;
@@ -70,11 +72,16 @@ describe('plateau', () => {
       });
       expect(disposition[0]).toBe('depart');
       expect(disposition[config.longueur]).toBe('arrivee');
-      expect(disposition.slice(1, 4).every((type) => type === 'bonus' || type === 'chance')).toBe(true);
+      expect(disposition.slice(1, 4).every((type) => type !== 'malchance' && type !== 'gamble')).toBe(true);
+      const compte = { bonus: 0, chance: 0, malchance: 0, cagnotte: 0, gamble: 0 };
       for (let index = 1; index < disposition.length - 1; index += 1) {
-        if (disposition[index] === 'cagnotte') expect(disposition[index - 1]).not.toBe('cagnotte');
-        if (disposition[index] === 'duel') expect(disposition[index - 1]).not.toBe('duel');
+        const type = disposition[index];
+        if (type === 'malchance' || type === 'gamble') expect(disposition[index - 1]).not.toBe(type);
+        if (type === 'bonus' || type === 'chance' || type === 'malchance' || type === 'cagnotte' || type === 'gamble') {
+          compte[type] += 1;
+        }
       }
+      expect(compte).toEqual(config.repartition);
     }
   });
 
@@ -119,7 +126,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     while (etat.course?.phase === 'deplacements') {
       const courant = etat.course.ordre[etat.course.indexCourant];
-      etat = jouer(etat, { type: 'lancerDe', mise: 0 }, { role: 'joueur', joueurId: courant! }, ctx);
+      etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: courant! }, ctx);
     }
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     expect(etat.course?.choisitId).toBe(ordre[1]);
@@ -146,18 +153,17 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
-    const trop = reduire(etat, { type: 'lancerDe', mise: 11 }, { role: 'joueur', joueurId: mira }, ctx);
+    const trop = reduire(etat, { type: 'lancerDe', option: 'super' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(trop.ok).toBe(false);
-    const pauvre = reduire(etat, { type: 'lancerDe', mise: 5 }, { role: 'joueur', joueurId: mira }, ctx);
+    const pauvre = reduire(etat, { type: 'lancerDe', option: 'booste' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(pauvre.ok).toBe(false);
     const avantPosition = etat.course?.positions[mira];
-    etat = jouer(etat, { type: 'lancerDe', mise: 4 }, { role: 'joueur', joueurId: mira }, ctx);
-    expect(etat.course?.cagnotte).toBeGreaterThanOrEqual(4);
-    expect(etat.transactions.some((transaction) => transaction.joueurId === mira && transaction.montant === -4 && transaction.source === 'mise')).toBe(true);
+    etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: mira }, ctx);
+    expect(etat.course?.cagnotte).toBe(0);
     const lancer = etat.course?.historique.lancers.find((entree) => entree.usage === 'deplacement');
-    const regles = etat.course?.regles;
-    expect(lancer?.mise).toBe(4);
-    expect(lancer?.esperance).toBeCloseTo(esperanceDe(probabilitesDe(4, regles?.miseMax ?? 0, regles?.probasMiseMax ?? [])), 10);
+    expect(lancer?.mise).toBe(0);
+    expect(lancer?.faces).toBe(6);
+    expect(lancer?.esperance).toBeCloseTo(esperanceDe(6), 10);
     expect(etat.course?.positions[mira]).not.toBe(avantPosition);
     expect(etat.course?.historique.effets.length).toBeGreaterThan(0);
   });
@@ -178,73 +184,36 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
-    etat = jouer(etat, { type: 'lancerDe', mise: 5 }, { role: 'joueur', joueurId: mira }, ctx);
+    etat = jouer(etat, { type: 'lancerDe', option: 'booste' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(1);
     expect(etat.course?.cagnotte).toBe(3);
     expect(solde(etat.transactions, mira, 'visibles')).toBe(20 - 5 + 2);
   });
 
-  it('ne retire des GP à personne avec une carte chance, et le cadeau est gratuit', () => {
-    const cartes = lireCartesChance(RACINE);
-    for (const carte of cartes) {
-      if (carte.effet.type === 'gain' || carte.effet.type === 'gainTous' || carte.effet.type === 'cadeau') {
-        expect(carte.effet.montant).toBeGreaterThan(0);
-      }
-    }
+  it('une carte qui déplace ne déclenche pas la case d\'arrivée', () => {
     const plateau: ConfigPlateau = {
       ...lireConfigPlateau(RACINE),
-      longueur: 4,
-      disposition: ['depart', 'chance', 'bonus', 'bonus', 'arrivee'],
+      longueur: 8,
+      disposition: ['depart', 'chance', 'bonus', 'cagnotte', 'bonus', 'malchance', 'bonus', 'bonus', 'arrivee'],
     };
     const ctx = contexte({
       plateau,
-      alea: (max) => Math.max(0, max - 1),
+      alea: () => 0,
       tirerDe: () => 1,
-      cartes: [{ id: 'cadeau', titre: 'Cadeau', texte: 'Offre.', effet: { type: 'cadeau', montant: 6 } }],
+      tirerCarte: () => 'en-avant',
     });
     let etat = partie(ctx, ['Mira', 'Noé']);
     const mira = etat.joueurs[0]!.id;
-    const noe = etat.joueurs[1]!.id;
     etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 10, libelle: 'Bonus' }, hote, ctx);
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 10, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
-    etat = jouer(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
-    expect(etat.course?.etape?.genre).toBe('cadeau');
-    const avant = solde(etat.transactions, mira, 'visibles');
-    etat = jouer(etat, { type: 'choisirBeneficiaire', joueurId: noe }, { role: 'joueur', joueurId: mira }, ctx);
-    expect(solde(etat.transactions, mira, 'visibles')).toBe(avant);
-    expect(solde(etat.transactions, noe, 'visibles')).toBe(16);
-  });
-
-  it('règle un duel : victoire, défaite et égalité', () => {
-    expect(creditsDuel(4, 2, 'joueur', 5)).toEqual({ joueur: 11, adversaire: 0 });
-    expect(creditsDuel(4, 2, 'adversaire', 5)).toEqual({ joueur: 0, adversaire: 11 });
-    expect(creditsDuel(4, 2, 'egalite', 5)).toEqual({ joueur: 4, adversaire: 2 });
-    const plateau: ConfigPlateau = {
-      ...lireConfigPlateau(RACINE),
-      longueur: 4,
-      disposition: ['depart', 'duel', 'bonus', 'bonus', 'arrivee'],
-    };
-    const ctx = contexte({ plateau, alea: (max) => Math.max(0, max - 1), tirerDe: () => 1 });
-    let etat = partie(ctx, ['Mira', 'Noé']);
-    const mira = etat.joueurs[0]!.id;
-    const noe = etat.joueurs[1]!.id;
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 30, libelle: 'Bonus' }, hote, ctx);
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 30, libelle: 'Bonus' }, hote, ctx);
-    etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
-    etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
-    etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
-    etat = jouer(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
-    etat = jouer(etat, { type: 'choisirAdversaire', joueurId: noe }, { role: 'joueur', joueurId: mira }, ctx);
-    etat = jouer(etat, { type: 'miserDuel', montant: 4 }, { role: 'joueur', joueurId: mira }, ctx);
-    etat = jouer(etat, { type: 'miserDuel', montant: 2 }, { role: 'joueur', joueurId: noe }, ctx);
-    etat = jouer(etat, { type: 'resultatDuel', resultat: 'adversaire' }, hote, ctx);
-    expect(solde(etat.transactions, mira, 'visibles')).toBe(30 - 1 - 4);
-    expect(solde(etat.transactions, noe, 'visibles')).toBe(30 - 2 + 4 + 2 + 5);
+    const courant = etat.course?.ordre[0] ?? mira;
+    etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: courant }, ctx);
+    expect(etat.course?.positions[courant]).toBe(3);
+    expect(etat.course?.cagnotte).toBe(0);
+    expect(etat.transactions.some((transaction) => transaction.libelle === 'Cagnotte')).toBe(false);
   });
 
   it("plaque l'arrivée, donne le rang, et empêche de relancer", () => {
@@ -261,37 +230,20 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
-    etat = jouer(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
+    etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(4);
     expect(etat.course?.arrivees).toEqual([mira]);
-    const relance = reduire(etat, { type: 'lancerDe', mise: 1 }, { role: 'joueur', joueurId: mira }, ctx);
+    const relance = reduire(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(relance.ok).toBe(false);
   });
 
-  it('garde secrètes les mises de duel tant qu\'elles ne sont pas révélées', () => {
-    const plateau: ConfigPlateau = {
-      ...lireConfigPlateau(RACINE),
-      longueur: 4,
-      disposition: ['depart', 'duel', 'bonus', 'bonus', 'arrivee'],
-    };
-    const ctx = contexte({ plateau, alea: (max) => Math.max(0, max - 1), tirerDe: () => 1 });
+  it('ne montre pas la pioche sur la télé', () => {
+    const ctx = contexte({ alea: () => 0, tirerDe: () => 1 });
     let etat = partie(ctx, ['Mira', 'Noé']);
-    const mira = etat.joueurs[0]!.id;
-    const noe = etat.joueurs[1]!.id;
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 20, libelle: 'Bonus' }, hote, ctx);
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 20, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
-    etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
-    etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
-    etat = jouer(etat, { type: 'lancerDe', mise: 0 }, { role: 'joueur', joueurId: mira }, ctx);
-    etat = jouer(etat, { type: 'choisirAdversaire', joueurId: noe }, { role: 'joueur', joueurId: mira }, ctx);
-    etat = jouer(etat, { type: 'miserDuel', montant: 7 }, { role: 'joueur', joueurId: mira }, ctx);
     const tv = vueTv(etat, { enLigne: {}, latenceJoueur: {}, appareils: [] }, 1, 'dem', 'http://x');
-    const autre = vueJoueur(etat, { enLigne: {}, latenceJoueur: {}, appareils: [] }, 1, 'dem', noe);
     expect(JSON.stringify(tv)).not.toContain('pioche');
-    expect(tv.course?.duel?.mises.find((mise) => mise.joueurId === mira)?.montant).toBeUndefined();
-    expect(autre.course?.duel?.mises.find((mise) => mise.joueurId === mira)?.montant).toBeUndefined();
+    expect(JSON.stringify(tv)).not.toContain('defausse');
   });
 
   it('joue 12 tours avec 4 joueurs sans casser les invariants', () => {
@@ -318,7 +270,7 @@ describe('plateau', () => {
         expect(solde(etat.transactions, joueur.id, 'visibles')).toBeGreaterThanOrEqual(0);
       }
       for (const transaction of etat.transactions) {
-        if (transaction.montant < 0) expect(transaction.source).toBe('mise');
+        if (transaction.montant < 0) expect(['mise', 'roue', 'carte']).toContain(transaction.source);
       }
     };
     for (let tour = 0; tour < 12 && etat.course?.phase !== 'terminee'; tour += 1) {
@@ -331,28 +283,18 @@ describe('plateau', () => {
         verifier();
         const course = etat.course;
         const courant = course.ordre[course.indexCourant];
-        if (course.etape?.genre === 'lancer' && courant) {
-          const plafond = Math.min(course.regles.miseMax, solde(etat.transactions, courant, 'visibles'));
-          etat = jouer(etat, { type: 'lancerDe', mise: alea(plafond + 1) }, { role: 'joueur', joueurId: courant }, ctx);
-        } else if (course.etape?.genre === 'cadeau' && courant) {
-          const autre = etat.joueurs.find((joueur) => joueur.id !== courant);
-          etat = jouer(etat, { type: 'choisirBeneficiaire', joueurId: autre!.id }, { role: 'joueur', joueurId: courant }, ctx);
-        } else if (course.etape?.genre === 'duel' && course.etape.duel.etape === 'adversaire' && courant) {
-          const autre = etat.joueurs.find((joueur) => joueur.id !== courant);
-          etat = jouer(etat, { type: 'choisirAdversaire', joueurId: autre!.id }, { role: 'joueur', joueurId: courant }, ctx);
-        } else if (course.etape?.genre === 'duel' && course.etape.duel.etape === 'mises') {
-          const duel = course.etape.duel;
-          const ids = [duel.joueurId, duel.adversaireId].filter((id): id is string => !!id);
-          for (const id of ids) {
-            if (duel.mises[id] !== null) continue;
-            const plafond = Math.min(course.regles.duel.miseMax, solde(etat.transactions, id, 'visibles'));
-            etat = jouer(etat, { type: 'miserDuel', montant: alea(plafond + 1) }, { role: 'joueur', joueurId: id }, ctx);
-          }
-        } else if (course.etape?.genre === 'duel' && course.etape.duel.etape === 'resultat') {
-          const issus = ['joueur', 'adversaire', 'egalite'] as const;
-          etat = jouer(etat, { type: 'resultatDuel', resultat: issus[alea(3)] ?? 'egalite' }, hote, ctx);
+        if (!courant) throw new Error('Tour bloqué');
+        if (course.etape?.genre === 'lancer') {
+          const soldeCourant = solde(etat.transactions, courant, 'visibles');
+          const options = course.regles.optionsDe.filter((option) => option.mise <= soldeCourant);
+          const option = options[alea(options.length)] ?? options[0];
+          etat = jouer(etat, { type: 'lancerDe', option: option?.id ?? 'normal' }, { role: 'joueur', joueurId: courant }, ctx);
+        } else if (course.etape?.genre === 'roue') {
+          const soldeCourant = solde(etat.transactions, courant, 'visibles');
+          const mise = alea(2) === 0 ? 0 : Math.min(5, soldeCourant);
+          etat = jouer(etat, { type: 'miserRoue', montant: mise }, { role: 'joueur', joueurId: courant }, ctx);
         } else {
-          throw new Error(`Tour bloqué : ${course.etape?.genre ?? 'sans étape'}`);
+          throw new Error('Tour bloqué');
         }
       }
       verifier();
@@ -383,16 +325,15 @@ describe('plateau', () => {
     store.dispatch({ type: 'passerAuxDeplacements' }, hote);
     const avant = store.etat().course?.positions[lanceur];
     const soldeAvant = solde(store.etat().transactions, lanceur, 'visibles');
-    store.dispatch({ type: 'lancerDe', mise: 2 }, { role: 'joueur', joueurId: lanceur });
+    store.dispatch({ type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: lanceur });
     expect(store.etat().course?.positions[lanceur]).not.toBe(avant);
-    expect(store.etat().course?.cagnotte).toBeGreaterThanOrEqual(2);
     expect(store.etat().course?.historique.effets.length).toBeGreaterThan(0);
     store.dispatch({ type: 'annuler' }, hote);
     expect(store.etat().course?.positions[lanceur]).toBe(avant);
     expect(store.etat().course?.cagnotte).toBe(0);
     expect(store.etat().course?.historique.effets).toHaveLength(0);
     expect(solde(store.etat().transactions, lanceur, 'visibles')).toBe(soldeAvant);
-    const relance = store.dispatch({ type: 'lancerDe', mise: 2 }, { role: 'joueur', joueurId: lanceur });
+    const relance = store.dispatch({ type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: lanceur });
     expect(relance.ok).toBe(true);
     store.fermer();
     fs.rmSync(dossier, { recursive: true, force: true });

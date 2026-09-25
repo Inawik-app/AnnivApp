@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
 import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
-import { lireCartesChance, lireConfigPlateau } from './course-config';
+import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { tirerOrdreParole } from './undercover';
 import { projeterCourse } from './vues';
@@ -28,6 +28,8 @@ function contexte(): ContexteReduction {
     alea: (max: number) => randomInt(0, Math.max(1, max)),
     plateau: lireConfigPlateau(RACINE),
     cartes: lireCartesChance(RACINE),
+    cartesMalchance: lireCartesMalchance(RACINE),
+    roue: lireRoue(RACINE),
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
     topten: lireTopTen(RACINE),

@@ -49,6 +49,17 @@
   align-items: center;
   white-space: nowrap;
   overflow: hidden;
+  min-height: 88px;
+}
+
+.entete-des {
+  display: flex;
+  align-items: center;
+  margin-right: 16px;
+}
+
+.entete-des .icone {
+  margin-right: 8px;
 }
 
 .entete-plateau h2,
@@ -142,8 +153,9 @@
 }
 
 .case-chance .pastille-case { background: #8ecbff; }
+.case-malchance .pastille-case { background: #6b1d2a; }
 .case-cagnotte .pastille-case { background: #7ddec4; }
-.case-duel .pastille-case { background: #ff9b90; }
+.case-gamble .pastille-case { background: #6a3d9a; }
 .case-depart .pastille-case,
 .case-arrivee .pastille-case { background: var(--carton); }
 
@@ -495,6 +507,47 @@
   background: #ffc21a;
 }
 
+.de-pixel {
+  width: 640px;
+  text-align: center;
+}
+
+.de-rangee {
+  margin-bottom: 16px;
+  font-family: var(--police-chiffres);
+  font-size: 40px;
+  color: #fff4dc;
+}
+
+.de-rangee span { margin: 0 8px; }
+.face-doree { color: #ffc21a; }
+
+.de-fenetre {
+  width: 220px;
+  height: 160px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #fff4dc;
+  border: 6px solid #1c1633;
+}
+
+.de-bande span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  font-family: var(--police-chiffres);
+  font-size: 128px;
+  line-height: 160px;
+  color: #1c1633;
+}
+
+.de-bande {
+  transition: transform calc(1.2s / var(--vitesse, 1)) steps(var(--pas), end);
+}
+
+.de-bande.pose { transition: none; }
+
 .de-scene {
   display: inline-block;
   position: relative;
@@ -526,6 +579,62 @@
   border-radius: 0;
   box-sizing: border-box;
   backface-visibility: hidden;
+}
+
+.roue-scene {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1400px;
+  max-width: 96%;
+}
+
+.roue-colonne { position: relative; margin-right: 32px; }
+
+.roue-pointeur {
+  position: absolute;
+  left: 244px;
+  top: 0;
+  z-index: 2;
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-top: 28px solid #ffc21a;
+}
+
+.roue-disque {
+  display: block;
+  transform-origin: 50% 50%;
+  transition: transform calc(4s / var(--vitesse, 1)) cubic-bezier(0.12, 0.6, 0.08, 1);
+}
+
+.roue-scene.reduit .roue-disque { transition-duration: 150ms; }
+
+.roue-legende {
+  width: 640px;
+  margin: 0;
+  padding: 16px;
+  list-style: none;
+  background: #14284a;
+  color: #fff4dc;
+  text-align: left;
+  font-size: 40px;
+  line-height: 1.3;
+}
+
+.roue-legende li { display: flex; align-items: center; margin-bottom: 8px; }
+.roue-legende li span { margin-right: 12px; }
+.roue-legende .icone { margin-right: 12px; }
+.roue-couleur {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #fff4dc;
+}
+
+.carte-malchance {
+  background: #3a1020;
+  --liseret: #ff8a8a;
 }
 
 .carte-effet,

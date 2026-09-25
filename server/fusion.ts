@@ -12,20 +12,49 @@ function estObjet(valeur: unknown): valeur is Record<string, unknown> {
   return !!valeur && typeof valeur === 'object' && !Array.isArray(valeur);
 }
 
+const ICONES_DE: Record<string, string> = { normal: 'de', booste: 'de-dore', super: 'super-de' };
+
+const OPTIONS_DEFAUT = [
+  { id: 'normal', nom: 'Dé normal', faces: 6, mise: 0, icone: 'de' },
+  { id: 'booste', nom: 'Dé boosté', faces: 7, mise: 5, icone: 'de-dore' },
+  { id: 'super', nom: 'Super dé', faces: 8, mise: 10, icone: 'super-de' },
+];
+
 function normaliserCourse(valeur: unknown): Course | null {
   if (!estObjet(valeur)) return null;
   if (!Array.isArray(valeur.disposition) || typeof valeur.phase !== 'string' || !estObjet(valeur.regles)) return null;
-  if (!estObjet(valeur.positions) || !Array.isArray(valeur.pioche)) return null;
+  if (!estObjet(valeur.positions)) return null;
+  if (!Array.isArray(valeur.pioche) && !estObjet(valeur.pioches)) return null;
+  valeur.disposition = valeur.disposition.map((type) => (type === 'duel' ? 'gamble' : type));
   const course = valeur as Course;
-  if (!Array.isArray(course.defausse)) course.defausse = [];
-  if (!course.historique) course.historique = { lancers: [], mises: [], effets: [], duels: [] };
+  if (!course.pioches || !Array.isArray(course.pioches.chance) || !Array.isArray(course.pioches.malchance)) {
+    course.pioches = { chance: [], malchance: [] };
+  }
+  if (!course.defausses || !Array.isArray(course.defausses.chance) || !Array.isArray(course.defausses.malchance)) {
+    course.defausses = { chance: [], malchance: [] };
+  }
+  if (!course.historique || !Array.isArray(course.historique.lancers)) {
+    course.historique = { lancers: [], effets: [], instantanes: [] };
+  }
+  if (!Array.isArray(course.historique.effets) || course.historique.effets.some((effet) => !effet || typeof effet.gpGagnes !== 'number')) {
+    course.historique.effets = [];
+  }
+  if (!Array.isArray(course.historique.instantanes)) course.historique.instantanes = [];
   if (!Array.isArray(course.arrivees)) course.arrivees = [];
-  if (!Array.isArray(course.regles.probasMiseMax) || course.regles.probasMiseMax.length !== 6) {
-    course.regles.probasMiseMax = [1 / 12, 7 / 60, 3 / 20, 11 / 60, 13 / 60, 1 / 4];
+  if (!Array.isArray(course.regles.optionsDe) || course.regles.optionsDe.length === 0) {
+    course.regles.optionsDe = OPTIONS_DEFAUT.map((option) => ({ ...option }));
+  }
+  for (const option of course.regles.optionsDe) {
+    if (typeof option.icone !== 'string' || option.icone === '') option.icone = ICONES_DE[option.id] ?? 'de';
   }
   for (const lancer of course.historique.lancers) {
     if (typeof lancer.mise !== 'number') lancer.mise = 0;
-    if (typeof lancer.esperance !== 'number') lancer.esperance = 3.5;
+    if (typeof lancer.faces !== 'number') lancer.faces = 6;
+    if (typeof lancer.esperance !== 'number') lancer.esperance = (lancer.faces + 1) / 2;
+    if (typeof lancer.option !== 'string') lancer.option = null;
+  }
+  if (course.etape && course.etape.genre !== 'lancer' && course.etape.genre !== 'roue') {
+    course.etape = { genre: 'lancer' };
   }
   const phase = course.phase as string;
   if (phase === 'mises' || phase === 'revelation') {
@@ -39,6 +68,18 @@ function normaliserCourse(valeur: unknown): Course | null {
   if (typeof course.grilleVisible !== 'boolean') course.grilleVisible = false;
   if (typeof course.ecranMini !== 'string') course.ecranMini = null;
   if (typeof course.resultatsSaisis !== 'boolean') course.resultatsSaisis = false;
+  if (typeof course.dernierTour !== 'boolean') course.dernierTour = false;
+  if (
+    !course.ceremonie ||
+    (course.ceremonie.etape !== 'podium' &&
+      course.ceremonie.etape !== 'trophees' &&
+      course.ceremonie.etape !== 'classement' &&
+      course.ceremonie.etape !== 'gagnant') ||
+    !Array.isArray(course.ceremonie.tirage) ||
+    typeof course.ceremonie.reveles !== 'number'
+  ) {
+    course.ceremonie = null;
+  }
   if (
     !course.minuteur ||
     (course.minuteur.etat !== 'arrete' && course.minuteur.etat !== 'enCours' && course.minuteur.etat !== 'enPause')

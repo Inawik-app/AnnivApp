@@ -32,6 +32,13 @@ export type ResultatReduction =
   | { ok: true; etat: EtatJeu; effets: Effet[]; prochainIdEvenement: number }
   | { ok: false; erreur: string };
 
+function sourceAjout(valeur: unknown): string {
+  if (typeof valeur !== 'string') return 'manuel';
+  const texte = valeur.trim();
+  if (!/^[a-z0-9-]{1,32}$/.test(texte)) return 'manuel';
+  return texte;
+}
+
 const ACTIONS_HOTE = new Set<Action['type']>([
   'ajouterGP',
   'revelerMasquees',
@@ -152,6 +159,10 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
     libelle: string,
     donnees: Record<string, unknown> = {},
   ) => {
+    if (ctx.simulation) {
+      prochain += 1;
+      return;
+    }
     const evenement: Evenement = {
       id: prochain,
       type,
@@ -208,11 +219,12 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
         const groupe = controlerGroupe(action.groupeRevelation);
         if (!joueur || !montant.ok || !libelle.ok || !groupe.ok) return;
         const masquee = action.masquee === true;
+        const source = sourceAjout(action.source);
         draft.transactions.push({
           id: ctx.id(),
           joueurId: joueur.id,
           montant: montant.montant,
-          source: 'manuel',
+          source,
           libelle: libelle.libelle,
           horodatage: ctx.maintenant,
           masquee,

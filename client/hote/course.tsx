@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { Action, VueHote } from '../../shared/types';
 import { Bouton, Tuile } from '../commun/composants';
 import { etapeSuivante, textePhase } from '../commun/course-texte';
@@ -9,10 +9,88 @@ const NOMS_CASES: Record<string, string> = {
   depart: 'Départ',
   bonus: 'Bonus',
   chance: 'Chance',
+  malchance: 'Malchance',
   cagnotte: 'Cagnotte',
-  duel: 'Duel',
+  gamble: 'Gamble',
   arrivee: 'Arrivée',
 };
+
+function messageMasques(nombre: number): string {
+  if (nombre <= 1) return "1 gain masqué n'est pas révélé";
+  return `${nombre} gains masqués ne sont pas révélés`;
+}
+
+function CeremonieHote({
+  vue,
+  envoi,
+  agir,
+}: {
+  vue: VueHote;
+  envoi: boolean;
+  agir: (action: Action) => void;
+}) {
+  const ceremonie = vue.course?.ceremonie;
+  if (!ceremonie) {
+    return (
+      <div class="pile">
+        {vue.nbMasquees > 0 ? (
+          <>
+            <p class="erreur" data-masquees="1">
+              {messageMasques(vue.nbMasquees)}
+            </p>
+            <div class="rangee">
+              <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'revelerMasquees' })}>
+                Révéler les gains
+              </Bouton>
+              <Bouton disabled={envoi} onClick={() => agir({ type: 'ouvrirPodium', forcer: true })}>
+                Continuer quand même
+              </Bouton>
+            </div>
+          </>
+        ) : (
+          <Bouton disabled={envoi} onClick={() => agir({ type: 'ouvrirPodium' })}>
+            Afficher le podium
+          </Bouton>
+        )}
+      </div>
+    );
+  }
+  const restants = ceremonie.suivants;
+  return (
+    <div class="pile" data-ceremonie-hote={ceremonie.etape}>
+      {ceremonie.etape === 'podium' ? (
+        <Bouton disabled={envoi} onClick={() => agir({ type: 'tirerTrophees' })}>
+          Tirer les trophées
+        </Bouton>
+      ) : null}
+      {ceremonie.reveles.length > 0 || restants.length > 0 ? (
+        <ul class="liste-trophees">
+          {ceremonie.reveles.map((trophee) => (
+            <li key={trophee.id}>Révélé : {trophee.nom}</li>
+          ))}
+          {restants.map((trophee) => (
+            <li key={trophee.id}>{trophee.nom}</li>
+          ))}
+        </ul>
+      ) : null}
+      {ceremonie.etape === 'trophees' && restants.length > 0 ? (
+        <Bouton disabled={envoi} onClick={() => agir({ type: 'revelerTrophee' })}>
+          Trophée suivant
+        </Bouton>
+      ) : null}
+      {ceremonie.etape === 'trophees' && restants.length === 0 && !ceremonie.classementRevele ? (
+        <Bouton disabled={envoi} onClick={() => agir({ type: 'revelerClassement' })}>
+          Révéler le classement
+        </Bouton>
+      ) : null}
+      {ceremonie.classementRevele && !ceremonie.gagnantRevele ? (
+        <Bouton disabled={envoi} onClick={() => agir({ type: 'revelerGagnant' })}>
+          Révéler le gagnant
+        </Bouton>
+      ) : null}
+    </div>
+  );
+}
 
 export function PanneauCourse({
   vue,
@@ -23,16 +101,11 @@ export function PanneauCourse({
   envoi: boolean;
   agir: (action: Action) => void;
 }) {
-  const [miseLancer, setMiseLancer] = useState(0);
   const [positions, setPositions] = useState<Record<string, string>>({});
   const [confirmerFin, setConfirmerFin] = useState(false);
   const course = vue.course;
   const pseudos = new Map(vue.joueurs.map((joueur) => [joueur.id, joueur.pseudo]));
   const suite = course ? etapeSuivante(course) : null;
-  const cleLancer = `${course?.tour ?? 0}|${course?.joueurCourantId ?? ''}`;
-  useEffect(() => {
-    setMiseLancer(0);
-  }, [cleLancer]);
   const joueurs = [...vue.joueurs].sort((a, b) => a.rejointA - b.rejointA || a.pseudo.localeCompare(b.pseudo, 'fr'));
 
   return (
@@ -50,7 +123,10 @@ export function PanneauCourse({
       ) : null}
       {course ? (
         <Tuile taille="petite" className="pile">
-          <p>{course.tour > 0 ? `Tour ${course.tour}` : 'Préparation'} · {textePhase(course, pseudos)}</p>
+          <p>
+            {course.tour > 0 ? `Tour ${course.tour}` : 'Préparation'} · {textePhase(course, pseudos)}
+            {course.dernierTour && course.phase !== 'terminee' ? ' · Dernier tour' : ''}
+          </p>
           <p>Cagnotte : {course.cagnotte} GP</p>
           <div class="apercu-plateau" aria-hidden="true">
             {course.disposition.map((type, index) => (
@@ -95,91 +171,23 @@ export function PanneauCourse({
           {course.phase === 'deplacements' && course.etape === 'lancer' && course.joueurCourantId ? (
             <div class="pile">
               <h3>Lancer pour {pseudos.get(course.joueurCourantId) ?? 'le joueur'}</h3>
-              <label>
-                Mise
-                <input
-                  type="number"
-                  min="0"
-                  max={course.miseMax}
-                  value={miseLancer}
-                  onInput={(event) => setMiseLancer(Math.max(0, Number((event.currentTarget as HTMLInputElement).value) || 0))}
-                />
-              </label>
-              <Bouton
-                disabled={envoi}
-                onClick={() => agir({ type: 'lancerDe', mise: miseLancer })}
-              >
-                Lancer pour {pseudos.get(course.joueurCourantId) ?? 'le joueur'}
-              </Bouton>
+              {course.optionsDe.map((option) => (
+                <Bouton
+                  key={option.id}
+                  variante="secondaire"
+                  disabled={envoi}
+                  onClick={() => agir({ type: 'lancerDe', option: option.id })}
+                >
+                  {option.nom}
+                  {option.mise > 0 ? ` · ${option.mise} GP` : ' · gratuit'}
+                </Bouton>
+              ))}
             </div>
           ) : null}
-          {course.duel ? (
-            <div class="pile">
-              <h3>Duel</h3>
-              <p>
-                {pseudos.get(course.duel.joueurId) ?? 'Joueur'}
-                {course.duel.adversaireId ? ` contre ${pseudos.get(course.duel.adversaireId) ?? 'Joueur'}` : ' choisit un adversaire'}
-              </p>
-              {course.duel.defi ? <p>{course.duel.defi}</p> : null}
-              {course.duel.etape === 'adversaire' ? (
-                <div class="grille-choix">
-                  {joueurs
-                    .filter((joueur) => joueur.id !== course.duel?.joueurId)
-                    .map((joueur) => (
-                      <Bouton key={joueur.id} disabled={envoi} onClick={() => agir({ type: 'choisirAdversaire', joueurId: joueur.id })}>
-                        {joueur.pseudo}
-                      </Bouton>
-                    ))}
-                </div>
-              ) : null}
-              {course.duel.etape === 'mises' || course.duel.etape === 'resultat' ? (
-                <div>
-                  {course.duel.mises.map((mise) => (
-                    <p key={mise.joueurId}>
-                      {pseudos.get(mise.joueurId) ?? 'Joueur'} : {mise.montant !== undefined ? `${mise.montant} GP` : 'en attente'}
-                    </p>
-                  ))}
-                  {course.duel.etape === 'mises' ? (
-                    <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'autreDefi' })}>
-                      Un autre défi
-                    </Bouton>
-                  ) : null}
-                  {course.duel.etape === 'mises' && course.duel.mises.some((mise) => !mise.aMise) ? (
-                    <Bouton disabled={envoi} onClick={() => agir({ type: 'cloreMisesDuel' })}>
-                      Clore les mises du duel
-                    </Bouton>
-                  ) : null}
-                </div>
-              ) : null}
-              {course.duel.etape === 'resultat' && course.duel.adversaireId ? (
-                <div class="grille-choix">
-                  <Bouton disabled={envoi} onClick={() => agir({ type: 'resultatDuel', resultat: 'joueur' })}>
-                    {pseudos.get(course.duel.joueurId) ?? 'Joueur'} gagne
-                  </Bouton>
-                  <Bouton disabled={envoi} onClick={() => agir({ type: 'resultatDuel', resultat: 'adversaire' })}>
-                    {pseudos.get(course.duel.adversaireId) ?? 'Joueur'} gagne
-                  </Bouton>
-                  <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'resultatDuel', resultat: 'egalite' })}>
-                    Égalité
-                  </Bouton>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {course.etape === 'cadeau' && course.joueurCourantId ? (
-            <div class="pile">
-              <h3>Cadeau</h3>
-              <p>{course.carte ? `${course.carte.titre}. ${course.carte.texte}` : 'Choisis le bénéficiaire.'}</p>
-              <div class="grille-choix">
-                {joueurs
-                  .filter((joueur) => joueur.id !== course.joueurCourantId)
-                  .map((joueur) => (
-                    <Bouton key={joueur.id} disabled={envoi} onClick={() => agir({ type: 'choisirBeneficiaire', joueurId: joueur.id })}>
-                      {joueur.pseudo}
-                    </Bouton>
-                  ))}
-              </div>
-            </div>
+          {course.phase === 'deplacements' && course.etape === 'roue' && course.joueurCourantId && joueurs.find((joueur) => joueur.id === course.joueurCourantId)?.enLigne === false ? (
+            <Bouton disabled={envoi} onClick={() => agir({ type: 'miserRoue', montant: 0 })}>
+              Passer la roue pour {pseudos.get(course.joueurCourantId) ?? 'le joueur'}
+            </Bouton>
           ) : null}
           <h3>Corrections</h3>
           {joueurs.map((joueur) => (
@@ -201,12 +209,14 @@ export function PanneauCourse({
               </Bouton>
             </div>
           ))}
-          {course.phase === 'deplacements' && course.etape && course.duel?.etape !== 'resultat' ? (
+          {course.phase === 'deplacements' && course.etape ? (
             <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'passerJoueur' })}>
               Passer le joueur
             </Bouton>
           ) : null}
-          {confirmerFin ? (
+          {course.phase === 'terminee' ? (
+            <CeremonieHote vue={vue} envoi={envoi} agir={agir} />
+          ) : confirmerFin ? (
             <div class="rangee">
               <Bouton
                 variante="danger"

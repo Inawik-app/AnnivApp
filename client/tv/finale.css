@@ -1,0 +1,142 @@
+.finale {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 96px;
+  text-align: center;
+}
+
+.finale-titre {
+  margin: 0 0 24px;
+  font-size: 64px;
+  line-height: 1.2;
+}
+
+.finale-detail,
+.finale-phrase,
+.finale-nom,
+.finale-rang,
+.roulement-nom {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.3;
+}
+
+.finale-phrase {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.finale-rangee,
+.finale-colonne {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.finale-colonne {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.finale-fiche {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 24px;
+}
+
+.finale-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.finale-gagnant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.finale-confettis {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.finale-confettis img {
+  margin: 0 24px;
+  animation: confettis-finale 1.2s steps(4, end) infinite;
+}
+
+.roulement-cadre {
+  height: 64px;
+  overflow: hidden;
+  margin-top: 32px;
+}
+
+.roulement-bande {
+  display: flex;
+  flex-direction: column;
+}
+
+.roulement-cadre.actif .roulement-bande {
+  animation: roulement-noms 0.8s steps(4, end) infinite;
+}
+
+.roulement-nom {
+  height: 64px;
+  line-height: 64px;
+}
+
+@keyframes roulement-noms {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes confettis-finale {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-16px);
+    opacity: 0.4;
+  }
+}
+
+.animations-reduites .roulement-cadre.actif .roulement-bande,
+.animations-reduites .finale-confettis img {
+  animation: none;
+}
+
+.bandeau-dernier-tour {
+  position: absolute;
+  left: 420px;
+  right: 96px;
+  bottom: 24px;
+  z-index: 6;
+  height: 80px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff5a36;
+  color: #1c1633;
+  border: 4px solid #1c1633;
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+}

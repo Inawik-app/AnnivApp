@@ -1,0 +1,116 @@
+{
+  "nombreCeremonie": 4,
+  "trophees": [
+  {
+    "id": "malchanceux",
+    "nom": "Le plus malchanceux",
+    "description": "L'indice de chance au dé le plus bas, avec au moins 3 lancers",
+    "icone": "trophee-malchanceux",
+    "critere": "indiceChance",
+    "sens": "minimum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} par lancer en moyenne"
+  },
+  {
+    "id": "poissard",
+    "nom": "Le poissard",
+    "description": "Le plus de cartes malchance subies",
+    "icone": "chat-noir",
+    "critere": "cartesMalchance",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} cartes malchance"
+  },
+  {
+    "id": "marche-arriere",
+    "nom": "Marche arrière",
+    "description": "Le plus de cases reculées",
+    "icone": "ecrevisse",
+    "critere": "casesReculees",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} cases en arrière"
+  },
+  {
+    "id": "genereux",
+    "nom": "Le plus généreux",
+    "description": "Le plus de GP donnés aux autres joueurs",
+    "icone": "trophee-genereux",
+    "critere": "gpDonnes",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} GP donnés"
+  },
+  {
+    "id": "pas-verni",
+    "nom": "Pas verni aux jeux",
+    "description": "Le moins de GP gagnés hors plateau",
+    "icone": "manette-cassee",
+    "critere": "gpHorsPlateau",
+    "sens": "minimum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} GP hors plateau"
+  },
+  {
+    "id": "dernier-pingpong",
+    "nom": "Dernier au ping-pong",
+    "description": "Le moins de points au tournoi de ping-pong",
+    "icone": "trophee-dernier-pingpong",
+    "critere": "pingpong",
+    "sens": "minimum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} points au ping-pong"
+  },
+  {
+    "id": "flambeur",
+    "nom": "Le flambeur",
+    "description": "Le plus de GP misés à la roue",
+    "icone": "machine-a-sous",
+    "critere": "misesRoue",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} GP misés à la roue"
+  },
+  {
+    "id": "prudent",
+    "nom": "Le prudent",
+    "description": "Le moins de GP misés au total, dé et roue",
+    "icone": "trophee-prudent",
+    "critere": "misesTotales",
+    "sens": "minimum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} GP misés"
+  },
+  {
+    "id": "touriste",
+    "nom": "Le touriste",
+    "description": "Dernier arrivé sur le plateau",
+    "icone": "trophee-touriste",
+    "critere": "rangArrivee",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : arrivé {valeur}"
+  },
+  {
+    "id": "contre-attentes",
+    "nom": "Contre toutes attentes",
+    "description": "La plus grande remontée dans la course",
+    "icone": "trophee-audacieux",
+    "iconeLegendaire": "couronne-flammes",
+    "critere": "remontee",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} places reprises"
+  },
+  {
+    "id": "retour-gagnant",
+    "nom": "Retour gagnant",
+    "description": "Le plus de places gagnées au classement GP entre la mi-partie et la fin",
+    "icone": "fleche-montante",
+    "critere": "placesGp",
+    "sens": "maximum",
+    "montant": 12,
+    "phrase": "{noms} : {valeur} places au classement GP"
+  }
+  ]
+}

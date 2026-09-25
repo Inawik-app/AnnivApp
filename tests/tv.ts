@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { chromium, type Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
+import { portionsRoue } from '../shared/roue';
+import { lireRoue } from '../server/course-config';
 import type { Action } from '../shared/types';
 import {
   CODE_HOTE,
@@ -601,6 +603,243 @@ async function verifierFormatPlateau(page: Page, reference: string, moment: stri
   if (format !== reference) throw new Error(`Le plateau change de format ${moment} : ${reference} devient ${format}`);
 }
 
+async function capturesDesEtRoue(browser: Browser, captures: string): Promise<void> {
+  const { serveur, dossier } = await ouvrirServeur({
+    desForces: [2, 3, 4],
+    tiragesForces: { cartes: ['tournee', 'en-avant'], roue: ['jackpot'] },
+    disposition: ['depart', 'bonus', 'malchance', 'gamble', 'chance', 'arrivee'],
+  }, true);
+  const sockets: Participant[] = [];
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const telephone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    const hote = await connecter(serveur.url, 'hote', { codeHote: CODE_HOTE });
+    sockets.push(hote);
+    const agirHote = async (action: Action) => {
+      const reponse = await agir(hote, action);
+      if (!reponse.ok) throw new Error(reponse.erreur);
+    };
+    const fiches = [
+      { pseudo: 'Lina', avatar: 'perso-planete' },
+      { pseudo: 'Inès', avatar: 'perso-verre-eau' },
+      { pseudo: 'Noé', avatar: 'perso-piment' },
+    ];
+    const joueurs: Participant[] = [];
+    for (const fiche of fiches) {
+      const joueur = await connecter(serveur.url, 'joueur');
+      sockets.push(joueur);
+      const reponse = await agir(joueur, { type: 'rejoindre', pseudo: fiche.pseudo, avatar: fiche.avatar });
+      if (!reponse.ok || !reponse.joueurId || !reponse.jeton) throw new Error(reponse.ok ? 'Joueur sans id' : reponse.erreur);
+      joueur.joueurId = reponse.joueurId;
+      joueur.jeton = reponse.jeton;
+      joueur.pseudo = fiche.pseudo;
+      joueurs.push(joueur);
+      await agirHote({ type: 'ajouterGP', joueurId: joueur.joueurId, montant: 30, libelle: 'Départ' });
+    }
+    const ines = joueurs.find((joueur) => joueur.pseudo === 'Inès');
+    const noe = joueurs.find((joueur) => joueur.pseudo === 'Noé');
+    const lina = joueurs.find((joueur) => joueur.pseudo === 'Lina');
+    if (!ines?.jeton || !noe || !lina) throw new Error('Inès, Noé ou Lina est absent');
+    await agirHote({ type: 'demarrerCourse' });
+    if (serveur.etat().course?.ordre[0] !== ines.joueurId) throw new Error('Inès devrait lancer en premier');
+    await agirHote({ type: 'nouveauTour' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
+    await agirHote({ type: 'passerAuxDeplacements' });
+
+    await page.goto(`${serveur.url}/tv?debug=1&vitesse=2`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-connecte="1"]').waitFor({ timeout: 20000 });
+    await page.getByText('choisit son dé').waitFor({ timeout: 20000 });
+    await telephone.addInitScript(`localStorage.setItem('gp-party.jeton', ${JSON.stringify(ines.jeton)});`);
+    await telephone.goto(`${serveur.url}/joueur`, { waitUntil: 'domcontentloaded' });
+    await telephone.locator('[data-choix-de="1"]').waitFor({ timeout: 20000 });
+    if (await telephone.locator('[data-option]').count() !== 3) throw new Error('Les trois dés devraient être proposés');
+    const choix = await telephone.locator('[data-choix-de="1"]').innerText();
+    if (!choix.includes('Dé normal') || !choix.includes('Dé boosté') || !choix.includes('Super dé')) {
+      throw new Error(`Tuiles de dé illisibles : ${choix}`);
+    }
+    if (await telephone.locator('[data-option="super"] .face-doree').count() !== 2) throw new Error('Les faces 7 et 8 devraient être dorées');
+    await telephone.locator('[data-option="normal"] img[data-icone="de"]').waitFor({ timeout: 20000 });
+    await telephone.locator('[data-option="booste"] img[data-icone="de-dore"]').waitFor({ timeout: 20000 });
+    await telephone.locator('[data-option="super"] img[data-icone="super-de"]').waitFor({ timeout: 20000 });
+    if (await telephone.locator('[data-choix-de="1"] [data-repli]').count() > 0) throw new Error('Une tuile de dé est en repli');
+    await telephone.screenshot({ path: path.join(captures, '27-de-choix.png') });
+    await page.locator('[data-zone="entete"] img[data-icone="de"]').waitFor({ timeout: 20000 });
+    await page.locator('[data-zone="entete"] img[data-icone="de-dore"]').waitFor({ timeout: 20000 });
+    await page.locator('[data-zone="entete"] img[data-icone="super-de"]').waitFor({ timeout: 20000 });
+    if (await page.locator('[data-zone="entete"] [data-repli]').count() > 0) throw new Error("L'en-tête du dé est en repli");
+    await page.locator('[data-case="2"] img[data-icone="chat-noir"]').waitFor({ timeout: 20000 });
+    await page.locator('[data-case="3"] img[data-icone="roue"]').waitFor({ timeout: 20000 });
+    if (await page.locator('[data-case="2"] [data-repli], [data-case="3"] [data-repli]').count() > 0) {
+      throw new Error('Une case du plateau est en repli');
+    }
+    await page.locator('[data-case="2"]').screenshot({ path: path.join(captures, '32-case-malchance.png') });
+    await page.locator('[data-case="3"]').screenshot({ path: path.join(captures, '33-case-gamble.png') });
+
+    const lancer = await agir(ines, { type: 'lancerDe', option: 'super' });
+    if (!lancer.ok) throw new Error(lancer.erreur);
+    await page.locator('[data-de="super"]').waitFor({ timeout: 20000 });
+    if (await page.locator('[data-de="super"] [data-dore="1"]').count() !== 2) throw new Error('Le super dé devrait montrer 7 et 8 en doré');
+    await page.screenshot({ path: path.join(captures, '28-super-de.png') });
+    await page.locator('.carte-malchance img[data-icone="chopes"]').waitFor({ timeout: 20000 });
+    const carte = await page.locator('.carte-malchance').innerText();
+    if (!carte.includes('Tournée générale')) throw new Error(`Carte inattendue : ${carte}`);
+    if (await page.locator('.carte-malchance [data-repli]').count() > 0) throw new Error('La carte malchance est en repli');
+    await page.screenshot({ path: path.join(captures, '29-malchance.png') });
+    await page.screenshot({ path: path.join(captures, '30-tournee.png') });
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+
+    const second = await agir(noe, { type: 'lancerDe', option: 'normal' });
+    if (!second.ok) throw new Error(second.erreur);
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    const mise = await agir(noe, { type: 'miserRoue', montant: 10 });
+    if (!mise.ok) throw new Error(mise.erreur);
+    await page.locator('[data-roue="1"]').waitFor({ timeout: 20000 });
+    const brut = await page.evaluate(
+      new Function(`
+        const liste = Array.from(document.querySelectorAll('[data-roue="1"] [data-option]'));
+        return liste.map((el) => el.getAttribute('data-option') + '=' + el.getAttribute('data-angle')).join('|');
+      `) as () => string,
+    );
+    const mesures = brut.split('|').filter(Boolean).map((entree) => {
+      const [id, angle] = entree.split('=');
+      return { id: id ?? '', angle: Number(angle) };
+    });
+    const roue = lireRoue(process.cwd());
+    const attendus = new Map(portionsRoue(roue.options).map((portion) => [portion.id, portion.angle]));
+    if (mesures.length !== roue.options.length) throw new Error(`${mesures.length} portions au lieu de ${roue.options.length}`);
+    for (const mesure of mesures) {
+      const attendu = attendus.get(mesure.id ?? '');
+      if (attendu === undefined || Math.abs(mesure.angle - attendu) > 1) {
+        throw new Error(`Angle de ${mesure.id ?? '?'} : ${mesure.angle} au lieu de ${attendu ?? 'absent'}`);
+      }
+    }
+    const legende = await page.locator('.roue-legende').innerText();
+    if (!legende.includes('Jackpot') || !legende.includes('15')) throw new Error('La légende de la roue est incomplète');
+    for (const nom of ['trophee-audacieux', 'parchemin-pacte', 'sac-argent', 'machine-a-sous']) {
+      if (await page.locator(`.roue-legende img[data-icone="${nom}"]`).count() !== 1) {
+        throw new Error(`La légende n'affiche pas ${nom}`);
+      }
+    }
+    if (await page.locator('.roue-legende img[data-icone]').count() !== 4) throw new Error('La légende devrait montrer quatre icônes');
+    if (await page.locator('.roue-legende [data-repli], [data-roue="1"] [data-repli]').count() > 0) throw new Error('La roue est en repli');
+    await page.screenshot({ path: path.join(captures, '31-roue.png') });
+    await page.locator('.carte-effet img[data-icone="machine-a-sous"]').waitFor({ timeout: 20000 });
+    if (await page.locator('.carte-effet [data-repli]').count() > 0) throw new Error('Le bandeau de la roue est en repli');
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+
+    const troisieme = await agir(lina, { type: 'lancerDe', option: 'normal' });
+    if (!troisieme.ok) throw new Error(troisieme.erreur);
+    await page.locator('.carte-effet img[data-icone="botte-ailee"]').waitFor({ timeout: 20000 });
+    const chance = await page.locator('.carte-effet').innerText();
+    if (!chance.includes('En avant')) throw new Error(`Carte chance inattendue : ${chance}`);
+    if (await page.locator('.carte-effet [data-repli]').count() > 0) throw new Error('La carte chance est en repli');
+    await page.screenshot({ path: path.join(captures, '34-chance.png') });
+    console.log('OK     Dés, cases, cartes et roue');
+  } finally {
+    await telephone.close();
+    await page.close();
+    await fermerSession({ serveur, dossier, sockets: sockets.map((participant) => participant.socket) });
+  }
+}
+
+async function capturesFinale(browser: Browser, captures: string): Promise<void> {
+  const { serveur, dossier } = await ouvrirServeur({
+    desForces: [2, 2, 2],
+    disposition: ['depart', 'bonus', 'arrivee'],
+  }, true);
+  const sockets: Participant[] = [];
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const telephone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    const hote = await connecter(serveur.url, 'hote', { codeHote: CODE_HOTE });
+    sockets.push(hote);
+    const agirHote = async (action: Action) => {
+      const reponse = await agir(hote, action);
+      if (!reponse.ok) throw new Error(reponse.erreur);
+    };
+    const fiches = [
+      { pseudo: 'Lina', avatar: 'perso-planete', montant: 30 },
+      { pseudo: 'Inès', avatar: 'perso-verre-eau', montant: 50 },
+      { pseudo: 'Noé', avatar: 'perso-piment', montant: 40 },
+    ];
+    const joueurs: Participant[] = [];
+    for (const fiche of fiches) {
+      const joueur = await connecter(serveur.url, 'joueur');
+      sockets.push(joueur);
+      const reponse = await agir(joueur, { type: 'rejoindre', pseudo: fiche.pseudo, avatar: fiche.avatar });
+      if (!reponse.ok || !reponse.joueurId || !reponse.jeton) throw new Error(reponse.ok ? 'Joueur sans id' : reponse.erreur);
+      joueur.joueurId = reponse.joueurId;
+      joueur.jeton = reponse.jeton;
+      joueur.pseudo = fiche.pseudo;
+      joueurs.push(joueur);
+      await agirHote({ type: 'ajouterGP', joueurId: joueur.joueurId, montant: fiche.montant, libelle: 'Départ' });
+    }
+    const ines = joueurs.find((joueur) => joueur.pseudo === 'Inès');
+    const noe = joueurs.find((joueur) => joueur.pseudo === 'Noé');
+    const lina = joueurs.find((joueur) => joueur.pseudo === 'Lina');
+    if (!ines?.jeton || !noe || !lina) throw new Error('Joueurs absents');
+    await agirHote({ type: 'demarrerCourse' });
+    if (serveur.etat().course?.ordre[0] !== ines.joueurId) throw new Error('Inès devrait passer en premier');
+    await agirHote({ type: 'nouveauTour' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
+    await agirHote({ type: 'passerAuxDeplacements' });
+    await page.goto(`${serveur.url}/tv?debug=1&vitesse=2`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-connecte="1"]').waitFor({ timeout: 20000 });
+    await telephone.addInitScript(`localStorage.setItem('gp-party.jeton', ${JSON.stringify(ines.jeton)});`);
+    await telephone.goto(`${serveur.url}/joueur`, { waitUntil: 'domcontentloaded' });
+    const lancer = await agir(ines, { type: 'lancerDe', option: 'normal' });
+    if (!lancer.ok) throw new Error(lancer.erreur);
+    await page.locator('[data-bandeau="dernier-tour"]').waitFor({ timeout: 20000 });
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    const bandeau = await page.locator('[data-bandeau="dernier-tour"]').innerText();
+    if (!bandeau.includes('Dernier tour !')) throw new Error(`Bandeau inattendu : ${bandeau}`);
+    await page.screenshot({ path: path.join(captures, '35-dernier-tour.png') });
+    const suiteNoe = await agir(noe, { type: 'lancerDe', option: 'normal' });
+    if (!suiteNoe.ok) throw new Error(suiteNoe.erreur);
+    const suiteLina = await agir(lina, { type: 'lancerDe', option: 'normal' });
+    if (!suiteLina.ok) throw new Error(suiteLina.erreur);
+    if (serveur.etat().course?.phase !== 'terminee') throw new Error('La course devrait être terminée');
+    if ((serveur.etat().course?.arrivees.length ?? 0) < 2) throw new Error('Plusieurs joueurs devraient être arrivés');
+    await agirHote({ type: 'ouvrirPodium' });
+    await page.locator('[data-ceremonie="podium"]').waitFor({ timeout: 20000 });
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    await verifierTextes(page);
+    await page.screenshot({ path: path.join(captures, '36-podium-course.png') });
+    await telephone.getByText('Regarde la télé !').waitFor({ timeout: 20000 });
+    await agirHote({ type: 'tirerTrophees' });
+    const secret = await page.locator('[data-ecran="finale"]').innerText();
+    if (secret.includes('Le touriste')) throw new Error('Le trophée apparaît avant sa révélation');
+    await agirHote({ type: 'revelerTrophee' });
+    await page.locator('[data-ceremonie="trophee"][data-phase="gagnants"]').waitFor({ timeout: 20000 });
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    await verifierTextes(page);
+    const trophee = await page.locator('[data-ceremonie="trophee"]').innerText();
+    if (!trophee.includes('Le touriste') || !trophee.includes('Lina')) throw new Error(`Trophée inattendu : ${trophee}`);
+    await page.screenshot({ path: path.join(captures, '37-trophee.png') });
+    await agirHote({ type: 'revelerClassement' });
+    await page.locator('[data-ceremonie="classement"][data-complet="1"]').waitFor({ timeout: 20000 });
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    await verifierTextes(page);
+    await page.screenshot({ path: path.join(captures, '38-classement.png') });
+    await telephone.getByText('Tu es').waitFor({ timeout: 20000 });
+    await agirHote({ type: 'revelerGagnant' });
+    await page.locator('[data-ceremonie="gagnant"][data-revele="1"]').waitFor({ timeout: 20000 });
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    await verifierTextes(page);
+    const gagnant = await page.locator('[data-ceremonie="gagnant"]').innerText();
+    if (!gagnant.includes('remporte le bon de 20 €') || !gagnant.includes('Inès')) throw new Error(`Gagnant inattendu : ${gagnant}`);
+    if (await page.locator('[data-ceremonie="gagnant"] img[data-icone="trophee"]').count() < 1) throw new Error('Le trophée du gagnant manque');
+    if (await page.locator('[data-ceremonie="gagnant"] img[data-icone="confettis"]').count() < 1) throw new Error('Les confettis manquent');
+    await page.screenshot({ path: path.join(captures, '39-gagnant.png') });
+    await telephone.locator('[data-celebration="1"]').waitFor({ timeout: 20000 });
+    console.log('OK     Dernier tour, podium, trophée, classement et gagnant');
+  } finally {
+    await telephone.close();
+    await page.close();
+    await fermerSession({ serveur, dossier, sockets: sockets.map((participant) => participant.socket) });
+  }
+}
+
 async function main(): Promise<void> {
   const debut = Date.now();
   const captures = path.join(process.cwd(), 'test-results', 'tv');
@@ -650,7 +889,7 @@ async function main(): Promise<void> {
     }
     await page.getByText('Maximilien-Alexandre').first().waitFor({ timeout: 20000 });
     await page.locator('.flip-inner.revele').nth(3).waitFor({ timeout: 20000 });
-    await page.waitForTimeout(500);
+    await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
     await verifierRendu(page);
     await page.screenshot({ path: path.join(captures, '15-accueil.png') });
     await agirHote({ type: 'choisirEcranTv', ecran: 'scores' });
@@ -707,10 +946,10 @@ async function main(): Promise<void> {
     await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
     await agirHote({ type: 'passerAuxDeplacements' });
     await page.getByText('À Inès de jouer').waitFor({ timeout: 20000 });
-    await page.getByText('choisit sa mise').waitFor({ timeout: 20000 });
+    await page.getByText('choisit son dé').waitFor({ timeout: 20000 });
     const mise = await texteEntete(page);
-    if (!mise.includes('Inès')) throw new Error(`En-tête de la mise : ${mise}`);
-    await verifierFormatPlateau(page, formatDepart, 'pendant le choix de la mise');
+    if (!mise.includes('Inès')) throw new Error(`En-tête du dé : ${mise}`);
+    await verifierFormatPlateau(page, formatDepart, 'pendant le choix du dé');
 
     const saut = (async () => {
       await page.waitForFunction(() => {
@@ -742,16 +981,16 @@ async function main(): Promise<void> {
         }
       }`);
     })();
-    const pendantDe = page.getByText('Mise : 0 GP').waitFor({ timeout: 20000 })
+    const pendantDe = page.getByText('lance le dé normal').waitFor({ timeout: 20000 })
       .then(() => verifierFormatPlateau(page, formatDepart, 'pendant le dé'));
-    const lancer = await agir(ines, { type: 'lancerDe', mise: 0 });
+    const lancer = await agir(ines, { type: 'lancerDe', option: 'normal' });
     if (!lancer.ok) throw new Error(lancer.erreur);
     await pendantDe;
     await saut;
     await verifierFormatPlateau(page, formatDepart, 'après le saut');
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
 
-    const second = await agir(noe, { type: 'lancerDe', mise: 0 });
+    const second = await agir(noe, { type: 'lancerDe', option: 'normal' });
     if (!second.ok) throw new Error(second.erreur);
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
     await verifierPlateau(page, { nombreCases, groupe: { index: 3, nombre: 2 } });
@@ -767,7 +1006,7 @@ async function main(): Promise<void> {
       await page.waitForFunction(() => window.__etapeCourante?.etape === 'arrivee', undefined, { timeout: 20000 });
       await page.screenshot({ path: path.join(captures, '04-arrivee.png') });
     })();
-    const dernier = await agir(ines, { type: 'lancerDe', mise: 0 });
+    const dernier = await agir(ines, { type: 'lancerDe', option: 'normal' });
     if (!dernier.ok) throw new Error(dernier.erreur);
     await arrivee;
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
@@ -808,6 +1047,9 @@ async function main(): Promise<void> {
     }
 
     const attendreFile = () => page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    // L'arrivée a ouvert le dernier tour. On l'annule pour garder la course ouverte pendant les écrans suivants.
+    await agirHote({ type: 'annuler' });
+    await attendreFile();
     for (let essai = 0; essai < 6; essai += 1) {
       if (serveur.etat().course?.phase !== 'deplacements') break;
       await agirHote({ type: 'passerJoueur' });
@@ -1118,6 +1360,9 @@ async function main(): Promise<void> {
     const motsFin = await texteZone('undercover');
     if (!motsFin.includes(mancheUc.paire.civils) || !motsFin.includes(mancheUc.paire.undercover)) throw new Error('Les deux mots ne sont pas révélés');
     console.log('OK     Undercover : ordre de parole, civil révélé, undercover révélé, mots cachés jusqu\'à la fin');
+
+    await capturesDesEtRoue(browser, captures);
+    await capturesFinale(browser, captures);
 
     console.log('OK     Fiches et cagnotte dans les coins, plateau hors des bandes, icône plus grande que le numéro');
     console.log('OK     Pions dans leur case, numéros visibles');

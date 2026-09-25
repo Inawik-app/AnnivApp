@@ -83,6 +83,7 @@ describe('vues', () => {
     expect(aCle(hote, 'jeton')).toBe(false);
     expect(aCle(hote, 'codeHote')).toBe(false);
     expect(vueMira.moi?.gpVisibles).toBe(5);
+    expect(hote.erreursConfig).toEqual([]);
   });
 
   it('garde l’ordre d’arrivée et calcule le rang à part', () => {

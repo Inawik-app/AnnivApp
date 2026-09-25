@@ -1,53 +1,101 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CarteChance, ConfigPlateau, EffetCarte, TypeCase } from '../shared/types';
+import type { ConfigRoue, OptionRoue } from '../shared/roue';
+import { lireTrophees, type CatalogueTrophees } from '../shared/trophees';
+import type { CarteChance, ConfigPlateau, EffetCarte, FamilleCarte, OptionDe, TypeCase } from '../shared/types';
 import { dispositionValide } from './plateau';
 
 function estObjet(valeur: unknown): valeur is Record<string, unknown> {
   return !!valeur && typeof valeur === 'object' && !Array.isArray(valeur);
 }
 
-const TYPES = new Set<TypeCase>(['depart', 'bonus', 'chance', 'cagnotte', 'duel', 'arrivee']);
+const TYPES_CASES: TypeCase[] = ['depart', 'bonus', 'chance', 'malchance', 'cagnotte', 'gamble', 'arrivee'];
+const TYPES = new Set<TypeCase>(TYPES_CASES);
+
+function lireIcone(entree: Record<string, unknown>, fichier: string, id: string): string {
+  if (typeof entree.icone !== 'string' || entree.icone.trim() === '') {
+    throw new Error(`config/${fichier} : ${id} : icône manquante`);
+  }
+  return entree.icone.trim();
+}
+
+function entierPositif(valeur: unknown): valeur is number {
+  return typeof valeur === 'number' && Number.isInteger(valeur) && valeur > 0;
+}
 
 function lireEffet(brut: unknown): EffetCarte | null {
   if (!estObjet(brut) || typeof brut.type !== 'string') return null;
-  if (brut.type === 'gain' || brut.type === 'gainTous' || brut.type === 'cadeau') {
-    if (typeof brut.montant !== 'number' || !Number.isInteger(brut.montant) || brut.montant < 0) return null;
+  if (brut.type === 'gain' || brut.type === 'perte' || brut.type === 'cotisation' || brut.type === 'tournee') {
+    if (!entierPositif(brut.montant)) return null;
     return { type: brut.type, montant: brut.montant };
+  }
+  if (brut.type === 'avancer' || brut.type === 'reculer') {
+    if (!entierPositif(brut.cases)) return null;
+    return { type: brut.type, cases: brut.cases };
+  }
+  if (brut.type === 'cagnotte') {
+    if (brut.sens !== 'avant' && brut.sens !== 'arriere') return null;
+    if (typeof brut.part !== 'number' || brut.part < 0 || brut.part > 1) return null;
+    return { type: 'cagnotte', sens: brut.sens, part: brut.part };
   }
   if (brut.type === 'gainDe' || brut.type === 'neutre') return { type: brut.type };
   return null;
 }
 
+function lirePaquet(racine: string, fichier: string, famille: FamilleCarte): CarteChance[] {
+  const brut: unknown = JSON.parse(fs.readFileSync(path.join(racine, 'config', fichier), 'utf8'));
+  if (!Array.isArray(brut) || brut.length === 0) throw new Error(`config/${fichier} est vide`);
+  const vues = new Set<string>();
+  return brut.map((entree) => {
+    if (!estObjet(entree) || typeof entree.id !== 'string' || typeof entree.titre !== 'string' || typeof entree.texte !== 'string') {
+      throw new Error(`Carte illisible dans ${fichier}`);
+    }
+    if (!entierPositif(entree.poids)) throw new Error(`Poids invalide pour ${entree.id}`);
+    const effet = lireEffet(entree.effet);
+    if (!effet) throw new Error(`Effet invalide pour la carte ${entree.id}`);
+    if (vues.has(entree.id)) throw new Error(`Carte en double : ${entree.id}`);
+    vues.add(entree.id);
+    return {
+      id: entree.id,
+      titre: entree.titre.trim(),
+      texte: entree.texte.trim(),
+      icone: lireIcone(entree, fichier, entree.id),
+      famille,
+      poids: entree.poids,
+      effet,
+    };
+  });
+}
+
+function lireOptions(brut: unknown): OptionDe[] {
+  if (!Array.isArray(brut) || brut.length === 0) throw new Error('optionsDe est vide');
+  const vues = new Set<string>();
+  return brut.map((entree) => {
+    if (!estObjet(entree) || typeof entree.id !== 'string' || typeof entree.nom !== 'string') {
+      throw new Error('Option de dé illisible');
+    }
+    if (!entierPositif(entree.faces) || entree.faces > 12) throw new Error(`Faces invalides pour ${entree.id}`);
+    if (typeof entree.mise !== 'number' || !Number.isInteger(entree.mise) || entree.mise < 0) {
+      throw new Error(`Mise invalide pour ${entree.id}`);
+    }
+    if (vues.has(entree.id)) throw new Error(`Dé en double : ${entree.id}`);
+    vues.add(entree.id);
+    return { id: entree.id, nom: entree.nom.trim(), faces: entree.faces, mise: entree.mise, icone: lireIcone(entree, 'plateau.json', entree.id) };
+  });
+}
+
 export function lireConfigPlateau(racine: string): ConfigPlateau {
   const brut: unknown = JSON.parse(fs.readFileSync(path.join(racine, 'config', 'plateau.json'), 'utf8'));
-  if (!estObjet(brut) || !estObjet(brut.repartition) || !estObjet(brut.duel)) {
-    throw new Error('config/plateau.json est illisible');
-  }
+  if (!estObjet(brut) || !estObjet(brut.repartition)) throw new Error('config/plateau.json est illisible');
   const longueur = brut.longueur;
   const gainBonus = brut.gainBonus;
-  const miseMax = brut.miseMax;
   const choix = brut.choixMiniJeu;
   const repartition = brut.repartition;
-  const duel = brut.duel;
   if (typeof longueur !== 'number' || longueur < 4) throw new Error('longueur du plateau invalide');
   if (typeof gainBonus !== 'number' || gainBonus < 0) throw new Error('gainBonus invalide');
-  if (typeof miseMax !== 'number' || miseMax < 0) throw new Error('miseMax invalide');
-  if (!Array.isArray(brut.probasMiseMax) || brut.probasMiseMax.length !== 6) {
-    throw new Error('probasMiseMax doit contenir 6 probabilités');
-  }
-  const probasMiseMax = brut.probasMiseMax.map((valeur) => {
-    if (typeof valeur !== 'number' || valeur < 0 || !Number.isFinite(valeur)) {
-      throw new Error('probasMiseMax contient une valeur invalide');
-    }
-    return valeur;
-  });
-  const sommeProbas = probasMiseMax.reduce((total, probabilite) => total + probabilite, 0);
-  if (Math.abs(sommeProbas - 1) > 1e-4) throw new Error('probasMiseMax doit sommer à 1');
-  const probasNormalisees = probasMiseMax.map((probabilite) => probabilite / sommeProbas);
   if (choix !== 'rotation' && choix !== 'dernierAuClassement') throw new Error('choixMiniJeu invalide');
-  const nombres = ['bonus', 'chance', 'cagnotte', 'duel'] as const;
-  const compte: Record<(typeof nombres)[number], number> = { bonus: 0, chance: 0, cagnotte: 0, duel: 0 };
+  const nombres = ['bonus', 'chance', 'malchance', 'cagnotte', 'gamble'] as const;
+  const compte = { bonus: 0, chance: 0, malchance: 0, cagnotte: 0, gamble: 0 };
   for (const cle of nombres) {
     const valeur = repartition[cle];
     if (typeof valeur !== 'number' || valeur < 0 || !Number.isInteger(valeur)) {
@@ -55,18 +103,11 @@ export function lireConfigPlateau(racine: string): ConfigPlateau {
     }
     compte[cle] = valeur;
   }
-  if (compte.bonus + compte.chance + compte.cagnotte + compte.duel !== longueur - 1) {
+  if (compte.bonus + compte.chance + compte.malchance + compte.cagnotte + compte.gamble !== longueur - 1) {
     throw new Error('La répartition ne couvre pas les cases 1 à l’avant-dernière');
   }
-  if (compte.cagnotte + compte.duel > longueur - 4) {
-    throw new Error('Trop de cagnottes et de duels pour les cases autorisées');
-  }
-  if (typeof duel.miseMax !== 'number' || typeof duel.bonusVainqueur !== 'number' || !Array.isArray(duel.defis)) {
-    throw new Error('Réglage des duels invalide');
-  }
-  if (duel.bonusVainqueur < 0 || duel.miseMax < 0) throw new Error('Réglage des duels invalide');
-  const defis = duel.defis.filter((defi): defi is string => typeof defi === 'string' && defi.trim().length > 0);
-  if (defis.length === 0) throw new Error('La liste des défis est vide');
+  const optionsDe = lireOptions(brut.optionsDe);
+  const iconesCases = lireIconesCases(brut.iconesCases);
   let disposition: TypeCase[] | undefined;
   if (brut.disposition !== undefined) {
     if (!Array.isArray(brut.disposition)) throw new Error('disposition invalide');
@@ -81,29 +122,80 @@ export function lireConfigPlateau(racine: string): ConfigPlateau {
     longueur,
     repartition: compte,
     gainBonus,
-    miseMax,
-    probasMiseMax: probasNormalisees,
     choixMiniJeu: choix,
-    duel: { miseMax: duel.miseMax, bonusVainqueur: duel.bonusVainqueur, defis: defis.map((defi) => defi.trim()) },
+    optionsDe,
+    iconesCases,
     ...(disposition ? { disposition } : {}),
   };
 }
 
+function lireIconesCases(brut: unknown): Record<TypeCase, string> {
+  if (!estObjet(brut)) throw new Error('config/plateau.json : iconesCases est illisible');
+  const resultat = {} as Record<TypeCase, string>;
+  for (const type of TYPES_CASES) {
+    const entree = brut[type];
+    if (!estObjet(entree)) throw new Error(`config/plateau.json : ${type} : icône manquante`);
+    resultat[type] = lireIcone(entree, 'plateau.json', type);
+  }
+  return resultat;
+}
+
 export function lireCartesChance(racine: string): CarteChance[] {
-  const brut: unknown = JSON.parse(fs.readFileSync(path.join(racine, 'config', 'cartes-chance.json'), 'utf8'));
-  if (!Array.isArray(brut) || brut.length === 0) throw new Error('config/cartes-chance.json est vide');
+  return lirePaquet(racine, 'cartes-chance.json', 'chance');
+}
+
+export function lireCartesMalchance(racine: string): CarteChance[] {
+  return lirePaquet(racine, 'cartes-malchance.json', 'malchance');
+}
+
+export function lireRoue(racine: string): ConfigRoue {
+  const brut: unknown = JSON.parse(fs.readFileSync(path.join(racine, 'config', 'roue.json'), 'utf8'));
+  if (!estObjet(brut) || !Array.isArray(brut.options) || brut.options.length === 0) {
+    throw new Error('config/roue.json est illisible');
+  }
   const vues = new Set<string>();
-  return brut.map((entree) => {
-    if (!estObjet(entree) || typeof entree.id !== 'string' || typeof entree.titre !== 'string' || typeof entree.texte !== 'string') {
-      throw new Error('Carte chance invalide');
+  const options: OptionRoue[] = brut.options.map((entree) => {
+    if (!estObjet(entree) || typeof entree.id !== 'string' || typeof entree.nom !== 'string' || typeof entree.couleur !== 'string') {
+      throw new Error('Option de roue illisible');
     }
-    const effet = lireEffet(entree.effet);
-    if (!effet) throw new Error(`Effet invalide pour la carte ${entree.id}`);
-    if (vues.has(entree.id)) throw new Error(`Carte chance en double : ${entree.id}`);
+    if (typeof entree.probabilite !== 'number' || !Number.isInteger(entree.probabilite) || entree.probabilite <= 0) {
+      throw new Error(`Probabilité invalide pour ${entree.id}`);
+    }
+    if (typeof entree.multiplicateur !== 'number' || entree.multiplicateur < 0) {
+      throw new Error(`Multiplicateur invalide pour ${entree.id}`);
+    }
+    if (vues.has(entree.id)) throw new Error(`Option de roue en double : ${entree.id}`);
     vues.add(entree.id);
-    if ((effet.type === 'gain' || effet.type === 'gainTous' || effet.type === 'cadeau') && effet.montant < 0) {
-      throw new Error(`La carte ${entree.id} retire des GP`);
+    const option: OptionRoue = {
+      id: entree.id,
+      nom: entree.nom.trim(),
+      probabilite: entree.probabilite,
+      multiplicateur: entree.multiplicateur,
+      couleur: entree.couleur,
+    };
+    if (entree.avance !== undefined) {
+      if (!entierPositif(entree.avance)) throw new Error(`Avance invalide pour ${entree.id}`);
+      option.avance = entree.avance;
     }
-    return { id: entree.id, titre: entree.titre.trim(), texte: entree.texte.trim(), effet };
+    if (entree.recule !== undefined) {
+      if (!entierPositif(entree.recule)) throw new Error(`Recul invalide pour ${entree.id}`);
+      option.recule = entree.recule;
+    }
+    if (entree.partCagnotte !== undefined) {
+      if (typeof entree.partCagnotte !== 'number' || entree.partCagnotte < 0 || entree.partCagnotte > 1) {
+        throw new Error(`Part de cagnotte invalide pour ${entree.id}`);
+      }
+      option.partCagnotte = entree.partCagnotte;
+    }
+    if (entree.icone !== undefined) option.icone = lireIcone(entree, 'roue.json', entree.id);
+    return option;
   });
+  const somme = options.reduce((total, option) => total + option.probabilite, 0);
+  if (somme !== 100) throw new Error(`Les probabilités de la roue somment à ${somme}, pas à 100`);
+  return { options };
+}
+
+export function lireCatalogueTrophees(racine: string): CatalogueTrophees {
+  const brut: unknown = JSON.parse(fs.readFileSync(path.join(racine, 'config', 'trophees.json'), 'utf8'));
+  return lireTrophees(brut);
 }

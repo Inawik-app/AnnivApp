@@ -13,7 +13,7 @@ export function melanger<T>(liste: readonly T[], alea: Alea): T[] {
   return copie;
 }
 
-const TYPES: TypeCase[] = ['depart', 'bonus', 'chance', 'cagnotte', 'duel', 'arrivee'];
+const TYPES: TypeCase[] = ['depart', 'bonus', 'chance', 'malchance', 'cagnotte', 'gamble', 'arrivee'];
 
 export function dispositionValide(disposition: TypeCase[], longueur: number): string | null {
   if (disposition.length !== longueur + 1) return 'La disposition ne couvre pas le plateau';
@@ -44,17 +44,16 @@ export function genererDisposition(config: ConfigPlateau, alea: Alea): TypeCase[
   const autorises: number[] = [];
   for (let index = 4; index < longueur; index += 1) autorises.push(index);
   for (let essai = 0; essai < 80; essai += 1) {
-    const cagnottes = placerSansVoisins(autorises, config.repartition.cagnotte, alea);
-    if (!cagnottes) continue;
-    const pris = new Set(cagnottes);
-    const reste = autorises.filter((index) => !pris.has(index));
-    const duels = placerSansVoisins(reste, config.repartition.duel, alea);
-    if (!duels) continue;
+    const malchances = placerSansVoisins(autorises, config.repartition.malchance, alea);
+    if (!malchances) continue;
+    const apresMalchance = autorises.filter((index) => !malchances.includes(index));
+    const gambles = placerSansVoisins(apresMalchance, config.repartition.gamble, alea);
+    if (!gambles) continue;
     const cases: TypeCase[] = Array.from({ length: longueur + 1 }, () => 'bonus');
     cases[0] = 'depart';
     cases[longueur] = 'arrivee';
-    for (const index of cagnottes) cases[index] = 'cagnotte';
-    for (const index of duels) cases[index] = 'duel';
+    for (const index of malchances) cases[index] = 'malchance';
+    for (const index of gambles) cases[index] = 'gamble';
     const vides: number[] = [];
     for (let index = 1; index < longueur; index += 1) {
       if (cases[index] === 'bonus') vides.push(index);
@@ -62,6 +61,7 @@ export function genererDisposition(config: ConfigPlateau, alea: Alea): TypeCase[
     const remplissage: TypeCase[] = [
       ...Array.from({ length: config.repartition.bonus }, () => 'bonus' as const),
       ...Array.from({ length: config.repartition.chance }, () => 'chance' as const),
+      ...Array.from({ length: config.repartition.cagnotte }, () => 'cagnotte' as const),
     ];
     if (remplissage.length !== vides.length) continue;
     const melange = melanger(remplissage, alea);
@@ -131,17 +131,6 @@ export function calculerClassement(
     for (const joueur of groupe) suite.push(joueur.id);
   }
   return [...arrives, ...suite];
-}
-
-export function creditsDuel(
-  miseJoueur: number,
-  miseAdversaire: number,
-  resultat: 'joueur' | 'adversaire' | 'egalite',
-  bonus: number,
-): { joueur: number; adversaire: number } {
-  if (resultat === 'egalite') return { joueur: miseJoueur, adversaire: miseAdversaire };
-  if (resultat === 'joueur') return { joueur: miseJoueur + miseAdversaire + bonus, adversaire: 0 };
-  return { joueur: 0, adversaire: miseJoueur + miseAdversaire + bonus };
 }
 
 export function plafondMise(soldeVisible: number, maximum: number): number {

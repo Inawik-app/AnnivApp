@@ -4,6 +4,7 @@ import { reduire, type ContexteReduction } from './reducteur';
 import type { Action, EtatJeu, Origine } from '../shared/types';
 import { solde } from '../shared/soldes';
 import { verifierRegleOr } from './regle-or';
+import { lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,16 +21,10 @@ function contexte(): ContexteReduction {
     nbJoueursMax: 4,
     estEnLigne: () => false,
     alea: (max) => (max <= 1 ? 0 : max - 1),
-    plateau: {
-      longueur: 34,
-      repartition: { bonus: 13, chance: 9, cagnotte: 5, duel: 6 },
-      gainBonus: 5,
-      miseMax: 10,
-      probasMiseMax: [1 / 12, 7 / 60, 3 / 20, 11 / 60, 13 / 60, 1 / 4],
-      choixMiniJeu: 'rotation',
-      duel: { miseMax: 10, bonusVainqueur: 5, defis: ['Défi'] },
-    },
-    cartes: [{ id: 'bourse', titre: 'Bourse', texte: 'Tu gagnes.', effet: { type: 'gain', montant: 3 } }],
+    plateau: lireConfigPlateau(RACINE),
+    cartes: [{ id: 'bourse', titre: 'Bourse', texte: 'Tu gagnes.', icone: 'gp-piece', famille: 'chance', poids: 1, effet: { type: 'gain', montant: 3 } }],
+    cartesMalchance: lireCartesMalchance(RACINE),
+    roue: lireRoue(RACINE),
     catalogue: lireCatalogue(RACINE),
     poker: lirePoker(RACINE),
     topten: lireTopTen(RACINE),
@@ -146,5 +141,10 @@ describe('réducteur', () => {
       'Cette action retirerait des GP à un autre joueur',
     );
     expect(verifierRegleOr(avant, apres, { role: 'hote' })).toBeNull();
+    const parCarte = {
+      ...apres,
+      transactions: [{ ...apres.transactions[0]!, source: 'carte' }],
+    };
+    expect(verifierRegleOr(avant, parCarte, { role: 'joueur', joueurId: 'a' })).toBeNull();
   });
 });

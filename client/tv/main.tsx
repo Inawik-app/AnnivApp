@@ -19,6 +19,7 @@ import {
 } from '../commun/spectacle';
 import '../commun/base.css';
 import { animerPlateau, PlateauTv, type Spectacle } from './plateau';
+import { FinaleTv, jouerCeremonie, sceneDepuis, type SceneFinale } from './finale';
 import { GrilleTv, PodiumMini, PokerTv, ReglesTv } from './mini-jeux';
 import { TopTenTv, dureeRevelationTopTen } from './topten';
 import { JeopardyTv } from './jeopardy';
@@ -213,6 +214,8 @@ function EcranTv() {
   const [positions, setPositions] = useState<Record<string, number>>({});
   const [cagnotte, setCagnotte] = useState(0);
   const [spectacle, setSpectacle] = useState<Spectacle | null>(null);
+  const [sceneFinale, setSceneFinale] = useState<SceneFinale | null>(null);
+  const sceneFinaleRef = useRef<SceneFinale | null>(null);
   const [brassage, setBrassage] = useState<string[] | null>(null);
   const [lanceId, setLanceId] = useState<string | null>(null);
   const courseRef = useRef<CourseVue | null>(null);
@@ -272,6 +275,11 @@ function EcranTv() {
     joueursRef.current = liste;
     setJoueurs(liste);
   };
+  const poserScene = (course: CourseVue | null, liste: JoueurPublic[]) => {
+    const scene = sceneDepuis(course, liste);
+    sceneFinaleRef.current = scene;
+    setSceneFinale(scene);
+  };
   const poserCourse = (course: CourseVue | null) => {
     courseRef.current = course;
     setCourseAffichee(course);
@@ -320,6 +328,7 @@ function EcranTv() {
       poserJoueurs(liste);
       setEcranLocal(source.partie.ecranTv);
       poserCourse(source.course);
+      poserScene(source.course, liste);
       versionRef.current = source.version;
       debutRetard.current = 0;
       fileVide.current = true;
@@ -367,7 +376,9 @@ function EcranTv() {
           const source = recuRef.current ?? recue;
           poserCourse(source.course);
           const liste = trierAccueil(source.joueurs);
-          poserJoueurs(ecranRef.current === 'scores' ? actualiserPlaces(liste) : liste);
+          const affiches = ecranRef.current === 'scores' ? actualiserPlaces(liste) : liste;
+          poserJoueurs(affiches);
+          poserScene(source.course, source.partie.ecranTv === 'scores' ? actualiserPlaces(liste) : liste);
           if (ecranRef.current !== source.partie.ecranTv) setEcranLocal(source.partie.ecranTv);
           debutRetard.current = 0;
           fileVide.current = true;
@@ -579,11 +590,23 @@ function EcranTv() {
       }
     } else if (evenement.type === 'tour.fini') {
       memoriserCourse(patchCourse(courseRef.current, { phase: 'finTour', etape: null, joueurCourantId: null }));
+    } else if (evenement.type === 'course.dernierTour') {
+      memoriserCourse(patchCourse(courseRef.current, { dernierTour: true }));
     } else if (evenement.type === 'course.terminee') {
       memoriserCourse(patchCourse(courseRef.current, { phase: 'terminee', etape: null, classement: recue.course?.classement ?? null }));
-    } else if (evenement.type === 'duel.annonce' || evenement.type === 'duel.adversaire') {
-      memoriserCourse(patchCourse(courseRef.current, { etape: 'duel' }));
+    } else if (evenement.type === 'roue.annonce') {
+      memoriserCourse(patchCourse(courseRef.current, { etape: 'roue' }));
     }
+    const ceremonieJouee = await jouerCeremonie(evenement, {
+      attendre: attendreAnime,
+      reduit: reduitRef.current,
+      setScene: (scene) => {
+        sceneFinaleRef.current = scene;
+        setSceneFinale(scene);
+      },
+      jouerSon: (nom) => sons().jouer(nom),
+    });
+    if (ceremonieJouee) return;
     await animerPlateau(evenement, {
       reduit: reduitRef.current,
       pseudo,
@@ -619,7 +642,6 @@ function EcranTv() {
       attendre: attendreAnime,
       segment,
       marquer,
-      miseMax: courseRef.current?.miseMax ?? 1,
     });
   }
 
@@ -739,7 +761,9 @@ function EcranTv() {
         {!connecte ? <p class="bandeau-hors-ligne">Hors ligne</p> : null}
         {sonOk || ecran === 'plateau' ? null : <p class="bandeau-son">Appuie sur OK pour activer le son</p>}
         <div class={`plan ${phase}${poseAnime ? '' : ' sans-transition'}`} style={sonOk || ecran === 'plateau' ? undefined : { height: 'calc(100% - 96px)' }}>
-          {ecran === 'plateau' ? (
+          {ecran === 'plateau' && sceneFinale ? (
+            <FinaleTv scene={sceneFinale} joueurs={joueurs} reduit={reduit} />
+          ) : ecran === 'plateau' ? (
             courseAffichee && !grille && !poker && !regles && !moduleVisible && !podiumVisible ? (
               <PlateauTv
                 course={courseAffichee}

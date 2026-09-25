@@ -6,6 +6,7 @@ import { connecter, type Session } from '../commun/connexion';
 import '../commun/polices';
 import { cleCodeHote } from '../commun/stockage';
 import { PanneauCourse } from './course';
+import { PanneauStatistiques } from './statistiques';
 import '../commun/base.css';
 
 function ligneDiagnostic(diagnostic: DiagnosticTv): string[] {
@@ -191,9 +192,15 @@ function PageHote() {
     <main class="page page-hote fond-encre">
       <Toast message={toast} />
       <h1>{vue.partie.titre} — Hôte</h1>
+      {vue.erreursConfig.map((message) => (
+        <p class="erreur" key={message}>
+          {message}
+        </p>
+      ))}
       <p>{connecte ? 'Connecté' : 'Hors ligne'}</p>
       {erreur ? <p class="erreur">{erreur}</p> : null}
       <PanneauCourse vue={vue} envoi={envoi} agir={(action) => void agir(action)} />
+      <PanneauStatistiques vue={vue} />
       <Tuile taille="petite">
         <p>IP retenue : {vue.reseau.ip}</p>
         <p>Autres : {vue.reseau.autres.length > 0 ? vue.reseau.autres.join(', ') : 'aucune'}</p>

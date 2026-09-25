@@ -1,19 +1,20 @@
 {
   "longueur": 38,
-  "repartition": { "bonus": 14, "chance": 10, "cagnotte": 6, "duel": 7 },
+  "repartition": { "bonus": 11, "chance": 9, "cagnotte": 6, "gamble": 6, "malchance": 5 },
   "gainBonus": 5,
-  "miseMax": 10,
-  "probasMiseMax": [0.08333333333333333, 0.11666666666666667, 0.15, 0.18333333333333333, 0.21666666666666667, 0.25],
   "choixMiniJeu": "rotation",
-  "duel": {
-    "miseMax": 10,
-    "bonusVainqueur": 5,
-    "defis": [
-      "Pierre-feuille-ciseaux en 2 manches gagnantes",
-      "Un point de ping-pong",
-      "Bataille de pouces",
-      "Le premier qui rit a perdu",
-      "Lancer de bouchon le plus près du mur"
-    ]
+  "optionsDe": [
+    { "id": "normal", "nom": "Dé normal", "faces": 6, "mise": 0, "icone": "de" },
+    { "id": "booste", "nom": "Dé boosté", "faces": 7, "mise": 5, "icone": "de-dore" },
+    { "id": "super", "nom": "Super dé", "faces": 8, "mise": 10, "icone": "super-de" }
+  ],
+  "iconesCases": {
+    "depart": { "icone": "case-depart" },
+    "bonus": { "icone": "case-bonus" },
+    "chance": { "icone": "case-chance" },
+    "malchance": { "icone": "chat-noir" },
+    "cagnotte": { "icone": "case-cagnotte" },
+    "gamble": { "icone": "roue" },
+    "arrivee": { "icone": "case-arrivee" }
   }
 }

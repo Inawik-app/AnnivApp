@@ -1,4 +1,6 @@
-import { esperanceDe, probabilitesDe } from '../shared/de';
+import { esperanceDe } from '../shared/de';
+import { trophees } from '../shared/trophees';
+import { lireCatalogueTrophees } from '../server/course-config';
 import { repartirTapisHote } from '../shared/mini-jeux';
 import { solde } from '../shared/soldes';
 import { REPONDANT_HOTE, scoreTopTen, type Devines } from '../shared/topten';
@@ -33,8 +35,10 @@ const DES = [
   6, 1, 2, 1,
   6, 1, 1, 1,
   6, 1, 1, 1,
-  1, 1, 1, 1,
+  1, 2, 1, 1,
 ];
+
+const TIRAGES = { cartes: ['gain-5', 'trou'], roue: ['fois-2', 'braquage'] };
 
 const CONFIG_JEOPARDY = lireJeopardy(process.cwd());
 
@@ -58,14 +62,9 @@ async function jouer(monde: Monde, acteur: Participant, action: Action, nom: str
   if (!reponse.ok) throw new Error(`${nom} : ${reponse.erreur}`);
   await toutLeMonde(monde, plancher);
   verifierInvariants(monde.serveur.etat());
-  const course = monde.tv.vue?.course;
-  if (course && course.duel?.etape === 'mises') {
-    const fuitesTv = fuitesMises(monde.tv.vue as VueClient, null);
-    if (fuitesTv.length > 0) throw new Error(`Mise visible sur la TV (${nom}) : ${fuitesTv.join(', ')}`);
-    for (const joueur of monde.joueurs) {
-      const fuites = fuitesMises(joueur.vue as VueClient, joueur.joueurId);
-      if (fuites.length > 0) throw new Error(`Mise visible pour ${joueur.pseudo} (${nom}) : ${fuites.join(', ')}`);
-    }
+  for (const page of pages(monde)) {
+    const fuites = fuitesMises(page.vue as VueClient);
+    if (fuites.length > 0) throw new Error(`Pioche visible (${nom}) : ${fuites.join(', ')}`);
   }
   verifierSecretsTopTen(monde, nom);
   verifierSecretsJeopardy(monde, nom);
@@ -414,8 +413,50 @@ async function annulerPuisRejouer(monde: Monde, nom: string, refaire: () => Prom
   await refaire();
 }
 
+async function ceremonie(monde: Monde): Promise<void> {
+  await annulerPuisRejouer(monde, 'le podium', async () => {
+    await jouer(monde, monde.hote, { type: 'ouvrirPodium' }, 'Podium');
+  });
+  if (monde.tv.vue?.course?.ceremonie?.etape !== 'podium') throw new Error('La télé devrait être au podium');
+  await annulerPuisRejouer(monde, 'le tirage des trophées', async () => {
+    await jouer(monde, monde.hote, { type: 'tirerTrophees' }, 'Tirage des trophées');
+  });
+  const tirage = monde.hote.vue?.course?.ceremonie?.suivants ?? [];
+  if (tirage.length < 1 || tirage.length > 4) throw new Error(`Tirage inattendu : ${tirage.length}`);
+  const attribuables = new Set(
+    trophees(monde.serveur.etat(), lireCatalogueTrophees(process.cwd()).trophees)
+      .filter((trophee) => trophee.attribuable)
+      .map((trophee) => trophee.id),
+  );
+  for (const trophee of tirage) {
+    if (!attribuables.has(trophee.id)) throw new Error(`${trophee.nom} n'est pas attribuable`);
+  }
+  const fuite = (nom: string) => {
+    for (const page of [monde.tv, ...monde.joueurs]) {
+      if (JSON.stringify(page.vue).includes(nom)) throw new Error(`${nom} apparaît chez ${page.pseudo} avant la révélation`);
+    }
+  };
+  for (const trophee of [...tirage]) {
+    fuite(trophee.nom);
+    await annulerPuisRejouer(monde, `la révélation de ${trophee.nom}`, async () => {
+      await jouer(monde, monde.hote, { type: 'revelerTrophee' }, trophee.nom);
+    });
+  }
+  await annulerPuisRejouer(monde, 'le classement final', async () => {
+    await jouer(monde, monde.hote, { type: 'revelerClassement' }, 'Classement final');
+  });
+  await annulerPuisRejouer(monde, 'le gagnant', async () => {
+    await jouer(monde, monde.hote, { type: 'revelerGagnant' }, 'Gagnant');
+  });
+  if (!monde.tv.vue?.course?.ceremonie?.gagnantRevele) throw new Error('Le gagnant devrait être révélé');
+  if (!JSON.stringify(monde.tv.vue).includes('remporte le bon de 20 €') && !JSON.stringify(monde.tv.vue).includes('remportent le bon de 20 €')) {
+    throw new Error('Le texte du gagnant manque');
+  }
+  console.log('OK     Cérémonie complète, annulations, trophées cachés jusqu\'à la révélation');
+}
+
 async function preparer(desForces: number[]): Promise<Monde> {
-  const { serveur, dossier } = await ouvrirServeur({ desForces, disposition: DISPOSITION });
+  const { serveur, dossier } = await ouvrirServeur({ desForces, tiragesForces: TIRAGES, disposition: DISPOSITION });
   const hote = await connecter(serveur.url, 'hote', { codeHote: CODE_HOTE });
   const tv = await connecter(serveur.url, 'tv');
   const joueurs: Participant[] = [];
@@ -518,32 +559,24 @@ async function main(): Promise<void> {
     await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Passage aux déplacements');
 
     await annulerPuisRejouer(monde, 'un lancer suivi de l\'effet de sa case', async () => {
-      await jouer(monde as Monde, ines, { type: 'lancerDe', mise: 4 }, 'Lancer d\'Inès sur un bonus');
+      await jouer(monde as Monde, ines, { type: 'lancerDe', option: 'booste' }, 'Lancer d\'Inès sur un bonus');
     });
     if (monde.serveur.etat().course?.positions[ines.joueurId] !== 1) throw new Error('Inès devrait être sur la case bonus');
-    if (monde.serveur.etat().course?.cagnotte !== 4) throw new Error('La mise devrait être dans la cagnotte');
+    if (monde.serveur.etat().course?.cagnotte !== 5) throw new Error('La mise devrait être dans la cagnotte');
 
-    await jouer(monde, noe, { type: 'lancerDe', mise: 0 }, 'Lancer de Noé sur une chance');
+    await jouer(monde, noe, { type: 'lancerDe', option: 'normal' }, 'Lancer de Noé sur une chance');
     const carte = monde.serveur.etat().course?.carteCourante?.carte;
-    if (carte?.effet.type !== 'cadeau') throw new Error(`La carte piochée n'est pas un cadeau (${carte?.id ?? 'aucune'})`);
-    console.log('OK     Carte chance cadeau');
-    await jouer(monde, noe, { type: 'choisirBeneficiaire', joueurId: ines.joueurId }, 'Noé offre le cadeau');
+    if (carte?.id !== 'gain-5') throw new Error(`La carte piochée n'est pas le gain de 5 (${carte?.id ?? 'aucune'})`);
+    if (monde.serveur.etat().course?.positions[noe.joueurId] !== 2) throw new Error('La carte ne devait pas déplacer Noé');
+    console.log('OK     Carte chance sans déplacement');
 
-    await jouer(monde, lina, { type: 'lancerDe', mise: 0 }, 'Lancer de Lina sur un duel');
-    await annulerPuisRejouer(monde, 'le choix de l\'adversaire d\'un duel', async () => {
-      await jouer(monde as Monde, lina, { type: 'choisirAdversaire', joueurId: leo.joueurId }, 'Lina choisit Léo');
+    await annulerPuisRejouer(monde, 'une carte malchance', async () => {
+      await jouer(monde as Monde, lina, { type: 'lancerDe', option: 'normal' }, 'Lancer de Lina sur une malchance');
     });
-    await jouer(monde, lina, { type: 'miserDuel', montant: 2 }, 'Mise de duel de Lina');
-    console.log('OK     Secrets des mises de duel');
-    await annulerPuisRejouer(monde, 'une mise de duel', async () => {
-      await jouer(monde as Monde, leo, { type: 'miserDuel', montant: 2 }, 'Mise de duel de Léo');
-    });
-    await annulerPuisRejouer(monde, 'le résultat d\'un duel', async () => {
-      await jouer(monde as Monde, (monde as Monde).hote, { type: 'resultatDuel', resultat: 'joueur' }, 'Victoire de Lina');
-    });
-    await jouer(monde, leo, { type: 'lancerDe', mise: 0 }, 'Lancer de Léo sur la cagnotte');
+    if (monde.serveur.etat().course?.carteCourante?.carte.id !== 'trou') throw new Error('La malchance devrait être le trou dans la poche');
+    await jouer(monde, leo, { type: 'lancerDe', option: 'normal' }, 'Lancer de Léo sur la cagnotte');
     if (monde.serveur.etat().course?.phase !== 'finTour') throw new Error('Le tour 1 devrait être fini');
-    console.log('OK     Duel en victoire');
+    console.log('OK     Malchance et cagnotte');
 
     await annulerPuisRejouer(monde, 'un nouveau tour', async () => {
       await jouer(monde as Monde, (monde as Monde).hote, { type: 'nouveauTour' }, 'Tour 2');
@@ -598,7 +631,7 @@ async function main(): Promise<void> {
     monde.serveur = await demarrerServeur({
       port: await portDisponible(),
       dossierData: dossier,
-      config: { desForces: DES.slice(4), disposition: DISPOSITION },
+      config: { desForces: DES.slice(4), tiragesForces: { roue: ['fois-2', 'braquage'] }, disposition: DISPOSITION },
     });
     monde.hote = await connecter(monde.serveur.url, 'hote', { codeHote: CODE_HOTE });
     monde.tv = await connecter(monde.serveur.url, 'tv');
@@ -630,15 +663,18 @@ async function main(): Promise<void> {
 
     const [leo2, ines2, noe2, lina2] = monde.joueurs;
     if (!leo2 || !ines2 || !noe2 || !lina2) throw new Error('Joueurs perdus');
-    await jouer(monde, ines2, { type: 'lancerDe', mise: 0 }, 'Inès avance, tour 2');
-    await jouer(monde, noe2, { type: 'lancerDe', mise: 0 }, 'Noé tombe sur un duel');
-    await jouer(monde, noe2, { type: 'choisirAdversaire', joueurId: lina2.joueurId }, 'Noé choisit Lina');
-    await jouer(monde, noe2, { type: 'miserDuel', montant: 1 }, 'Mise de duel de Noé');
-    await jouer(monde, lina2, { type: 'miserDuel', montant: 1 }, 'Mise de duel de Lina');
-    await jouer(monde, monde.hote, { type: 'resultatDuel', resultat: 'egalite' }, 'Égalité du duel');
-    console.log('OK     Duel en égalité');
-    await jouer(monde, lina2, { type: 'lancerDe', mise: 0 }, 'Lancer de Lina, tour 2');
-    await jouer(monde, leo2, { type: 'lancerDe', mise: 0 }, 'Lancer de Léo, tour 2');
+    await jouer(monde, ines2, { type: 'lancerDe', option: 'normal' }, 'Inès avance, tour 2');
+    await annulerPuisRejouer(monde, 'une arrivée sur la roue', async () => {
+      await jouer(monde as Monde, noe2, { type: 'lancerDe', option: 'normal' }, 'Noé tombe sur la roue');
+    });
+    await annulerPuisRejouer(monde, 'un tour de roue', async () => {
+      await jouer(monde as Monde, noe2, { type: 'miserRoue', montant: 10 }, 'Noé fait tourner la roue');
+    });
+    const roue = monde.serveur.etat().course?.historique.effets.find((effet) => effet.roue?.option === 'fois-2');
+    if (!roue || roue.cases !== 0) throw new Error('Le ×2 ne devait pas déplacer Noé');
+    console.log('OK     Roue ×2');
+    await jouer(monde, lina2, { type: 'lancerDe', option: 'normal' }, 'Lancer de Lina, tour 2');
+    await jouer(monde, leo2, { type: 'lancerDe', option: 'normal' }, 'Lancer de Léo, tour 2');
 
     for (const tour of [3, 4, 5, 6, 7]) {
       await jouer(monde, monde.hote, { type: 'nouveauTour' }, `Tour ${tour}`);
@@ -667,47 +703,60 @@ async function main(): Promise<void> {
         await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, `Mini-jeu du tour ${tour}`);
       }
       await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, `Dés du tour ${tour}`);
-      await jouer(monde, ines2, { type: 'lancerDe', mise: 0 }, `Lancer d'Inès, tour ${tour}`);
-      await jouer(monde, noe2, { type: 'lancerDe', mise: 0 }, `Lancer de Noé, tour ${tour}`);
-      await jouer(monde, lina2, { type: 'lancerDe', mise: 0 }, `Lancer de Lina, tour ${tour}`);
-      await jouer(monde, leo2, { type: 'lancerDe', mise: 0 }, `Lancer de Léo, tour ${tour}`);
+      await jouer(monde, ines2, { type: 'lancerDe', option: 'normal' }, `Lancer d'Inès, tour ${tour}`);
+      await jouer(monde, noe2, { type: 'lancerDe', option: 'normal' }, `Lancer de Noé, tour ${tour}`);
+      await jouer(monde, lina2, { type: 'lancerDe', option: 'normal' }, `Lancer de Lina, tour ${tour}`);
+      await jouer(monde, leo2, { type: 'lancerDe', option: 'normal' }, `Lancer de Léo, tour ${tour}`);
     }
 
     await jouer(monde, monde.hote, { type: 'nouveauTour' }, 'Tour 8');
     await jouer(monde, monde.hote, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, 'Mini-jeu du tour 8');
     await jouer(monde, monde.hote, { type: 'passerAuxDeplacements' }, 'Dés du tour 8');
     await annulerPuisRejouer(monde, 'une arrivée', async () => {
-      await jouer(monde, ines2, { type: 'lancerDe', mise: 0 }, 'Inès arrive');
+      await jouer(monde, ines2, { type: 'lancerDe', option: 'normal' }, 'Inès arrive');
     });
     const finale = monde.serveur.etat().course;
     if (!finale?.arrivees.includes(ines2.joueurId)) throw new Error('Inès devrait être arrivée');
     if (finale.positions[ines2.joueurId] !== finale.regles.longueur) throw new Error('Inès n\'est pas sur l\'arrivée');
     if (finale.ordre[finale.indexCourant] === ines2.joueurId) throw new Error('Inès relance alors qu\'elle est arrivée');
-    await jouer(monde, noe2, { type: 'lancerDe', mise: 0 }, 'Noé joue après l\'arrivée');
-    await jouer(monde, lina2, { type: 'lancerDe', mise: 0 }, 'Lancer de Lina, tour 8');
-    await jouer(monde, leo2, { type: 'lancerDe', mise: 0 }, 'Lancer de Léo, tour 8');
-    const effets = new Set(finale && monde.serveur.etat().course?.historique.effets.map((effet) => effet.type));
-    for (const type of ['bonus', 'cagnotte', 'chance']) {
-      if (!effets.has(type)) throw new Error(`Aucun effet ${type} dans l'historique`);
+    if (!finale.dernierTour) throw new Error('Le dernier tour devrait être annoncé');
+    if (finale.phase === 'terminee') throw new Error('Les autres joueurs doivent encore jouer ce tour-ci');
+    await jouer(monde, noe2, { type: 'lancerDe', option: 'normal' }, 'Noé joue après l\'arrivée');
+    await jouer(monde, noe2, { type: 'miserRoue', montant: 10 }, 'Noé braque la roue');
+    await jouer(monde, lina2, { type: 'lancerDe', option: 'normal' }, 'Lancer de Lina, tour 8');
+    await jouer(monde, leo2, { type: 'lancerDe', option: 'normal' }, 'Lancer de Léo, tour 8');
+    const effets = monde.serveur.etat().course?.historique.effets ?? [];
+    const types = new Set(effets.map((effet) => effet.type));
+    for (const type of ['bonus', 'cagnotte', 'chance', 'malchance', 'roue']) {
+      if (!types.has(type)) throw new Error(`Aucun effet ${type} dans l'historique`);
     }
-    const duels = monde.serveur.etat().course?.historique.duels ?? [];
-    if (!duels.some((duel) => duel.resultat === 'joueur') || !duels.some((duel) => duel.resultat === 'egalite')) {
-      throw new Error('Il manque une victoire ou une égalité de duel');
+    const optionsRoue = effets.flatMap((effet) => (effet.roue ? [effet.roue.option] : []));
+    if (!optionsRoue.includes('fois-2') || !optionsRoue.includes('braquage')) {
+      throw new Error(`Résultats de roue manquants : ${optionsRoue.join(', ')}`);
     }
+    if (JSON.stringify(monde.serveur.etat()).includes('duel')) throw new Error('Il reste une trace de duel');
     const courseFinale = monde.serveur.etat().course;
     const lancers = courseFinale?.historique.lancers ?? [];
     if (lancers.length === 0) throw new Error('Aucun lancer enregistré');
     for (const lancer of lancers) {
-      if (typeof lancer.mise !== 'number' || typeof lancer.esperance !== 'number') {
-        throw new Error('Un lancer n\'a pas de mise ou d\'espérance');
+      if (typeof lancer.mise !== 'number' || typeof lancer.esperance !== 'number' || typeof lancer.faces !== 'number') {
+        throw new Error('Un lancer n\'a pas de mise, de faces ou d\'espérance');
       }
-      const attendue = esperanceDe(
-        probabilitesDe(lancer.usage === 'deplacement' ? lancer.mise : 0, courseFinale?.regles.miseMax ?? 0, courseFinale?.regles.probasMiseMax ?? []),
-      );
-      if (Math.abs(lancer.esperance - attendue) > 1e-9) throw new Error(`Espérance inattendue pour une mise de ${lancer.mise}`);
+      if (Math.abs(lancer.esperance - esperanceDe(lancer.faces)) > 1e-9) {
+        throw new Error(`Espérance inattendue pour un dé à ${lancer.faces} faces`);
+      }
     }
+    const catalogue = lireCatalogueTrophees(process.cwd()).trophees;
+    const etatFinal = monde.serveur.etat();
+    const premierCalcul = trophees(etatFinal, catalogue);
+    const secondCalcul = trophees(etatFinal, catalogue);
+    if (JSON.stringify(premierCalcul) !== JSON.stringify(secondCalcul)) throw new Error('Les trophées ne sont pas déterministes');
+    if (monde.serveur.etat().course?.phase !== 'terminee') throw new Error('La course devrait être terminée à la fin du dernier tour');
+    const tourSuivant = await agir(monde.hote, { type: 'nouveauTour' });
+    if (tourSuivant.ok) throw new Error('Aucun nouveau tour ne doit commencer');
+    await ceremonie(monde);
     console.log('OK     Chaque lancer a sa mise et son espérance');
-    console.log('OK     Bonus, cagnotte, chance, duels et arrivée');
+    console.log('OK     Bonus, chance, malchance, cagnotte, roue et arrivée');
     console.log('OK     Invariants tenus après chaque action');
   } catch (erreur) {
     console.log(`ÉCHEC  ${erreur instanceof Error ? erreur.message : String(erreur)}`);

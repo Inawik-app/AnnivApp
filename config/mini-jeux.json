@@ -83,7 +83,7 @@
       "id": "top-ten",
       "nom": "Top Ten",
       "resume": "Classer les réponses des autres selon leur numéro secret.",
-      "icone": "pouvoir-pari",
+      "icone": "podium",
       "regles": [
         "Chaque répondant reçoit un numéro secret de 1 à 10.",
         "Il répond au thème à voix haute selon son numéro.",
@@ -97,7 +97,7 @@
       "id": "undercover",
       "nom": "Undercover",
       "resume": "Un mot secret, un mot proche, un intrus à démasquer.",
-      "icone": "enveloppe",
+      "icone": "deguisement",
       "regles": [
         "Tous ont le même mot, sauf l'undercover.",
         "Chacun donne un indice à voix haute, dans l'ordre.",

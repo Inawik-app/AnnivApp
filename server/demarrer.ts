@@ -22,6 +22,7 @@ import { actionBot, delaiBot } from './bots';
 import { configValide } from './fusion';
 import { choisirIp, listerCartes } from './ip';
 import { creerStore } from './store';
+import { verifierIconesConfig } from './icones-config';
 import { vueHote, vueJoueur, vueTv, type Presence } from './vues';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -44,8 +45,10 @@ type Lien = {
 };
 
 export type ConfigTest = {
-  /** Valeurs de dé (1 à 6) consommées dans l'ordre. Le reste du hasard est figé. */
+  /** Valeurs de dé (1 à 8) consommées dans l'ordre. Le reste du hasard est figé. */
   desForces?: number[];
+  /** Cartes et résultats de roue imposés, consommés dans l'ordre. */
+  tiragesForces?: { cartes?: string[]; roue?: string[] };
   /** Cases explicites, de la case 0 à l'arrivée. La longueur du plateau suit cette liste. */
   disposition?: TypeCase[];
 };
@@ -94,13 +97,9 @@ function ecrireDiagnostic(fichier: string, diagnostic: DiagnosticTv): void {
   }
 }
 
-/**
- * Hasard figé du mode test, hors dés.
- * Le mélange d'un paquet de 14 cartes place « cadeau » en dernière position, donc en première pioche.
- */
+/** Hasard figé du mode test, hors files de dés, de cartes et de roue. */
 function aleaTest(max: number): number {
-  if (max === 14) return 6;
-  return 0;
+  return max < 0 ? 0 : 0;
 }
 
 export async function demarrerServeur(options: OptionsDemarrage): Promise<ServeurJeu> {
@@ -109,8 +108,8 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
     throw new Error('Les leviers de test sont impossibles en production');
   }
   const desForces = options.config?.desForces;
-  if (desForces?.some((valeur) => !Number.isInteger(valeur) || valeur < 1 || valeur > 6)) {
-    throw new Error('desForces ne contient que des valeurs de dé, de 1 à 6');
+  if (desForces?.some((valeur) => !Number.isInteger(valeur) || valeur < 1 || valeur > 8)) {
+    throw new Error('desForces ne contient que des valeurs de dé, de 1 à 8');
   }
   const partie = configValide(JSON.parse(fs.readFileSync(path.join(RACINE, 'config', 'partie.json'), 'utf8')));
   const devOutils = process.env.NODE_ENV !== 'production';
@@ -141,6 +140,9 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
   let minuteurBots: NodeJS.Timeout | null = null;
   let surveillanceMinuteur: NodeJS.Timeout | null = null;
 
+  const erreursIcones = verifierIconesConfig(RACINE);
+  for (const message of erreursIcones) console.error(message);
+
   const store = creerStore({
     dossierData: options.dossierData,
     titre: partie.titre,
@@ -148,6 +150,8 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
     dev,
     test: modeTest,
     desForces,
+    cartesForcees: options.config?.tiragesForces?.cartes,
+    roueForcees: options.config?.tiragesForces?.roue,
     disposition: options.config?.disposition,
     alea: modeTest ? aleaTest : undefined,
     sauvegardesAuto: !modeTest,
@@ -218,7 +222,7 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
     io.to('tv').emit('vue', vueTv(etat, actuel, heure, idDemarrage, reseau.urlJoueur, partie.nbJoueursMax, volumeSon));
     io.to('hote').emit(
       'vue',
-      vueHote(etat, actuel, heure, idDemarrage, dev, reseau, diagnostic, store.libelleAnnulation(), volumeSon),
+      vueHote(etat, actuel, heure, idDemarrage, dev, reseau, diagnostic, store.libelleAnnulation(), volumeSon, erreursIcones),
     );
     io.to('joueur:anonyme').emit('vue', vueJoueur(etat, actuel, heure, idDemarrage, null));
     for (const joueur of etat.joueurs) {

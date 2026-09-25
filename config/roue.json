@@ -1,0 +1,14 @@
+{
+  "options": [
+    { "id": "tout-perdre", "nom": "Tout perdre", "probabilite": 15, "multiplicateur": 0, "couleur": "#8f2d3a" },
+    { "id": "moitie", "nom": "Moitié", "probabilite": 18, "multiplicateur": 0.5, "couleur": "#c46a2b" },
+    { "id": "rembourse", "nom": "Remboursé", "probabilite": 26, "multiplicateur": 1, "couleur": "#2f6fed" },
+    { "id": "turbo", "nom": "Turbo", "probabilite": 10, "multiplicateur": 1, "avance": 3, "couleur": "#1f9d55", "icone": "trophee-audacieux" },
+    { "id": "fois-1-5", "nom": "×1,5", "probabilite": 12, "multiplicateur": 1.5, "couleur": "#7a4de0" },
+    { "id": "fois-2", "nom": "×2", "probabilite": 7, "multiplicateur": 2, "couleur": "#d4a017" },
+    { "id": "pacte", "nom": "Pacte", "probabilite": 5, "multiplicateur": 2, "recule": 3, "couleur": "#5c3d8f", "icone": "parchemin-pacte" },
+    { "id": "fois-3", "nom": "×3", "probabilite": 4, "multiplicateur": 3, "couleur": "#e23d3d" },
+    { "id": "braquage", "nom": "Braquage", "probabilite": 2, "multiplicateur": 1, "partCagnotte": 0.25, "couleur": "#1a7a72", "icone": "sac-argent" },
+    { "id": "jackpot", "nom": "Jackpot", "probabilite": 1, "multiplicateur": 5, "couleur": "#ff8a1e", "icone": "machine-a-sous" }
+  ]
+}

@@ -2,14 +2,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { couleurBuzzer } from '../shared/jeopardy';
+import { statistiques } from '../shared/statistiques';
+import { trophees } from '../shared/trophees';
 import { solde } from '../shared/soldes';
+import { projeterTirage } from './ceremonie';
+import { lireCatalogueTrophees, lireConfigPlateau } from './course-config';
 import { REPONDANT_HOTE } from '../shared/topten';
 import type {
   AppareilVue,
   Course,
   CourseVue,
   DiagnosticTv,
-  DuelVue,
   EtatJeu,
   Evenement,
   JeopardyVue,
@@ -18,7 +21,6 @@ import type {
   MancheUndercoverVue,
   QuestionJeopardyVue,
   UndercoverVue,
-  MiseVue,
   TopTenVue,
   ReseauVue,
   VueHote,
@@ -46,11 +48,6 @@ function visibles(evenements: Evenement[], cible: 'tv' | 'joueur' | 'hote', joue
     );
   });
   return filtres.slice(-limite);
-}
-
-function miseVue(joueurId: string, montant: number | null, voirMontant: boolean): MiseVue {
-  if (voirMontant && montant !== null) return { joueurId, aMise: true, montant };
-  return { joueurId, aMise: montant !== null };
 }
 
 /** Les numéros ne partent qu'à leur répondant et à l'hôte, puis à tout le monde une fois la manche révélée. */
@@ -168,23 +165,7 @@ export function projeterUndercover(course: Course, cible: 'tv' | 'joueur' | 'hot
 
 export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | 'hote', joueurId: string | null): CourseVue | null {
   if (!course) return null;
-  let duel: DuelVue | null = null;
-  let etape: CourseVue['etape'] = null;
-  if (course.etape?.genre === 'lancer') etape = 'lancer';
-  if (course.etape?.genre === 'cadeau') etape = 'cadeau';
-  if (course.etape?.genre === 'duel') {
-    etape = 'duel';
-    const enCours = course.etape.duel;
-    duel = {
-      joueurId: enCours.joueurId,
-      etape: enCours.etape,
-      adversaireId: enCours.adversaireId,
-      defi: enCours.defi,
-      mises: Object.entries(enCours.mises).map(([id, montant]) =>
-        miseVue(id, montant, enCours.revelees || cible === 'hote' || id === joueurId),
-      ),
-    };
-  }
+  const etape: CourseVue['etape'] = course.etape?.genre === 'lancer' || course.etape?.genre === 'roue' ? course.etape.genre : null;
   const courant = course.phase === 'deplacements' ? (course.ordre[course.indexCourant] ?? null) : null;
   return {
     active: course.active,
@@ -214,14 +195,20 @@ export function projeterCourse(course: Course | null, cible: 'tv' | 'joueur' | '
     pokerConfig: lirePoker(RACINE),
     etape,
     carte: course.carteCourante?.carte ?? null,
-    duel,
     dernierDe: course.dernierDe,
     classement: course.classement ? [...course.classement] : null,
+    dernierTour: course.dernierTour === true,
+    ceremonie: course.ceremonie
+      ? {
+          etape: course.ceremonie.etape,
+          ...projeterTirage(course.ceremonie, cible),
+          classementRevele: course.ceremonie.classementRevele,
+          gagnantRevele: course.ceremonie.gagnantRevele,
+        }
+      : null,
     gainBonus: course.regles.gainBonus,
-    miseMax: course.regles.miseMax,
-    probasMiseMax: [...course.regles.probasMiseMax],
-    miseMaxDuel: course.regles.duel.miseMax,
-    bonusDuel: course.regles.duel.bonusVainqueur,
+    optionsDe: course.regles.optionsDe.map((option) => ({ ...option })),
+    iconesCases: { ...lireConfigPlateau(RACINE).iconesCases },
   };
 }
 
@@ -323,6 +310,7 @@ export function vueHote(
   diagnostic: DiagnosticTv | null,
   annulation: string | null,
   volume = 0.8,
+  erreursConfig: string[] = [],
 ): VueHote {
   const joueurs = classer(etat, presence).map((joueur) => ({
     ...joueur,
@@ -368,6 +356,9 @@ export function vueHote(
     diagnostic,
     volume,
     course: projeterCourse(etat.course, 'hote', null),
+    erreursConfig: [...erreursConfig],
     bots: etat.bots === true,
+    statistiques: statistiques(etat),
+    trophees: trophees(etat, lireCatalogueTrophees(RACINE).trophees),
   };
 }
