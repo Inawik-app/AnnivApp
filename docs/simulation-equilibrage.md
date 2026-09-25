@@ -1,30 +1,34 @@
 # Simulation d'équilibrage
 
-Graine maîtresse : 20260926. 1000 parties par scénario, plus une partie détaillée dont la graine est indiquée. Durée du calcul : 70.1 s.
+Graine maîtresse : 20260926. 1000 parties par scénario, plus une partie détaillée dont la graine est indiquée. Durée du calcul : 655.8 s.
 
-Les quatre joueurs jouent chaque partie dans un ordre tiré au sort. Ils commencent avec les GP du tournoi de ping-pong : 3 GP par point marqué contre un joueur, 6 GP par point marqué contre l'hôte, sur 4 matchs en 7 points.
+Les quatre joueurs jouent chaque partie dans un ordre tiré au sort. Ils commencent avec les GP du tournoi de ping-pong : 1 GP par point contre un joueur, 2 GP par point contre l'hôte, sur 4 matchs (formule : points × (3 × gpParPoint + gpParPointContreHote)).
 
 | Joueur | Profil | Points par match | GP de départ |
 | --- | --- | ---: | ---: |
-| A | Très faible | 1 | 15 |
-| B | Moyen | 4 | 60 |
-| C | Bon | 6 | 90 |
-| D | Parfait | 7 | 105 |
+| A | Très faible | 1 | 5 |
+| B | Moyen | 4 | 20 |
+| C | Bon | 6 | 30 |
+| D | Parfait | 7 | 35 |
 
 ## Hypothèses
 
-Identiques pour les trois scénarios. Le simulateur appelle le vrai réducteur, les vrais tirages et `trophees(etat)`.
+Identiques pour les trois scénarios. Le simulateur appelle le vrai réducteur, les vrais tirages et `trophees(etat)`. Pas d'apéro.
 
-- **Dé et roue.** Prudent : toujours le dé normal ; mise 0 à la roue dans 80 % des cas, 5 GP sinon. Moyen : dé normal 30 %, boosté 50 %, super dé 20 % ; mise d'environ 15 % du solde visible, arrondie. Fort : toujours le super dé s'il est abordable, sinon le dé boosté ; mise de 50 % du solde visible. Si une option n'est pas abordable, le joueur prend la plus forte qu'il peut se payer.
-- **Mini-jeu à chaque tour.** Parmi ceux de `config/mini-jeux.json` qui n'ont pas encore été joués. Ensuite, au hasard parmi les mini-jeux physiques, qui peuvent donc revenir.
-- **Physiques.** Classement ou équipes tirés au hasard, puis la vraie fonction de score.
-- **Jeopardy.** 16 questions. Le choisisseur répond juste dans 70 % des cas. Sinon, un autre joueur tiré au hasard vole la question dans 50 % des cas.
-- **Top Ten.** L'ordre du Cap'Ten est le bon ordre, perturbé par 0, 1 ou 2 échanges entre voisins, équiprobables. Chaque numéro est deviné exactement avec une probabilité de 30 %.
-- **Undercover.** Les civils gagnent 70 % des manches. Un undercover éliminé devine le mot dans 30 % des cas.
-- **Poker.** 100 GP de jetons (4 × 20, plus les 20 de l'hôte), redistribués par 40 transferts d'un jeton, puis convertis par le vrai calcul.
-- **Apéro.** Une fois, le premier tour où un pion a atteint la moitié du plateau : entre 20 et 40 GP par joueur. S'il n'a pas eu lieu, il est donné juste avant la cérémonie.
+| Mini-jeu | Hypothèse |
+| --- | --- |
+| Jeopardy | Valeurs actuelles, rotation du choisisseur. Juste à 85 / 70 / 55 / 40 % selon le niveau 1 à 4. Sinon, 50 % qu'un autre joueur tiré au hasard réussisse. |
+| Top Ten | Ordre proposé = bon ordre avec 0, 1 ou 2 échanges de voisins (équiprobables). Chaque numéro exact à 30 %. |
+| Undercover | 4 joueurs. Civils gagnent 70 % des manches ; undercover éliminé trouve le mot à 30 %. |
+| Codenames | Équipes au hasard. Chaque manche gagnée 50/50 (cartes de l'équipe courante jusqu'à la victoire, ou assassin). |
+| Perudo | Ordre d'élimination tiré uniformément au hasard (1 dé/joueur en simu pour la durée ; barème de classement inchangé). |
+| Just One | Devineur trouve à 60 %. Chaque indice a 15 % de chance de copier un autre (hôte : doublon n'annule que l'hôte). Indices lettres seules (Zzza, Zzzb…). Un cycle (hôte inclus) en simu, contre 2 en soirée. |
+| Poker | 100 GP de jetons (4 × 20 + hôte 20 redistribué), redistribution aléatoire raisonnable. |
+
+- **Dé et roue.** Prudent : toujours le dé normal ; mise 0 à la roue dans 80 % des cas, 5 GP sinon. Moyen : dé normal 30 %, boosté 50 %, super dé 20 % ; mise d'environ 15 % du solde visible. Fort : toujours le super dé s'il est abordable ; 50 % du solde à la roue. Coup de pouce actif : toujours le dé gratuit (de7 → boosté, de8 → super).
+- **Mini-jeu à chaque tour.** Parmi les 7 modules de `config/mini-jeux.json` pas encore joués ; ensuite au hasard parmi les 7.
 - **Missions secrètes.** Ignorées.
-- **Fin.** Dernier tour dès la première arrivée, puis cérémonie des trophées (`nombreCeremonie`).
+- **Fin.** Dernier tour dès la première arrivée, podium, éventuelle cagnotte de consolation, trophées (`nombreCeremonie`), classement, gagnant.
 
 ## 1 — Prudent
 
@@ -32,7 +36,7 @@ Identiques pour les trois scénarios. Le simulateur appelle le vrai réducteur, 
 
 | | Tours |
 | --- | ---: |
-| Moyenne | 9,5 |
+| Moyenne | 9,4 |
 | Minimum | 5 |
 | Maximum | 13 |
 
@@ -40,10 +44,10 @@ Identiques pour les trois scénarios. Le simulateur appelle le vrai réducteur, 
 
 | Joueur | Moyenne | Écart-type | Minimum | Maximum |
 | --- | ---: | ---: | ---: | ---: |
-| A | 175,1 | 21,5 | 110 | 239 |
-| B | 201,6 | 21,4 | 141 | 287 |
-| C | 237,5 | 21,8 | 176 | 310 |
-| D | 242,3 | 20,0 | 184 | 327 |
+| A | 166,7 | 25,9 | 101 | 257 |
+| B | 172,4 | 25,9 | 94 | 262 |
+| C | 182,0 | 25,6 | 113 | 277 |
+| D | 188,2 | 26,4 | 93 | 281 |
 
 ### Victoires
 
@@ -51,15 +55,15 @@ Une victoire compte même en cas d'ex aequo : les probabilités peuvent donc dé
 
 | Joueur | Victoires |
 | --- | ---: |
-| A | 0,4 % |
-| B | 3,6 % |
-| C | 40,2 % |
-| D | 57,2 % |
-| Ex aequo | 1,4 % |
+| A | 9,9 % |
+| B | 15,7 % |
+| C | 30,8 % |
+| D | 45,2 % |
+| Ex aequo | 1,6 % |
 
 ### Écart 1er – 2e
 
-21,6 GP en moyenne.
+16,0 GP en moyenne.
 
 ### Origine des GP
 
@@ -67,31 +71,30 @@ Moyenne par joueur. La roue est nette (mises soustraites). Les mises au dé sont
 
 | Source | A | B | C | D |
 | --- | ---: | ---: | ---: | ---: |
-| ping-pong | 15,0 | 60,0 | 90,0 | 105,0 |
-| bonus | 13,4 | 13,2 | 13,2 | 13,0 |
-| chance | 6,8 | 6,7 | 6,5 | 6,8 |
-| malchance | -2,1 | -1,9 | -1,9 | -2,0 |
-| cagnotte | 1,4 | 1,5 | 1,5 | 1,5 |
-| roue (nette) | 0,1 | 0,1 | -0,0 | 0,1 |
-| mises au dé | 0,0 | 0,0 | 0,0 | 0,0 |
-| apéro | 30,0 | 29,7 | 30,1 | 29,9 |
-| poker | 26,0 | 24,7 | 24,6 | 24,4 |
-| trophées | 24,6 | 12,4 | 13,4 | 11,9 |
-| mini-jeu : Jeopardy | 11,5 | 11,6 | 12,0 | 12,3 |
-| mini-jeu : Mémoire express | 9,8 | 9,6 | 9,6 | 8,0 |
-| mini-jeu : Mime express | 11,1 | 7,5 | 10,9 | 7,0 |
-| mini-jeu : Pong gobelets | 10,2 | 9,1 | 9,8 | 6,9 |
-| mini-jeu : Top Ten | 8,2 | 8,1 | 8,2 | 8,2 |
-| mini-jeu : Undercover | 9,3 | 9,2 | 9,6 | 9,4 |
+| ping-pong | 5,0 | 20,0 | 30,0 | 35,0 |
+| bonus | 12,7 | 13,1 | 13,3 | 13,1 |
+| chance | 6,9 | 6,6 | 6,7 | 6,7 |
+| malchance | -1,8 | -1,9 | -1,9 | -1,9 |
+| cagnotte | 1,5 | 1,3 | 1,3 | 1,3 |
+| roue (nette) | -0,0 | 0,1 | -0,1 | -0,0 |
+| arrivée | 12,2 | 12,2 | 11,9 | 11,8 |
+| poker | 34,8 | 33,3 | 33,2 | 33,3 |
+| trophées | 21,7 | 13,7 | 13,1 | 13,2 |
+| mini-jeu : Codenames | 13,5 | 13,7 | 13,7 | 13,8 |
+| mini-jeu : Jeopardy | 14,1 | 13,7 | 14,4 | 14,9 |
+| mini-jeu : Just One | 15,6 | 15,8 | 15,9 | 15,9 |
+| mini-jeu : Perudo | 6,7 | 6,9 | 6,8 | 6,7 |
+| mini-jeu : Top Ten | 11,4 | 11,2 | 11,2 | 11,4 |
+| mini-jeu : Undercover | 12,7 | 12,6 | 12,6 | 13,0 |
 
 ### Économie
 
 | | Valeur |
 | --- | ---: |
 | GP misés au dé, moyenne par partie | 0,0 |
-| GP misés à la roue, moyenne par partie | 6,4 |
-| Cagnotte maximale moyenne | 7,2 |
-| Cagnotte maximale observée | 18 |
+| GP misés à la roue, moyenne par partie | 6,2 |
+| Cagnotte maximale moyenne | 6,8 |
+| Cagnotte maximale observée | 22 |
 | Cagnotte restante en fin de partie | 2,9 |
 | Jackpots, moyenne par partie | 0,0 |
 
@@ -99,12 +102,12 @@ Moyenne par joueur. La roue est nette (mises soustraites). Les mises au dé sont
 
 | Joueur | Position finale moyenne |
 | --- | ---: |
-| A | 32,0 |
+| A | 32,2 |
 | B | 32,2 |
-| C | 31,8 |
+| C | 32,1 |
 | D | 32,1 |
 
-Arrivées multiples au dernier tour : 25,2 %.
+Arrivées multiples au dernier tour : 25,1 %.
 
 ### Trophées
 
@@ -112,34 +115,32 @@ La colonne des gagnants est la part des parties où ce joueur reçoit le trophé
 
 | Trophée | Attribuable | Tiré | A | B | C | D |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Le plus malchanceux | 100,0 % | 55,0 % | 15,7 % | 15,2 % | 15,7 % | 13,7 % |
-| Le poissard | 97,0 % | 51,1 % | 18,8 % | 18,2 % | 17,7 % | 18,3 % |
-| Marche arrière | 96,2 % | 53,3 % | 15,0 % | 13,1 % | 16,1 % | 16,4 % |
-| Le plus généreux | 94,3 % | 51,0 % | 19,4 % | 18,7 % | 19,2 % | 18,2 % |
-| Pas verni aux jeux | 100,0 % | 52,7 % | 50,6 % | 2,6 % | 0,0 % | 0,0 % |
-| Dernier au ping-pong | 100,0 % | 51,1 % | 51,1 % | 0,0 % | 0,0 % | 0,0 % |
-| Le flambeur | 73,9 % | 36,2 % | 11,7 % | 11,6 % | 13,4 % | 12,1 % |
-| Le prudent | 73,9 % | 29,4 % | 18,2 % | 19,1 % | 18,9 % | 17,6 % |
-| Le touriste | 0,4 % | 0,1 % | 0,1 % | 0,0 % | 0,0 % | 0,0 % |
-| Contre toutes attentes | 0,4 % | 0,0 % | 0,0 % | 0,0 % | 0,0 % | 0,0 % |
-| Retour gagnant | 42,0 % | 20,1 % | 4,7 % | 5,2 % | 10,4 % | 3,0 % |
+| Le plus malchanceux | 100,0 % | 44,5 % | 12,4 % | 10,6 % | 14,0 % | 11,9 % |
+| Le poissard | 96,5 % | 41,9 % | 13,2 % | 16,4 % | 15,2 % | 15,8 % |
+| Marche arrière | 94,5 % | 42,8 % | 12,6 % | 12,3 % | 11,5 % | 14,0 % |
+| Le plus généreux | 94,5 % | 41,2 % | 15,8 % | 15,7 % | 14,8 % | 17,1 % |
+| Pas verni aux jeux | 100,0 % | 45,3 % | 29,1 % | 10,4 % | 4,6 % | 2,7 % |
+| Dernier au ping-pong | 100,0 % | 44,6 % | 44,6 % | 0,0 % | 0,0 % | 0,0 % |
+| Le flambeur | 70,6 % | 27,6 % | 10,0 % | 9,0 % | 7,9 % | 11,1 % |
+| Le prudent | 70,6 % | 25,1 % | 15,9 % | 15,9 % | 15,1 % | 15,7 % |
+| Le touriste | 100,0 % | 43,7 % | 12,3 % | 10,5 % | 12,8 % | 11,8 % |
+| Contre toutes attentes | 49,9 % | 16,5 % | 4,0 % | 3,6 % | 4,4 % | 4,5 % |
+| Retour gagnant | 70,4 % | 26,8 % | 10,6 % | 9,8 % | 8,4 % | 5,8 % |
 
 ### Partie type
 
-Graine 3271248641.
+Graine 3271252882.
 
-- Tour 1 — A case 3 · 20 GP ; B case 2 · 71 GP ; C case 3 · 95 GP ; D case 4 · 115 GP — C cagnotte, B cagnotte, A cagnotte, D bonus
-- Tour 2 — A case 8 · 32 GP ; B case 4 · 82 GP ; C case 4 · 110 GP ; D case 5 · 142 GP — C bonus, B bonus, A roue passe, D roue passe
-- Tour 3 — A case 13 · 63 GP ; B case 6 · 116 GP ; C case 10 · 127 GP ; D case 11 · 165 GP — C roue passe, B bonus, A cagnotte, D chance +4
-- Tour 4 — A case 19 · 78 GP ; B case 10 · 119 GP ; C case 11 · 138 GP ; D case 12 · 171 GP — C bonus, B roue passe, A bonus, D bonus
-- Tour 5 — A case 20 · 130 GP ; B case 12 · 159 GP ; C case 12 · 195 GP ; D case 18 · 213 GP — C bonus, B bonus, A cagnotte, D chance
-- Tour 6 — A case 18 · 138 GP ; B case 19 · 167 GP ; C case 18 · 205 GP ; D case 19 · 220 GP — C chance, B chance +2, A malchance -4, D bonus
-- Tour 7 — A case 20 · 145 GP ; B case 22 · 174 GP ; C case 20 · 206 GP ; D case 20 · 224 GP — C cagnotte, B malchance, A cagnotte, D cagnotte
-- Tour 8 — A case 20 · 153 GP ; B case 28 · 176 GP ; C case 23 · 219 GP ; D case 21 · 226 GP — C bonus, B roue passe, A malchance -2, D roue passe
-- Tour 9 — A case 23 · 160 GP ; B case 30 · 184 GP ; C case 25 · 227 GP ; D case 23 · 233 GP — C roue passe, B chance, A bonus, D bonus
-- Tour 10 — A case 29 · 168 GP ; B case 31 · 198 GP ; C case 29 · 235 GP ; D case 28 · 235 GP — C cagnotte, B chance, A cagnotte, D roue passe
-- Tour 11 — A case 31 · 183 GP ; B case 36 · 194 GP ; C case 31 · 245 GP ; D case 29 · 239 GP — C chance, B malchance, A chance, D cagnotte
-- Tour 12 — A case 38 · 184 GP ; B case 37 · 202 GP ; C case 33 · 252 GP ; D case 29 · 243 GP — C chance, B chance, A chance +1, D malchance -3
+- Tour 1 — A case 4 · 15 GP ; B case 5 · 31 GP ; C case 6 · 42 GP ; D case 5 · 51 GP — B bonus, C bonus, D bonus, A roue passe
+- Tour 2 — A case 6 · 35 GP ; B case 10 · 40 GP ; C case 8 · 57 GP ; D case 6 · 65 GP — B chance, C chance, D bonus, A bonus
+- Tour 3 — A case 8 · 72 GP ; B case 12 · 73 GP ; C case 13 · 77 GP ; D case 7 · 85 GP — B chance, C roue passe, D bonus, A chance
+- Tour 4 — A case 9 · 69 GP ; B case 16 · 81 GP ; C case 16 · 94 GP ; D case 11 · 98 GP — B bonus, C bonus, D bonus, A malchance
+- Tour 5 — A case 10 · 91 GP ; B case 20 · 93 GP ; C case 17 · 107 GP ; D case 20 · 106 GP — B cagnotte, C bonus, D chance +5, A chance
+- Tour 6 — A case 16 · 100 GP ; B case 21 · 109 GP ; C case 21 · 123 GP ; D case 21 · 110 GP — B cagnotte, C cagnotte, D cagnotte, A bonus
+- Tour 7 — A case 22 · 121 GP ; B case 20 · 115 GP ; C case 25 · 129 GP ; D case 24 · 107 GP — B malchance -4, C cagnotte, D malchance, A roue rembourse
+- Tour 8 — A case 23 · 126 GP ; B case 26 · 120 GP ; C case 29 · 137 GP ; D case 29 · 119 GP — B roue passe, C cagnotte, D cagnotte, A malchance -1
+- Tour 9 — A case 26 · 151 GP ; B case 28 · 121 GP ; C case 32 · 147 GP ; D case 29 · 129 GP — B malchance, C malchance -2, D chance -6, A malchance -2
+- Tour 10 — A case 30 · 162 GP ; B case 32 · 115 GP ; C case 38 · 168 GP ; D case 30 · 140 GP — B malchance, C roue +1 turbo, D bonus, A bonus
 
 ## 2 — Moyen
 
@@ -148,17 +149,17 @@ Graine 3271248641.
 | | Tours |
 | --- | ---: |
 | Moyenne | 8,3 |
-| Minimum | 5 |
+| Minimum | 4 |
 | Maximum | 12 |
 
 ### Scores finaux
 
 | Joueur | Moyenne | Écart-type | Minimum | Maximum |
 | --- | ---: | ---: | ---: | ---: |
-| A | 155,1 | 35,0 | 47 | 308 |
-| B | 186,1 | 37,2 | 81 | 325 |
-| C | 218,3 | 38,6 | 131 | 373 |
-| D | 227,7 | 39,4 | 111 | 417 |
+| A | 140,5 | 35,2 | 49 | 270 |
+| B | 148,7 | 35,8 | 64 | 304 |
+| C | 158,4 | 36,5 | 68 | 331 |
+| D | 162,0 | 35,5 | 78 | 306 |
 
 ### Victoires
 
@@ -166,15 +167,15 @@ Une victoire compte même en cas d'ex aequo : les probabilités peuvent donc dé
 
 | Joueur | Victoires |
 | --- | ---: |
-| A | 3,2 % |
-| B | 12,3 % |
-| C | 36,4 % |
-| D | 49,2 % |
-| Ex aequo | 1,1 % |
+| A | 14,0 % |
+| B | 21,7 % |
+| C | 30,3 % |
+| D | 35,8 % |
+| Ex aequo | 1,8 % |
 
 ### Écart 1er – 2e
 
-39,3 GP en moyenne.
+28,3 GP en moyenne.
 
 ### Origine des GP
 
@@ -182,153 +183,42 @@ Moyenne par joueur. La roue est nette (mises soustraites). Les mises au dé sont
 
 | Source | A | B | C | D |
 | --- | ---: | ---: | ---: | ---: |
-| ping-pong | 15,0 | 60,0 | 90,0 | 105,0 |
-| bonus | 11,6 | 11,5 | 11,6 | 11,4 |
-| chance | 9,5 | 9,6 | 9,6 | 9,6 |
-| malchance | -1,6 | -1,9 | -1,5 | -1,7 |
-| cagnotte | 25,9 | 26,8 | 26,0 | 27,0 |
-| roue (nette) | 0,6 | 1,2 | 1,5 | 1,0 |
-| mises au dé | -38,0 | -37,3 | -37,4 | -37,6 |
-| apéro | 29,5 | 30,1 | 30,3 | 30,2 |
-| poker | 25,9 | 24,7 | 24,2 | 24,7 |
-| trophées | 21,7 | 11,6 | 11,1 | 11,2 |
-| mini-jeu : Jeopardy | 11,7 | 11,7 | 11,6 | 12,2 |
-| mini-jeu : Mémoire express | 8,0 | 7,3 | 7,6 | 6,1 |
-| mini-jeu : Mime express | 8,8 | 5,8 | 8,5 | 5,6 |
-| mini-jeu : Pong gobelets | 9,0 | 7,2 | 7,9 | 5,4 |
-| mini-jeu : Top Ten | 8,2 | 8,4 | 8,3 | 8,3 |
-| mini-jeu : Undercover | 9,2 | 9,3 | 9,0 | 9,5 |
+| ping-pong | 5,0 | 20,0 | 30,0 | 35,0 |
+| bonus | 11,8 | 11,5 | 11,6 | 11,1 |
+| chance | 9,5 | 9,0 | 9,2 | 9,2 |
+| malchance | -1,7 | -1,6 | -1,6 | -1,9 |
+| cagnotte | 24,9 | 25,7 | 26,1 | 26,1 |
+| roue (nette) | 0,9 | 1,4 | 1,4 | 0,7 |
+| mises au dé | -36,9 | -37,9 | -37,2 | -37,5 |
+| arrivée | 12,2 | 12,5 | 11,6 | 11,6 |
+| poker | 30,5 | 29,9 | 29,6 | 29,5 |
+| trophées | 18,8 | 12,2 | 12,1 | 12,0 |
+| mini-jeu : Codenames | 11,7 | 12,0 | 11,7 | 11,9 |
+| mini-jeu : Jeopardy | 12,7 | 12,8 | 12,6 | 13,0 |
+| mini-jeu : Just One | 14,2 | 14,2 | 14,2 | 14,3 |
+| mini-jeu : Perudo | 5,8 | 6,0 | 5,9 | 6,1 |
+| mini-jeu : Top Ten | 10,0 | 10,0 | 9,9 | 10,0 |
+| mini-jeu : Undercover | 11,1 | 11,1 | 11,2 | 11,0 |
 
 ### Économie
 
 | | Valeur |
 | --- | ---: |
-| GP misés au dé, moyenne par partie | 150,3 |
-| GP misés à la roue, moyenne par partie | 100,1 |
-| Cagnotte maximale moyenne | 89,3 |
-| Cagnotte maximale observée | 211 |
-| Cagnotte restante en fin de partie | 59,7 |
-| Jackpots, moyenne par partie | 0,0 |
+| GP misés au dé, moyenne par partie | 149,6 |
+| GP misés à la roue, moyenne par partie | 58,3 |
+| Cagnotte maximale moyenne | 81,2 |
+| Cagnotte maximale observée | 188 |
+| Cagnotte restante en fin de partie | 53,0 |
+| Jackpots, moyenne par partie | 0,1 |
 
 ### Course
 
 | Joueur | Position finale moyenne |
 | --- | ---: |
-| A | 32,1 |
-| B | 32,0 |
-| C | 32,1 |
-| D | 32,0 |
-
-Arrivées multiples au dernier tour : 26,5 %.
-
-### Trophées
-
-La colonne des gagnants est la part des parties où ce joueur reçoit le trophée, y compris les partages.
-
-| Trophée | Attribuable | Tiré | A | B | C | D |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Le plus malchanceux | 100,0 % | 47,8 % | 12,1 % | 12,0 % | 12,5 % | 13,5 % |
-| Le poissard | 96,3 % | 44,1 % | 16,3 % | 17,5 % | 15,6 % | 17,0 % |
-| Marche arrière | 95,1 % | 46,3 % | 13,9 % | 14,5 % | 12,2 % | 12,8 % |
-| Le plus généreux | 90,5 % | 45,1 % | 15,4 % | 17,3 % | 16,8 % | 17,8 % |
-| Pas verni aux jeux | 100,0 % | 47,0 % | 44,7 % | 2,3 % | 0,0 % | 0,0 % |
-| Dernier au ping-pong | 100,0 % | 48,9 % | 48,9 % | 0,0 % | 0,0 % | 0,0 % |
-| Le flambeur | 100,0 % | 50,3 % | 3,3 % | 10,5 % | 18,3 % | 19,2 % |
-| Le prudent | 100,0 % | 41,3 % | 16,5 % | 11,3 % | 7,9 % | 7,6 % |
-| Le touriste | 0,9 % | 0,2 % | 0,1 % | 0,1 % | 0,0 % | 0,0 % |
-| Contre toutes attentes | 0,9 % | 0,1 % | 0,0 % | 0,1 % | 0,0 % | 0,0 % |
-| Retour gagnant | 63,7 % | 28,9 % | 9,4 % | 11,3 % | 8,8 % | 5,5 % |
-
-### Partie type
-
-Graine 3271241577.
-
-- Tour 1 — A case 7 · 34 GP ; B case 3 · 89 GP ; C case 7 · 113 GP ; D case 2 · 132 GP — A cagnotte, B bonus, C cagnotte, D bonus
-- Tour 2 — A case 12 · 43 GP ; B case 6 · 83 GP ; C case 14 · 114 GP ; D case 3 · 131 GP — A bonus, B roue tout-perdre, C chance, D malchance -2
-- Tour 3 — A case 13 · 51 GP ; B case 21 · 90 GP ; C case 15 · 122 GP ; D case 9 · 128 GP — A bonus, B chance +7, C bonus, D chance
-- Tour 4 — A case 20 · 86 GP ; B case 23 · 147 GP ; C case 21 · 192 GP ; D case 11 · 166 GP — A bonus, B cagnotte, C cagnotte, D malchance
-- Tour 5 — A case 24 · 91 GP ; B case 25 · 123 GP ; C case 25 · 164 GP ; D case 17 · 162 GP — A bonus, B roue tout-perdre, C roue tout-perdre, D bonus
-- Tour 6 — A case 26 · 104 GP ; B case 31 · 180 GP ; C case 28 · 195 GP ; D case 21 · 179 GP — A chance, B cagnotte, C cagnotte, D cagnotte
-- Tour 7 — A case 29 · 113 GP ; B case 35 · 189 GP ; C case 30 · 191 GP ; D case 27 · 182 GP — A roue rembourse, B bonus, C malchance, D malchance
-- Tour 8 — A case 33 · 120 GP ; B case 38 · 186 GP ; C case 37 · 194 GP ; D case 37 · 190 GP — A chance, C roue +3 turbo, D chance +4
-
-## 3 — Fort
-
-### Durée
-
-| | Tours |
-| --- | ---: |
-| Moyenne | 7,2 |
-| Minimum | 5 |
-| Maximum | 10 |
-
-### Scores finaux
-
-| Joueur | Moyenne | Écart-type | Minimum | Maximum |
-| --- | ---: | ---: | ---: | ---: |
-| A | 142,5 | 64,0 | 18 | 468 |
-| B | 169,6 | 72,3 | 7 | 771 |
-| C | 210,4 | 80,2 | 25 | 646 |
-| D | 215,6 | 89,5 | 49 | 1 299 |
-
-### Victoires
-
-Une victoire compte même en cas d'ex aequo : les probabilités peuvent donc dépasser 100 % au total.
-
-| Joueur | Victoires |
-| --- | ---: |
-| A | 10,8 % |
-| B | 18,3 % |
-| C | 36,2 % |
-| D | 35,5 % |
-| Ex aequo | 0,8 % |
-
-### Écart 1er – 2e
-
-75,2 GP en moyenne.
-
-### Origine des GP
-
-Moyenne par joueur. La roue est nette (mises soustraites). Les mises au dé sont négatives.
-
-| Source | A | B | C | D |
-| --- | ---: | ---: | ---: | ---: |
-| ping-pong | 15,0 | 60,0 | 90,0 | 105,0 |
-| bonus | 10,0 | 9,3 | 9,6 | 9,9 |
-| chance | 12,6 | 13,0 | 11,6 | 11,4 |
-| malchance | -1,4 | -1,3 | -1,3 | -1,4 |
-| cagnotte | 49,1 | 48,1 | 51,9 | 49,0 |
-| roue (nette) | 2,9 | 4,1 | 7,1 | 6,9 |
-| mises au dé | -71,4 | -71,9 | -71,9 | -71,9 |
-| apéro | 29,9 | 30,2 | 30,6 | 29,6 |
-| poker | 25,1 | 23,9 | 23,9 | 23,8 |
-| trophées | 23,2 | 10,8 | 11,9 | 11,4 |
-| mini-jeu : Jeopardy | 10,8 | 11,1 | 11,5 | 12,1 |
-| mini-jeu : Mémoire express | 5,9 | 5,6 | 6,1 | 4,6 |
-| mini-jeu : Mime express | 6,9 | 4,6 | 6,6 | 4,4 |
-| mini-jeu : Pong gobelets | 7,1 | 5,1 | 6,1 | 3,7 |
-| mini-jeu : Top Ten | 7,9 | 8,0 | 7,8 | 8,0 |
-| mini-jeu : Undercover | 8,9 | 9,1 | 9,0 | 9,2 |
-
-### Économie
-
-| | Valeur |
-| --- | ---: |
-| GP misés au dé, moyenne par partie | 287,0 |
-| GP misés à la roue, moyenne par partie | 254,0 |
-| Cagnotte maximale moyenne | 185,4 |
-| Cagnotte maximale observée | 457 |
-| Cagnotte restante en fin de partie | 123,1 |
-| Jackpots, moyenne par partie | 0,0 |
-
-### Course
-
-| Joueur | Position finale moyenne |
-| --- | ---: |
-| A | 30,9 |
-| B | 31,8 |
-| C | 31,3 |
-| D | 31,2 |
+| A | 31,9 |
+| B | 32,4 |
+| C | 31,8 |
+| D | 31,9 |
 
 Arrivées multiples au dernier tour : 27,0 %.
 
@@ -338,37 +228,246 @@ La colonne des gagnants est la part des parties où ce joueur reçoit le trophé
 
 | Trophée | Attribuable | Tiré | A | B | C | D |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Le plus malchanceux | 100,0 % | 49,0 % | 11,9 % | 10,6 % | 14,8 % | 15,2 % |
-| Le poissard | 95,4 % | 41,6 % | 15,4 % | 14,2 % | 15,5 % | 17,1 % |
-| Marche arrière | 91,2 % | 42,7 % | 11,7 % | 13,3 % | 12,0 % | 10,7 % |
-| Le plus généreux | 85,7 % | 44,7 % | 19,2 % | 16,0 % | 19,4 % | 17,2 % |
-| Pas verni aux jeux | 100,0 % | 50,2 % | 48,8 % | 1,5 % | 0,0 % | 0,0 % |
-| Dernier au ping-pong | 100,0 % | 47,6 % | 47,6 % | 0,0 % | 0,0 % | 0,0 % |
-| Le flambeur | 99,5 % | 48,2 % | 3,6 % | 10,3 % | 16,1 % | 18,4 % |
-| Le prudent | 99,5 % | 40,5 % | 19,7 % | 13,0 % | 10,7 % | 9,7 % |
-| Le touriste | 0,3 % | 0,1 % | 0,0 % | 0,0 % | 0,1 % | 0,0 % |
-| Contre toutes attentes | 0,3 % | 0,0 % | 0,0 % | 0,0 % | 0,0 % | 0,0 % |
-| Retour gagnant | 76,6 % | 35,4 % | 15,3 % | 11,4 % | 10,2 % | 6,4 % |
+| Le plus malchanceux | 100,0 % | 42,1 % | 10,0 % | 10,6 % | 12,9 % | 10,9 % |
+| Le poissard | 96,7 % | 40,8 % | 15,0 % | 14,1 % | 15,4 % | 13,9 % |
+| Marche arrière | 95,0 % | 42,5 % | 11,1 % | 10,8 % | 11,8 % | 14,4 % |
+| Le plus généreux | 90,2 % | 37,5 % | 12,7 % | 14,0 % | 14,8 % | 14,3 % |
+| Pas verni aux jeux | 100,0 % | 42,4 % | 26,2 % | 10,5 % | 3,6 % | 3,0 % |
+| Dernier au ping-pong | 100,0 % | 42,1 % | 42,1 % | 0,0 % | 0,0 % | 0,0 % |
+| Le flambeur | 99,8 % | 41,7 % | 4,6 % | 10,8 % | 14,3 % | 14,1 % |
+| Le prudent | 100,0 % | 32,9 % | 11,5 % | 7,2 % | 7,3 % | 9,4 % |
+| Le touriste | 100,0 % | 39,0 % | 9,8 % | 11,0 % | 10,1 % | 10,7 % |
+| Contre toutes attentes | 46,5 % | 12,1 % | 3,0 % | 2,8 % | 3,9 % | 2,7 % |
+| Retour gagnant | 81,1 % | 26,9 % | 10,8 % | 9,7 % | 6,9 % | 6,9 % |
 
 ### Partie type
 
-Graine 3271230289.
+Graine 3271245818.
 
-- Tour 1 — A case 4 · 17 GP ; B case 1 · 56 GP ; C case 2 · 97 GP ; D case 7 · 123 GP — C bonus, B malchance -4, A bonus, D cagnotte
-- Tour 2 — A case 7 · 55 GP ; B case 9 · 72 GP ; C case 3 · 123 GP ; D case 9 · 145 GP — C cagnotte, B bonus, A cagnotte, D bonus
-- Tour 3 — A case 9 · 66 GP ; B case 10 · 52 GP ; C case 9 · 121 GP ; D case 18 · 156 GP — C bonus, B roue moitie, A bonus, D chance +4
-- Tour 4 — A case 16 · 76 GP ; B case 14 · 60 GP ; C case 14 · 121 GP ; D case 24 · 213 GP — C chance, B chance, A chance, D cagnotte
-- Tour 5 — A case 21 · 116 GP ; B case 16 · 97 GP ; C case 15 · 102 GP ; D case 28 · 295 GP — C roue moitie, B chance, A chance, D cagnotte
-- Tour 6 — A case 25 · 105 GP ; B case 21 · 89 GP ; C case 17 · 105 GP ; D case 35 · 305 GP — C bonus, B chance, A malchance, D chance
-- Tour 7 — A case 29 · 120 GP ; B case 26 · 87 GP ; C case 19 · 110 GP ; D case 38 · 301 GP — C bonus, B bonus, A roue fois-1-5, D chance +2
+- Tour 1 — A case 6 · 27 GP ; B case 2 · 42 GP ; C case 6 · 59 GP ; D case 4 · 67 GP — B cagnotte, D bonus, C bonus, A bonus
+- Tour 2 — A case 9 · 31 GP ; B case 6 · 51 GP ; C case 7 · 71 GP ; D case 6 · 82 GP — B bonus, D bonus, C cagnotte, A malchance -3
+- Tour 3 — A case 14 · 30 GP ; B case 11 · 68 GP ; C case 10 · 57 GP ; D case 9 · 93 GP — B chance, D cagnotte, C malchance, A malchance
+- Tour 4 — A case 15 · 51 GP ; B case 19 · 73 GP ; C case 19 · 63 GP ; D case 8 · 105 GP — B chance +2, D malchance -4, C chance +2, A bonus
+- Tour 5 — A case 21 · 56 GP ; B case 23 · 88 GP ; C case 23 · 68 GP ; D case 10 · 110 GP — B bonus, D malchance -2, C bonus, A chance
+- Tour 6 — A case 28 · 56 GP ; B case 26 · 90 GP ; C case 24 · 79 GP ; D case 31 · 130 GP — B malchance, D chance +14, C chance, A chance
+- Tour 7 — A case 32 · 67 GP ; B case 29 · 93 GP ; C case 32 · 84 GP ; D case 35 · 168 GP — B bonus, D cagnotte, C bonus, A bonus
+- Tour 8 — A case 35 · 101 GP ; B case 34 · 107 GP ; C case 37 · 85 GP ; D case 38 · 168 GP — B chance, C bonus, A cagnotte
+
+## 3 — Fort
+
+### Durée
+
+| | Tours |
+| --- | ---: |
+| Moyenne | 7,3 |
+| Minimum | 4 |
+| Maximum | 10 |
+
+### Scores finaux
+
+| Joueur | Moyenne | Écart-type | Minimum | Maximum |
+| --- | ---: | ---: | ---: | ---: |
+| A | 119,2 | 50,4 | 26 | 313 |
+| B | 121,3 | 52,7 | 19 | 473 |
+| C | 134,6 | 57,8 | 21 | 560 |
+| D | 139,7 | 58,1 | 28 | 559 |
+
+### Victoires
+
+Une victoire compte même en cas d'ex aequo : les probabilités peuvent donc dépasser 100 % au total.
+
+| Joueur | Victoires |
+| --- | ---: |
+| A | 20,7 % |
+| B | 20,7 % |
+| C | 28,8 % |
+| D | 30,9 % |
+| Ex aequo | 1,1 % |
+
+### Écart 1er – 2e
+
+51,4 GP en moyenne.
+
+### Origine des GP
+
+Moyenne par joueur. La roue est nette (mises soustraites). Les mises au dé sont négatives.
+
+| Source | A | B | C | D |
+| --- | ---: | ---: | ---: | ---: |
+| ping-pong | 5,0 | 20,0 | 30,0 | 35,0 |
+| bonus | 9,8 | 10,1 | 10,3 | 10,0 |
+| chance | 11,3 | 12,0 | 10,5 | 10,6 |
+| malchance | -1,2 | -1,5 | -1,7 | -1,5 |
+| cagnotte | 45,8 | 44,8 | 48,1 | 47,0 |
+| roue (nette) | 2,1 | 0,9 | 3,0 | 3,4 |
+| mises au dé | -70,8 | -73,0 | -73,0 | -73,0 |
+| arrivée | 12,2 | 11,8 | 12,2 | 11,9 |
+| poker | 26,7 | 26,1 | 25,9 | 25,9 |
+| trophées | 21,3 | 12,1 | 11,5 | 11,9 |
+| mini-jeu : Codenames | 10,6 | 10,4 | 10,5 | 10,5 |
+| mini-jeu : Jeopardy | 10,8 | 11,3 | 10,9 | 11,6 |
+| mini-jeu : Just One | 12,3 | 12,4 | 12,6 | 12,4 |
+| mini-jeu : Perudo | 5,0 | 5,5 | 5,3 | 5,4 |
+| mini-jeu : Top Ten | 8,7 | 8,5 | 8,8 | 8,5 |
+| mini-jeu : Undercover | 9,5 | 9,8 | 9,8 | 10,1 |
+
+### Économie
+
+| | Valeur |
+| --- | ---: |
+| GP misés au dé, moyenne par partie | 289,8 |
+| GP misés à la roue, moyenne par partie | 125,7 |
+| Cagnotte maximale moyenne | 162,7 |
+| Cagnotte maximale observée | 403 |
+| Cagnotte restante en fin de partie | 113,0 |
+| Jackpots, moyenne par partie | 0,0 |
+
+### Course
+
+| Joueur | Position finale moyenne |
+| --- | ---: |
+| A | 31,7 |
+| B | 31,7 |
+| C | 32,1 |
+| D | 31,7 |
+
+Arrivées multiples au dernier tour : 30,3 %.
+
+### Trophées
+
+La colonne des gagnants est la part des parties où ce joueur reçoit le trophée, y compris les partages.
+
+| Trophée | Attribuable | Tiré | A | B | C | D |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Le plus malchanceux | 100,0 % | 42,4 % | 13,1 % | 9,6 % | 11,4 % | 11,7 % |
+| Le poissard | 95,5 % | 39,5 % | 15,7 % | 15,7 % | 13,5 % | 16,5 % |
+| Marche arrière | 90,9 % | 40,4 % | 12,6 % | 12,8 % | 8,5 % | 11,2 % |
+| Le plus généreux | 85,0 % | 34,0 % | 13,6 % | 12,9 % | 14,8 % | 13,7 % |
+| Pas verni aux jeux | 100,0 % | 41,5 % | 29,1 % | 8,4 % | 3,2 % | 1,8 % |
+| Dernier au ping-pong | 100,0 % | 43,5 % | 43,5 % | 0,0 % | 0,0 % | 0,0 % |
+| Le flambeur | 99,6 % | 38,8 % | 4,9 % | 8,8 % | 11,9 % | 13,7 % |
+| Le prudent | 99,6 % | 36,5 % | 17,4 % | 9,4 % | 9,5 % | 9,2 % |
+| Le touriste | 100,0 % | 40,3 % | 11,6 % | 8,6 % | 11,5 % | 10,8 % |
+| Contre toutes attentes | 44,9 % | 11,5 % | 3,1 % | 2,6 % | 3,2 % | 2,6 % |
+| Retour gagnant | 85,1 % | 31,6 % | 12,7 % | 11,6 % | 8,7 % | 7,6 % |
+
+### Partie type
+
+Graine 3271234498.
+
+- Tour 1 — A case 10 · 32 GP ; B case 1 · 36 GP ; C case 3 · 54 GP ; D case 8 · 48 GP — B bonus, D malchance, C bonus, A chance +8
+- Tour 2 — A case 16 · 41 GP ; B case 4 · 34 GP ; C case 10 · 73 GP ; D case 12 · 78 GP — B roue rembourse, D cagnotte, C cagnotte, A chance
+- Tour 3 — A case 20 · 41 GP ; B case 12 · 57 GP ; C case 12 · 89 GP ; D case 15 · 96 GP — B cagnotte, D cagnotte, C cagnotte, A malchance -1
+- Tour 4 — A case 24 · 37 GP ; B case 13 · 28 GP ; C case 19 · 87 GP ; D case 17 · 131 GP — B roue tout-perdre, D roue fois-2, C bonus, A malchance -2
+- Tour 5 — A case 25 · 42 GP ; B case 15 · 73 GP ; C case 23 · 83 GP ; D case 22 · 140 GP — B cagnotte, D chance, C roue rembourse, A bonus
+- Tour 6 — A case 29 · 108 GP ; B case 22 · 79 GP ; C case 24 · 77 GP ; D case 24 · 139 GP — B chance +4, D bonus, C malchance -4, A cagnotte
+- Tour 7 — A case 37 · 109 GP ; B case 27 · 90 GP ; C case 25 · 78 GP ; D case 32 · 129 GP — B roue rembourse, D chance +2, C bonus, A bonus
+- Tour 8 — A case 38 · 105 GP ; B case 31 · 140 GP ; C case 31 · 111 GP ; D case 38 · 124 GP — B cagnotte, C cagnotte
 
 ## Observations
 
-- 1 — Prudent : A ne gagne que 0,4 %. Sa chance réelle est faible dans ce style de mise.
-- 2 — Moyen : A ne gagne que 3,2 %. Sa chance réelle est faible dans ce style de mise.
-- 3 — Fort : la source « mises au dé » représente environ 287,0 GP en valeur absolue cumulée, pour un score moyen de 184,5.
-- « Le touriste » n'est attribuable que dans 0,5 % des parties, tous scénarios confondus.
-- « Contre toutes attentes » n'est attribuable que dans 0,5 % des parties, tous scénarios confondus.
-- Le joueur très faible reste rarement vainqueur quand tout le monde joue prudent ou moyen. Le style fort lui rend une chance, avec une variance et une cagnotte beaucoup plus grandes. Le joueur parfait ne gagne pas presque toutes les parties.
-- Pistes possibles, sans rien changer ici : resserrer l'écart de départ du ping-pong, ou rendre Le touriste et Contre toutes attentes plus souvent attribuables, si le rattrapage doit peser davantage.
+- 1 — Prudent : la source « poker » représente environ 134,6 GP en valeur absolue cumulée, pour un score moyen de 177,3.
+- 2 — Moyen : la source « mises au dé » représente environ 149,6 GP en valeur absolue cumulée, pour un score moyen de 152,4.
+- 3 — Fort : la source « mises au dé » représente environ 289,8 GP en valeur absolue cumulée, pour un score moyen de 128,7.
+- Note : `calculerClassement` dans `server/plateau.ts` départage les non-arrivés à égalité de position en rangeant le plus bas GP devant (mieux classé). C'est le code de jeu ; la simulation ne le change pas.
+- Le biais D des anciennes parties venait surtout des mini-jeux physiques au classement aléatoire et d'un Perudo cyclique (annonce 20×6 + Dudo). Le Perudo tire désormais un ordre d'élimination uniforme.
 - Aucune valeur de `config/` et aucune règle de jeu n'ont été modifiées pour produire ce rapport.
+
+## Annexe — mises asymétriques
+
+1000 parties par cas. Un seul joueur mise fort (super dé s'il est abordable, 50 % du solde à la roue) ; les trois autres jouent prudent. Référence : scénario tout-prudent (mêmes 1000 parties, graines du scénario 1). Durée de l'annexe : 896.5 s.
+
+Aucune valeur de `config/` n'a été modifiée.
+
+### Synthèse (miseur seul)
+
+| Miseur | Victoires (asym.) | Victoires (tout-prudent) | Δ victoires | GP moyen (asym.) | GP moyen (tout-prudent) | Δ GP |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A | 0,4 % | 9,9 % | −9,5 pts | 93,3 | 166,7 | −73,4 |
+| B | 1,5 % | 15,7 % | −14,2 pts | 102,0 | 172,4 | −70,4 |
+| C | 2,4 % | 30,8 % | −28,4 pts | 112,5 | 182,0 | −69,5 |
+| D | 3,1 % | 45,2 % | −42,1 pts | 117,6 | 188,2 | −70,6 |
+
+### Miseur A (les autres sont prudents)
+
+| Indicateur | Asymétrique | Tout-prudent | Δ |
+| --- | ---: | ---: | ---: |
+| Victoires | 0,4 % | 9,9 % | −9,5 pts |
+| GP final moyen | 93,3 | 166,7 | −73,4 |
+| mises au dé (moy. / partie) | -82,3 | 0,0 | −82,3 |
+| arrivée (moy. / partie) | 20,4 | 12,2 | +8,3 |
+| cagnotte (moy. / partie) | 16,1 | 1,5 | +14,6 |
+| roue (nette) (moy. / partie) | 0,9 | -0,0 | +0,9 |
+
+Victoires de tous les joueurs dans ce cas :
+
+| Joueur | Victoires |
+| --- | ---: |
+| A | 0,4 % |
+| B | 23,8 % |
+| C | 33,5 % |
+| D | 43,8 % |
+| Ex aequo | 1,5 % |
+
+### Miseur B (les autres sont prudents)
+
+| Indicateur | Asymétrique | Tout-prudent | Δ |
+| --- | ---: | ---: | ---: |
+| Victoires | 1,5 % | 15,7 % | −14,2 pts |
+| GP final moyen | 102,0 | 172,4 | −70,4 |
+| mises au dé (moy. / partie) | -84,0 | 0,0 | −84,0 |
+| arrivée (moy. / partie) | 20,2 | 12,2 | +8,1 |
+| cagnotte (moy. / partie) | 17,0 | 1,3 | +15,6 |
+| roue (nette) (moy. / partie) | 2,5 | 0,1 | +2,3 |
+
+Victoires de tous les joueurs dans ce cas :
+
+| Joueur | Victoires |
+| --- | ---: |
+| A | 14,4 % |
+| B | 1,5 % |
+| C | 37,3 % |
+| D | 49,4 % |
+| Ex aequo | 2,5 % |
+
+### Miseur C (les autres sont prudents)
+
+| Indicateur | Asymétrique | Tout-prudent | Δ |
+| --- | ---: | ---: | ---: |
+| Victoires | 2,4 % | 30,8 % | −28,4 pts |
+| GP final moyen | 112,5 | 182,0 | −69,5 |
+| mises au dé (moy. / partie) | -84,4 | 0,0 | −84,4 |
+| arrivée (moy. / partie) | 19,9 | 11,9 | +8,1 |
+| cagnotte (moy. / partie) | 18,3 | 1,3 | +17,0 |
+| roue (nette) (moy. / partie) | 2,2 | -0,1 | +2,3 |
+
+Victoires de tous les joueurs dans ce cas :
+
+| Joueur | Victoires |
+| --- | ---: |
+| A | 19,2 % |
+| B | 26,0 % |
+| C | 2,4 % |
+| D | 53,8 % |
+| Ex aequo | 1,4 % |
+
+### Miseur D (les autres sont prudents)
+
+| Indicateur | Asymétrique | Tout-prudent | Δ |
+| --- | ---: | ---: | ---: |
+| Victoires | 3,1 % | 45,2 % | −42,1 pts |
+| GP final moyen | 117,6 | 188,2 | −70,6 |
+| mises au dé (moy. / partie) | -84,9 | 0,0 | −84,9 |
+| arrivée (moy. / partie) | 19,9 | 11,8 | +8,1 |
+| cagnotte (moy. / partie) | 17,7 | 1,3 | +16,4 |
+| roue (nette) (moy. / partie) | 1,9 | -0,0 | +2,0 |
+
+Victoires de tous les joueurs dans ce cas :
+
+| Joueur | Victoires |
+| --- | ---: |
+| A | 21,7 % |
+| B | 27,7 % |
+| C | 48,7 % |
+| D | 3,1 % |
+| Ex aequo | 1,2 % |

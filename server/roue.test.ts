@@ -6,7 +6,7 @@ import type { Transaction } from '../shared/types';
 import type { Action, EtatJeu, Origine, TypeCase } from '../shared/types';
 import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { etatInitial } from './etat-initial';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     tirerDe: () => 1,
     ...partiel,
   };
@@ -64,7 +68,7 @@ function pret(ctx: ContexteReduction, montants = [30, 30]): EtatJeu {
   });
   etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
   etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-  etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+  etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
   etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
   return etat;
 }

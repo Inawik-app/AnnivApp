@@ -6,7 +6,7 @@ import { trophees } from '../shared/trophees';
 import type { Action, EtatJeu, Origine, ReseauVue, TypeCase } from '../shared/types';
 import { lireCatalogueTrophees, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { etatInitial } from './etat-initial';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { vueHote, vueJoueur, vueTv, type Presence } from './vues';
 
@@ -42,6 +42,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     ...partiel,
   };
 }
@@ -88,7 +92,7 @@ describe('fin de course', () => {
     let etat = inscrire(etatInitial('GP Party'), ctx, ['Inès', 'Noé', 'Lina']);
     etat = jouer(etat, { type: 'demarrerCourse' }, HOTE, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, HOTE, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, HOTE, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, HOTE, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, HOTE, ctx);
     const ordre = etat.course?.ordre ?? [];
     etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: ordre[0] ?? null }, ctx);
@@ -150,6 +154,10 @@ describe('cérémonie', () => {
       topten: null,
       jeopardy: null,
       undercover: null,
+      codenames: null,
+      perudo: null,
+      justone: null,
+      motsSoiree: [],
       choisitId: null,
       carteCourante: null,
       dernierDe: null,
@@ -160,6 +168,8 @@ describe('cérémonie', () => {
         longueur: 2,
         gainBonus: 5,
         choixMiniJeu: 'rotation',
+        recompenseArrivee: [0, 0, 0, 0],
+        coupDePouce: 'aucun',
         optionsDe: [
           { id: 'normal', nom: 'Dé normal', faces: 6, mise: 0, icone: 'de' },
           { id: 'booste', nom: 'Dé boosté', faces: 7, mise: 5, icone: 'de-dore' },
@@ -274,6 +284,7 @@ describe('cérémonie', () => {
     if (!plateau) throw new Error('course');
     plateau.regles.longueur = 38;
     plateau.arrivees = [ines, noe, lina, leo];
+    plateau.positions = { [ines]: 38, [noe]: 38, [lina]: 38, [leo]: 38 };
     plateau.historique.instantanes.push(
       {
         tour: 3,
@@ -315,6 +326,102 @@ describe('cérémonie', () => {
     expect(gain?.libelle).toContain('Remontada légendaire');
     expect(gain?.joueurId).toBe(ines);
     expect(JSON.stringify(vueTv(legende, PRESENCE, 0, 'x', ''))).toContain('Remontada légendaire');
+  });
+
+  it('crédite les récompenses d\'arrivée à l\'ouverture du podium', () => {
+    const { etat, ctx, ids } = courseTerminee(['Inès', 'Noé', 'Lina', 'Léo']);
+    const course = etat.course;
+    if (!course) throw new Error('course');
+    course.regles.recompenseArrivee = [25, 15, 8, 0];
+    const avant = etat.transactions.length;
+    const ouvert = jouer(etat, { type: 'ouvrirPodium' }, HOTE, ctx);
+    const gains = ouvert.transactions.slice(avant).filter((transaction) => transaction.source === 'arrivee');
+    expect(gains).toHaveLength(3);
+    expect(gains.map((transaction) => ({ id: transaction.joueurId, montant: transaction.montant }))).toEqual([
+      { id: ids[0], montant: 25 },
+      { id: ids[1], montant: 15 },
+      { id: ids[2], montant: 8 },
+    ]);
+    const podium = ouvert.evenements.find((evenement) => evenement.type === 'ceremonie.podium');
+    expect(podium?.donnees.recompenses).toEqual([
+      { joueurId: ids[0], montant: 25 },
+      { joueurId: ids[1], montant: 15 },
+      { joueurId: ids[2], montant: 8 },
+      { joueurId: ids[3], montant: 0 },
+    ]);
+    const tv = vueTv(ouvert, PRESENCE, 0, 'x', '');
+    expect(JSON.stringify(tv)).toContain('"montant":25');
+  });
+
+  it('verse la cagnotte de consolation au joueur le plus pauvre', () => {
+    const { etat, ctx, ids } = courseTerminee(['Inès', 'Noé', 'Lina']);
+    const course = etat.course;
+    if (!course) throw new Error('course');
+    course.cagnotte = 12;
+    etat.transactions.push(
+      { id: 't1', joueurId: ids[0]!, montant: 40, source: 'manuel', libelle: 'A', horodatage: 1, masquee: false },
+      { id: 't2', joueurId: ids[1]!, montant: 10, source: 'manuel', libelle: 'B', horodatage: 1, masquee: false },
+      { id: 't3', joueurId: ids[2]!, montant: 20, source: 'manuel', libelle: 'C', horodatage: 1, masquee: false },
+    );
+    ctx.cagnotteConsolation = 'dernier';
+    let courant = jouer(etat, { type: 'ouvrirPodium' }, HOTE, ctx);
+    expect(courant.course?.ceremonie?.etape).toBe('cagnotte');
+    expect(courant.course?.ceremonie?.cagnotteEnAttente).toEqual({ joueurId: ids[1], montant: 12 });
+    expect(refuser(courant, { type: 'tirerTrophees' }, ctx)).toBe("Affiche d'abord le podium");
+    courant = jouer(courant, { type: 'verserCagnotteConsolation' }, HOTE, ctx);
+    expect(courant.course?.cagnotte).toBe(0);
+    expect(courant.course?.ceremonie?.etape).toBe('podium');
+    const gain = courant.transactions.find((transaction) => transaction.source === 'cagnotte-consolation');
+    expect(gain).toMatchObject({ joueurId: ids[1], montant: 12 });
+    courant = jouer(courant, { type: 'tirerTrophees' }, HOTE, ctx);
+    expect(courant.course?.ceremonie?.etape).toBe('trophees');
+  });
+});
+
+describe('coup de pouce', () => {
+  it('offre gratuitement le dé boosté au joueur le plus pauvre encore en course', () => {
+    const plateau = lireConfigPlateau(RACINE);
+    plateau.longueur = 10;
+    plateau.disposition = [
+      'depart',
+      'bonus',
+      'bonus',
+      'bonus',
+      'bonus',
+      'bonus',
+      'bonus',
+      'bonus',
+      'bonus',
+      'bonus',
+      'arrivee',
+    ];
+    plateau.coupDePouce = 'de7';
+    const ctx = contexte({
+      plateau,
+      tirerDe: () => 1,
+    });
+    let etat = inscrire(etatInitial('GP Party'), ctx, ['Inès', 'Noé']);
+    const pauvre = etat.joueurs[0]!.id;
+    const riche = etat.joueurs[1]!.id;
+    etat = jouer(etat, { type: 'ajouterGP', joueurId: riche, montant: 20, libelle: 'Avance' }, HOTE, ctx);
+    etat = jouer(etat, { type: 'demarrerCourse' }, HOTE, ctx);
+    etat = jouer(etat, { type: 'nouveauTour' }, HOTE, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, HOTE, ctx);
+    etat = jouer(etat, { type: 'passerAuxDeplacements' }, HOTE, ctx);
+    const courant = etat.course?.ordre[etat.course.indexCourant];
+    if (courant !== pauvre) {
+      etat = jouer(etat, { type: 'passerJoueur' }, HOTE, ctx);
+    }
+    expect(etat.course?.ordre[etat.course.indexCourant]).toBe(pauvre);
+    expect(etat.course?.coupDePouceActif).toBe(true);
+    expect(vueJoueur(etat, PRESENCE, 0, 'x', pauvre).course?.optionsDe.find((option) => option.id === 'booste')?.mise).toBe(0);
+    etat = jouer(etat, { type: 'lancerDe', option: 'booste' }, { role: 'joueur', joueurId: pauvre }, ctx);
+    const mises = etat.transactions.filter(
+      (transaction) => transaction.joueurId === pauvre && transaction.source === 'mise',
+    );
+    expect(mises).toHaveLength(0);
+    expect(etat.course?.cagnotte).toBe(0);
+    expect(etat.course?.coupDePouceActif).toBe(false);
   });
 });
 

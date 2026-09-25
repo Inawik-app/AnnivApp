@@ -1,5 +1,6 @@
 {
   "nombreCeremonie": 4,
+  "cagnotteConsolation": "aucune",
   "trophees": [
   {
     "id": "malchanceux",
@@ -84,7 +85,7 @@
   {
     "id": "touriste",
     "nom": "Le touriste",
-    "description": "Dernier arrivé sur le plateau",
+    "description": "Dernier au classement final de la course",
     "icone": "trophee-touriste",
     "critere": "rangArrivee",
     "sens": "maximum",

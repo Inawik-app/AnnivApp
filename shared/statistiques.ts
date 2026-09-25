@@ -78,11 +78,10 @@ function cleJeu(transaction: Transaction): string | null {
   if (transaction.montant <= 0) return null;
   if (transaction.source === 'poker') return 'poker';
   if (transaction.source === 'ping-pong') return 'ping-pong';
-  if (transaction.source === 'apero' || transaction.source === 'apéro') return 'apéro';
+  if (transaction.source === 'arrivee') return 'arrivée';
   if (transaction.source !== 'mini-jeu') return null;
   const libelle = transaction.libelle.toLowerCase();
   if (libelle.includes('ping-pong') || libelle.includes('ping pong')) return 'ping-pong';
-  if (libelle.includes('apéro') || libelle.includes('apero')) return 'apéro';
   return transaction.libelle;
 }
 
@@ -180,11 +179,15 @@ export function statistiques(etat: EtatJeu): Record<string, StatistiquesJoueur> 
     }
   }
 
+  const rangsFinaux = rangsCourse(
+    etat.joueurs.map((joueur) => joueur.id),
+    (id) => course.positions[id] ?? 0,
+    course.arrivees,
+  );
   for (const joueur of etat.joueurs) {
     const stats = resultat[joueur.id];
     if (!stats) continue;
-    const index = course.arrivees.indexOf(joueur.id);
-    stats.rangArrivee = index >= 0 ? index + 1 : null;
+    stats.rangArrivee = rangsFinaux[joueur.id] ?? null;
     const apres = stats.rangs.length === 0 ? [] : instantanes.filter((instantane) => instantane.tour >= 3);
     const pires = apres
       .map((instantane) => instantane.joueurs.find((ligne) => ligne.id === joueur.id)?.rang)

@@ -1,5 +1,4 @@
 import { useState } from 'preact/hooks';
-import { REPONDANT_HOTE } from '../../shared/topten';
 import type { Action, TopTenVue } from '../../shared/types';
 import { Bouton } from '../commun/composants';
 import { BilanTopTen, ClassementTopTen, NumeroSecret, ResultatManche, nommeur, texteTheme } from '../commun/topten';
@@ -29,41 +28,36 @@ export function PanneauTopTen({
         {topten.bonusChiffresExacts.join(' / ')}
       </p>
       {manche ? (
-        <div class="pile">
-          <h3>
-            Manche {manche.numero} sur {nbManches} · Cap'Ten : {nom(manche.captenId)}
-          </h3>
-          <p class="theme-topten">{manche.theme.intitule}</p>
-          <p>{texteTheme(manche.theme)}</p>
-          {manche.etape === 'reponses' ? (
-            <>
-              {manche.monNumero !== null ? (
-                <>
-                  <p>Ton numéro :</p>
-                  <NumeroSecret numero={manche.monNumero} />
-                </>
-              ) : null}
-              {manche.numeros ? (
-                <ul class="recap-ordre" data-numeros-hote="1">
-                  {manche.repondants.map((id) => (
-                    <li key={id}>
-                      {nom(id)}
-                      {id === REPONDANT_HOTE ? ' (toi)' : ''} : {manche.numeros?.[id]}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {aLaPlace === manche.numero ? (
+        <div class="pile justone-zones">
+          <section class="pile" data-zone="mon-jeu">
+            <h3>Mon jeu</h3>
+            <p class="theme-topten">{manche.theme.intitule}</p>
+            <p>{texteTheme(manche.theme)}</p>
+            {manche.etape === 'reponses' && manche.monNumero !== null ? (
+              <>
+                <p>Ton numéro :</p>
+                <NumeroSecret numero={manche.monNumero} />
+              </>
+            ) : null}
+            {manche.etape === 'revelee' ? <ResultatManche manche={manche} nom={nom} /> : null}
+          </section>
+          <section class="pile" data-zone="arbitrage">
+            <h3>Arbitrage</h3>
+            <p>
+              Manche {manche.numero} sur {nbManches} · Cap'Ten : {nom(manche.captenId)}
+            </p>
+            {manche.etape === 'reponses' ? (
+              aLaPlace === manche.numero ? (
                 <ClassementTopTen key={manche.numero} manche={manche} nom={nom} occupe={envoi} envoyer={agir} />
               ) : (
                 <Bouton variante="secondaire" disabled={envoi} onClick={() => setALaPlace(manche.numero)}>
                   Classer à la place du Cap'Ten
                 </Bouton>
-              )}
-            </>
-          ) : (
-            <ResultatManche manche={manche} nom={nom} />
-          )}
+              )
+            ) : (
+              <ResultatManche manche={manche} nom={nom} />
+            )}
+          </section>
         </div>
       ) : (
         <p>Cap'Ten dans l'ordre : {topten.captens.map(nom).join(', ')}</p>

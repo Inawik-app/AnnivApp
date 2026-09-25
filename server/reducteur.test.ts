@@ -5,7 +5,7 @@ import type { Action, EtatJeu, Origine } from '../shared/types';
 import { solde } from '../shared/soldes';
 import { verifierRegleOr } from './regle-or';
 import { lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,6 +30,10 @@ function contexte(): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
   };
 }
 

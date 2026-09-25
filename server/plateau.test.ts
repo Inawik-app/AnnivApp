@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
 import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { creerStore } from './store';
 import { vueTv } from './vues';
@@ -41,6 +41,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     ...partiel,
   };
 }
@@ -122,7 +126,7 @@ describe('plateau', () => {
     const ordre = etat.course?.ordre ?? [];
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     expect(etat.course?.choisitId).toBe(ordre[0]);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     while (etat.course?.phase === 'deplacements') {
       const courant = etat.course.ordre[etat.course.indexCourant];
@@ -151,7 +155,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 4, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     const trop = reduire(etat, { type: 'lancerDe', option: 'super' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(trop.ok).toBe(false);
@@ -182,7 +186,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: noe, montant: 20, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', option: 'booste' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(1);
@@ -207,7 +211,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 10, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     const courant = etat.course?.ordre[0] ?? mira;
     etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: courant }, ctx);
@@ -228,7 +232,7 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 5, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(4);
@@ -275,7 +279,7 @@ describe('plateau', () => {
     };
     for (let tour = 0; tour < 12 && etat.course?.phase !== 'terminee'; tour += 1) {
       etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-      etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+      etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
       etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
       let garde = 0;
       while (etat.course?.phase === 'deplacements' && garde < 40) {
@@ -321,7 +325,7 @@ describe('plateau', () => {
     store.dispatch({ type: 'demarrerCourse' }, hote);
     const lanceur = store.etat().course?.ordre[0] ?? courant;
     store.dispatch({ type: 'nouveauTour' }, hote);
-    store.dispatch({ type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote);
+    store.dispatch({ type: 'choisirMiniJeu', id: 'poker' }, hote);
     store.dispatch({ type: 'passerAuxDeplacements' }, hote);
     const avant = store.etat().course?.positions[lanceur];
     const soldeAvant = solde(store.etat().transactions, lanceur, 'visibles');

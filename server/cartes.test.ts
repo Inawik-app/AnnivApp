@@ -7,7 +7,7 @@ import type { Action, EtatJeu, Origine, TypeCase } from '../shared/types';
 import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { etatInitial } from './etat-initial';
 import { fusionnerEtat } from './fusion';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +36,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     tirerDe: () => 1,
     ...partiel,
   };
@@ -61,7 +65,7 @@ function partie(ctx: ContexteReduction, pseudos: string[], montants: number[]): 
   });
   etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
   etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-  etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+  etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
   etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
   return etat;
 }
@@ -300,7 +304,14 @@ describe('ancienne sauvegarde', () => {
       course: {
         disposition: ['depart', 'duel', 'arrivee'],
         phase: 'deplacements',
-        regles: { longueur: 2, gainBonus: 5, choixMiniJeu: 'rotation' },
+        regles: {
+          longueur: 2,
+          gainBonus: 5,
+          choixMiniJeu: 'rotation',
+          recompenseArrivee: [0, 0, 0, 0],
+          coupDePouce: 'aucun',
+          optionsDe: [],
+        },
         positions: {},
         pioche: ['cadeau'],
         etape: { genre: 'duel' },

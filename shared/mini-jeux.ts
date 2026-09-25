@@ -21,7 +21,7 @@ export type EntreeClassement = { joueurId: string; exAequo: boolean };
 export type GainMiniJeu = { joueurId: string; montant: number; rang?: number };
 
 /** Modules dont l'écran existe. Les autres affichent les règles, en attendant l'étape suivante. */
-export const MODULES_PRETS = new Set(['poker', 'topten', 'jeopardy', 'undercover']);
+export const MODULES_PRETS = new Set(['poker', 'topten', 'jeopardy', 'undercover', 'codenames', 'perudo', 'justone']);
 
 export function modulePret(module: string): boolean {
   return module === 'aucun' || MODULES_PRETS.has(module);
@@ -217,6 +217,9 @@ export function validerCatalogue(brut: unknown): CatalogueMiniJeux {
     if (typeof entree.module !== 'string' || entree.module.trim().length === 0) {
       echec(`le mini-jeu « ${id} » n'a pas de module`);
     }
+    if (typeof entree.hoteParticipe !== 'boolean') {
+      echec(`le mini-jeu « ${id} » doit indiquer hoteParticipe (booléen)`);
+    }
     const jeu: MiniJeu = {
       id,
       nom: entree.nom.trim(),
@@ -225,6 +228,7 @@ export function validerCatalogue(brut: unknown): CatalogueMiniJeux {
       regles,
       saisie: entree.saisie as SaisieMiniJeu,
       module: entree.module.trim(),
+      hoteParticipe: entree.hoteParticipe,
     };
     if (materiel) jeu.materiel = materiel;
     if (duree !== undefined) jeu.duree = duree;
@@ -266,4 +270,10 @@ export function validerPoker(brut: unknown): ConfigPoker {
 
 export function jeuParId(catalogue: CatalogueMiniJeux, id: string): MiniJeu | undefined {
   return catalogue.jeux.find((jeu) => jeu.id === id);
+}
+
+/** Vrai si le mini-jeu courant laisse l'hôte participer comme un joueur (sans GP). */
+export function jeuHoteParticipe(catalogue: CatalogueMiniJeux, miniJeuId: string | null | undefined): boolean {
+  if (!miniJeuId) return false;
+  return jeuParId(catalogue, miniJeuId)?.hoteParticipe === true;
 }

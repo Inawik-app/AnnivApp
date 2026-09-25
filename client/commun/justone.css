@@ -1,0 +1,76 @@
+.justone-avertissement {
+  font-family: var(--police-pixel);
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.justone-secret {
+  font-family: var(--police-pixel);
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.justone-formulaire input {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 0.5rem;
+  font-size: 1.25rem;
+  touch-action: manipulation;
+}
+
+.justone-indices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.justone-indices li {
+  margin: 0 0.5rem 0.5rem 0;
+}
+
+.justone-carte {
+  min-width: 120px;
+  min-height: 72px;
+  padding: 0.5rem;
+  border: 3px solid var(--encre, #1a1a2e);
+  background: var(--carton, #f5e6c8);
+  font-family: var(--police-pixel);
+  touch-action: manipulation;
+}
+
+.justone-carte.annulee {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.justone-carte.choisie {
+  outline: 3px solid var(--or, #c9a227);
+}
+
+.justone-auteur {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.justone-mot {
+  display: block;
+  font-size: 1.1rem;
+  margin-top: 0.25rem;
+}
+
+.justone-zones {
+  display: flex;
+  flex-direction: column;
+}
+
+.justone-zones > * {
+  margin-bottom: 1rem;
+}
+
+.justone-zones h3 {
+  margin: 0 0 0.5rem;
+  font-family: var(--police-pixel);
+}

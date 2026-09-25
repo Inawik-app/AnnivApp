@@ -43,11 +43,14 @@ const CRITERES = new Set<string>([
 
 export type CatalogueTrophees = {
   nombreCeremonie: number;
+  cagnotteConsolation: 'aucune' | 'dernier';
   trophees: TropheeConfig[];
 };
 
 export function lireTrophees(contenu: unknown): CatalogueTrophees {
-  if (Array.isArray(contenu)) return { nombreCeremonie: 4, trophees: lireListeTrophees(contenu) };
+  if (Array.isArray(contenu)) {
+    return { nombreCeremonie: 4, cagnotteConsolation: 'aucune', trophees: lireListeTrophees(contenu) };
+  }
   if (!contenu || typeof contenu !== 'object') throw new Error('Le catalogue des trophées est illisible.');
   const brut = contenu as Record<string, unknown>;
   if (!Array.isArray(brut.trophees)) throw new Error('Le catalogue des trophées doit contenir une liste.');
@@ -55,7 +58,15 @@ export function lireTrophees(contenu: unknown): CatalogueTrophees {
   if (typeof nombre !== 'number' || !Number.isInteger(nombre) || nombre < 1) {
     throw new Error('nombreCeremonie doit être un entier au moins égal à 1.');
   }
-  return { nombreCeremonie: nombre, trophees: lireListeTrophees(brut.trophees) };
+  const consolation = brut.cagnotteConsolation;
+  if (consolation !== undefined && consolation !== 'aucune' && consolation !== 'dernier') {
+    throw new Error('cagnotteConsolation doit être « aucune » ou « dernier ».');
+  }
+  return {
+    nombreCeremonie: nombre,
+    cagnotteConsolation: consolation === 'dernier' ? 'dernier' : 'aucune',
+    trophees: lireListeTrophees(brut.trophees),
+  };
 }
 
 function lireListeTrophees(contenu: unknown[]): TropheeConfig[] {
@@ -143,11 +154,11 @@ export function trophees(etat: EtatJeu, catalogue: readonly TropheeConfig[]): Tr
     const eligibles = ids.filter((id) => valeurs[id] !== null);
     const nombres = eligibles.map((id) => valeurs[id]!);
     const toutNul = nombres.length > 0 && nombres.every((nombre) => nombre === 0);
-    const exigeTous = trophee.critere !== 'indiceChance';
+    const exigeTous = trophee.critere !== 'indiceChance' && trophee.critere !== 'rangArrivee';
     const incomplet = exigeTous && eligibles.length !== ids.length;
     const cible = nombres.length === 0 ? null : trophee.sens === 'maximum' ? Math.max(...nombres) : Math.min(...nombres);
     const tousEgaux = cible !== null && eligibles.length >= 2 && nombres.every((nombre) => nombre === cible);
-    const remonteeVide = trophee.critere === 'remontee' && (cible === null || cible <= 0);
+    const remonteeVide = trophee.critere === 'remontee' && (cible === null || cible < 2);
     const sansEcart = tousEgaux || toutNul || incomplet || eligibles.length === 0 || remonteeVide;
     let gagnants = sansEcart || cible === null ? [] : eligibles.filter((id) => valeurs[id] === cible);
     if (trophee.critere === 'remontee' && gagnants.length > 1) {

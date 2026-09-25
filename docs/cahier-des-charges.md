@@ -13,6 +13,9 @@ Je suis développeur et j'organise mon anniversaire le **samedi 26 septembre** c
 - **4 joueurs** : mes amis. Ils jouent depuis leur téléphone.
 - **L'hôte** : moi. Je pilote la partie depuis mon téléphone. **Je ne gagne jamais de points** (je participe à certaines activités mais mes gains éventuels sont redistribués ou ignorés, voir plus bas).
 
+**Participation de l'hôte.** L'hôte peut jouer dans certains mini-jeux, mais il ne gagne jamais de GP. Sa présence ne doit **jamais** faire perdre de points à un joueur, ni directement ni indirectement : il ne peut ni prendre un rôle qui rapporte des points, ni retirer une chance de gain à un joueur. Il ne participe qu'aux jeux où cette règle est garantie par le code.
+Exception : au poker, l'hôte joue normalement. Les jetons sont offerts et non pris sur les GP des joueurs, et le tapis de l'hôte est redistribué à parts égales en fin de partie.
+
 ## Architecture technique
 
 - **Serveur local** sur mon PC : Node.js + Express + Socket.IO. Tout passe par le réseau Wi-Fi de mon appartement, pas d'hébergement.
@@ -118,16 +121,10 @@ Idée discutée pour donner de la valeur à l'ordre de passage : à chaque tour,
 
 - Tournoi à 5 (les 4 joueurs + moi), chacun affronte chacun une fois : 10 matchs.
 - Matchs en **7 points**.
-- Chaque point marqué = **3 GP**.
-- **Contre moi, chaque point marqué vaut 6 GP**, quelle que soit l'issue du match. **Ce bonus est secret** : les GP du tournoi ne doivent **pas** être affichés en direct. Je saisis les scores des matchs, et le décompte en GP est révélé d'un coup à la fin du tournoi.
+- Chaque point marqué = **1 GP** (`gpParPoint` dans `config/pingpong.json`).
+- **Contre moi, chaque point marqué vaut 2 GP** (`gpParPointContreHote`), quelle que soit l'issue du match. **Ce bonus est secret** : les GP du tournoi ne doivent **pas** être affichés en direct. Je saisis les scores des matchs, et le décompte en GP est révélé d'un coup à la fin du tournoi.
+- Formule papier : `GP = points_vs_joueurs × gpParPoint + points_vs_hote × gpParPointContreHote` (4 matchs entre joueurs + matchs contre l'hôte).
 - Je ne gagne pas de GP.
-
-### Apéro (environ 1h, pendant la cuisson du repas)
-
-- **Qui suis-je ?** (post-it sur le front) : 15 / 10 / 5 GP aux trois premiers qui trouvent.
-- **Undercover** (mots sur papier) : barème à définir.
-- Total visé pour l'apéro : 20 à 40 GP par joueur maximum. Saisie manuelle.
-- Pas d'écran pendant ces jeux (mains prises).
 
 ### Poker (après le repas)
 
@@ -144,7 +141,7 @@ Chaque joueur reçoit des missions à accomplir discrètement pendant la soirée
 
 ### Échelle attendue
 
-Ping-pong : 40 à 80 GP par joueur environ. Poker : 0 à 40. Apéro : 20 à 40. Les valeurs du plateau (cases, mises, trophées) doivent rester cohérentes avec cette échelle.
+Ping-pong : environ 5 à 35 GP par joueur avec le barème retenu (1 GP / point, 2 GP contre l'hôte). Poker : 0 à 40. Les valeurs du plateau (cases, mises, trophées, récompenses d'arrivée) doivent rester cohérentes avec cette échelle.
 
 ## La phase finale
 
@@ -152,7 +149,7 @@ Dès qu'un joueur atteint l'arrivée, le tour en cours va jusqu'au bout : les au
 
 La cérémonie, pilotée par l'hôte et annulable étape par étape :
 
-1. **Fin de la course** : la télé affiche le podium, dans l'ordre d'arrivée.
+1. **Fin de la course** : la télé affiche le podium, dans l'ordre d'arrivée. Des GP d'arrivée sont versés alors selon `recompenseArrivee` dans `config/plateau.json` (retenu : 25 / 15 / 8 / 0 pour le 1er au 4e, source `arrivee`), et affichés sur le podium.
 2. **Trophées de rattrapage** : le serveur en tire 4 parmi ceux qui sont attribuables (`nombreCeremonie` dans `config/trophees.json`). S'il y en a moins, ils sont tous décernés. L'hôte voit la liste à l'avance. La télé révèle chaque trophée à son tour : le nom, un moment de suspense, puis les gagnants. En cas d'égalité, tous le reçoivent. La remontée depuis la dernière place jusqu'à l'arrivée s'appelle Remontada légendaire et rapporte un bonus.
 3. **Classement final** : les joueurs du dernier au deuxième, avec leur total.
 4. **Gagnant** : il apparaît en grand et remporte le bon de 20 €.

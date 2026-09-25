@@ -1,6 +1,7 @@
 import type { CatalogueMiniJeux, ConfigPoker } from './mini-jeux';
 import type { Devines, ScoreTopTen, ThemeTopTen } from './topten';
 import type { CouleurBuzzer, QuestionEnCours } from './jeopardy';
+import type { CouleurCarte, EquipeCodenames, NombreIndice } from './codenames';
 import type { PaireUndercover, RoleUndercover } from './undercover';
 
 export type Joueur = {
@@ -101,6 +102,10 @@ export type ReglesCourse = {
   /** `rotation` : le choix tourne dans l'ordre de passage. `dernierAuClassement` : le moins de GP visibles choisit. */
   choixMiniJeu: 'rotation' | 'dernierAuClassement';
   optionsDe: OptionDe[];
+  /** GP crédités à l'ouverture du podium, dans l'ordre du classement d'arrivée. */
+  recompenseArrivee: number[];
+  /** Dé gratuit (7 ou 8 faces) pour le joueur le plus pauvre encore en course. */
+  coupDePouce: 'aucun' | 'de7' | 'de8';
 };
 
 export type EtapeDeplacement = { genre: 'lancer' } | { genre: 'roue' };
@@ -156,6 +161,8 @@ export type MiniJeu = {
   bareme?: number[];
   /** `aucun` pour un jeu physique, sinon le nom du module à l'écran. */
   module: string;
+  /** L'hôte joue comme un participant (sans jamais gagner de GP). */
+  hoteParticipe: boolean;
 };
 
 export type EtatMinuteur = 'arrete' | 'enCours' | 'enPause';
@@ -230,6 +237,119 @@ export type UndercoverCourse = {
   recap: boolean;
 };
 
+export type CarteCodenames = {
+  mot: string;
+  couleur: CouleurCarte;
+  revelee: boolean;
+};
+
+export type IndiceCodenames = {
+  mot: string;
+  nombre: NombreIndice;
+};
+
+export type PreparationCodenames = {
+  equipes: { rouge: string[]; bleu: string[] };
+  espions: { rouge: string | null; bleu: string | null };
+};
+
+export type MancheCodenames = {
+  numero: number;
+  cartes: CarteCodenames[];
+  equipeDebut: EquipeCodenames;
+  equipes: { rouge: string[]; bleu: string[] };
+  espions: { rouge: string; bleu: string };
+  etape: 'indice' | 'choix' | 'finie';
+  equipeCourante: EquipeCodenames;
+  indicePropose: IndiceCodenames | null;
+  indice: IndiceCodenames | null;
+  essaisRestants: number | null;
+  /** Cartes retournées depuis l'indice en cours. */
+  cartesTour: number;
+  dernierRevele: number | null;
+  gagnant: EquipeCodenames | null;
+  gains: Record<string, number>;
+};
+
+export type CodenamesCourse = {
+  nbManches: number;
+  /** Mots déjà sortis dans la soirée, pour ne pas les rejouer. */
+  motsJoues: string[];
+  preparation: PreparationCodenames;
+  manches: MancheCodenames[];
+};
+
+export type JoueurPerudo = {
+  id: string;
+  desRestants: number;
+  faces: number[];
+  aLance: boolean;
+};
+
+export type AnnoncePerudoEtat = {
+  joueurId: string;
+  nombre: number;
+  valeur: number;
+};
+
+export type RevelationPerudo = {
+  faces: Record<string, number[]>;
+  annonce: AnnoncePerudoEtat;
+  compte: number;
+  genre: 'dudo' | 'calza';
+  concerneId: string;
+  delta: -1 | 0 | 1;
+  libelle: string;
+};
+
+export type PerudoCourse = {
+  desParJoueur: number;
+  calzaAutorise: boolean;
+  numeroManche: number;
+  joueurs: JoueurPerudo[];
+  indexCourant: number;
+  etape: 'lancers' | 'encheres' | 'revelation' | 'terminee';
+  annonce: AnnoncePerudoEtat | null;
+  historique: AnnoncePerudoEtat[];
+  revelation: RevelationPerudo | null;
+  /** Premier sorti en tête. */
+  elimines: string[];
+  premierId: string;
+  gains: Record<string, number>;
+};
+
+export type IndiceJustOne = {
+  auteurId: string;
+  mot: string;
+  annule: boolean;
+};
+
+export type MancheJustOne = {
+  numero: number;
+  devineurId: string;
+  /** Mot secret : toujours dans l'état serveur. */
+  mot: string;
+  etape: 'indices' | 'verification' | 'revelation' | 'reponse' | 'finie';
+  indices: IndiceJustOne[];
+  propositionAnnulation: { auteurId: string; indexA: number; indexB: number } | null;
+  issue: 'trouve' | 'rate' | 'passe' | null;
+  gains: Record<string, number>;
+};
+
+export type JustOneCourse = {
+  cycles: number;
+  hoteDevine: boolean;
+  dureeIndices: number;
+  gainDevineur: number;
+  gainIndice: number;
+  /** Rotation : joueurs × cycles, puis hôte × cycles si hoteDevine. */
+  ordreDevineurs: string[];
+  indexDevineur: number;
+  manches: MancheJustOne[];
+  recap: boolean;
+  gains: Record<string, number>;
+};
+
 export type Course = {
   active: boolean;
   disposition: TypeCase[];
@@ -257,6 +377,11 @@ export type Course = {
   topten?: TopTenCourse | null;
   jeopardy?: JeopardyCourse | null;
   undercover?: UndercoverCourse | null;
+  codenames?: CodenamesCourse | null;
+  perudo?: PerudoCourse | null;
+  justone?: JustOneCourse | null;
+  /** Registre commun des mots déjà tirés (Codenames + Just One). */
+  motsSoiree: string[];
   choisitId: string | null;
   carteCourante: { joueurId: string; carte: CarteChance } | null;
   dernierDe: { joueurId: string; valeur: number; faces: number; usage: UsageDe; option: string | null } | null;
@@ -264,6 +389,8 @@ export type Course = {
   /** Vrai dès la première arrivée : le tour en cours va au bout, puis la course s'arrête. */
   dernierTour: boolean;
   ceremonie: Ceremonie | null;
+  /** Vrai quand le lanceur courant a droit au dé gratuit du coup de pouce. */
+  coupDePouceActif?: boolean;
   regles: ReglesCourse;
   historique: HistoriqueCourse;
 };
@@ -280,11 +407,13 @@ export type TropheeTire = {
 
 export type Ceremonie = {
   masqueesIgnorees: boolean;
-  etape: 'podium' | 'trophees' | 'classement' | 'gagnant';
+  etape: 'podium' | 'cagnotte' | 'trophees' | 'classement' | 'gagnant';
   tirage: TropheeTire[];
   reveles: number;
   classementRevele: boolean;
   gagnantRevele: boolean;
+  /** Cagnotte de consolation en attente de versement. */
+  cagnotteEnAttente?: { joueurId: string; montant: number } | null;
 };
 
 export type ConfigPlateau = {
@@ -295,6 +424,8 @@ export type ConfigPlateau = {
   optionsDe: OptionDe[];
   iconesCases: Record<TypeCase, string>;
   disposition?: TypeCase[];
+  recompenseArrivee: number[];
+  coupDePouce: 'aucun' | 'de7' | 'de8';
 };
 
 export type Partie = {
@@ -333,7 +464,7 @@ export type Action =
       libelle: string;
       masquee?: boolean;
       groupeRevelation?: string;
-      /** Défaut `manuel`. `ping-pong` et `apero` alimentent les statistiques. */
+      /** Défaut `manuel`. `ping-pong` alimente les statistiques. */
       source?: string;
     }
   | { type: 'revelerMasquees'; groupe?: string }
@@ -383,6 +514,27 @@ export type Action =
   | { type: 'eliminerUndercover'; joueurId: string }
   | { type: 'devinerUndercover'; trouve: boolean }
   | { type: 'recapUndercover' }
+  | { type: 'affecterCodenames'; joueurId: string; equipe: EquipeCodenames | null }
+  | { type: 'equipesHasardCodenames' }
+  | { type: 'designerEspionCodenames'; equipe: EquipeCodenames; joueurId: string }
+  | { type: 'lancerGrilleCodenames' }
+  | { type: 'proposerIndiceCodenames'; mot: string; nombre: NombreIndice }
+  | { type: 'validerIndiceCodenames' }
+  | { type: 'refuserIndiceCodenames' }
+  | { type: 'retournerMotCodenames'; index: number }
+  | { type: 'finirTourCodenames' }
+  | { type: 'lancerDesPerudo'; joueurId?: string }
+  | { type: 'annoncerPerudo'; nombre: number; valeur: number }
+  | { type: 'dudoPerudo' }
+  | { type: 'calzaPerudo' }
+  | { type: 'mancheSuivantePerudo' }
+  | { type: 'lancerMancheJustOne' }
+  | { type: 'proposerIndiceJustOne'; mot: string; joueurId?: string }
+  | { type: 'proposerAnnulationJustOne'; indexA: number; indexB: number }
+  | { type: 'validerAnnulationJustOne'; accepter: boolean }
+  | { type: 'revelerIndicesJustOne' }
+  | { type: 'jugerJustOne'; issue: 'trouve' | 'rate' | 'passe' }
+  | { type: 'recapJustOne' }
   | { type: 'passerAuxDeplacements' }
   | { type: 'lancerDe'; option: string }
   | { type: 'miserRoue'; montant: number }
@@ -390,6 +542,7 @@ export type Action =
   | { type: 'passerJoueur' }
   | { type: 'terminerCourse' }
   | { type: 'ouvrirPodium'; forcer?: boolean }
+  | { type: 'verserCagnotteConsolation' }
   | { type: 'tirerTrophees' }
   | { type: 'revelerTrophee' }
   | { type: 'revelerClassement' }
@@ -436,7 +589,7 @@ export type MancheTopTenVue = {
   etape: 'reponses' | 'revelee';
   /** Le numéro du répondant qui regarde (joueur ou hôte), sinon null. */
   monNumero: number | null;
-  /** Tous les numéros : l'hôte toujours, les autres seulement après la révélation. */
+  /** Tous les numéros : après révélation, ou hôte hors participation ; sinon null. */
   numeros: Record<string, number> | null;
   proposition: { ordre: string[]; devines: Devines } | null;
   score: ScoreTopTen | null;
@@ -502,6 +655,109 @@ export type UndercoverVue = {
   recap: boolean;
 };
 
+export type CarteCodenamesVue = {
+  index: number;
+  mot: string;
+  couleur: CouleurCarte | null;
+  revelee: boolean;
+};
+
+export type MancheCodenamesVue = {
+  numero: number;
+  cartes: CarteCodenamesVue[];
+  equipeDebut: EquipeCodenames;
+  equipes: { rouge: string[]; bleu: string[] };
+  espions: { rouge: string; bleu: string };
+  etape: 'indice' | 'choix' | 'finie';
+  equipeCourante: EquipeCodenames;
+  acteurId: string;
+  indicePropose: IndiceCodenames | null;
+  indice: IndiceCodenames | null;
+  essaisRestants: number | null;
+  restants: { rouge: number; bleu: number };
+  dernierRevele: number | null;
+  gagnant: EquipeCodenames | null;
+  gains: Record<string, number>;
+  monRole: 'espion' | 'agent' | null;
+  monEquipe: EquipeCodenames | null;
+};
+
+export type CodenamesVue = {
+  nbManches: number;
+  dureeIndice: number;
+  gainGagnant: number;
+  gainPerdant: number;
+  preparation: PreparationCodenames;
+  courante: MancheCodenamesVue | null;
+};
+
+export type JoueurPerudoVue = {
+  id: string;
+  desRestants: number;
+  faces: number[] | null;
+  aLance: boolean;
+  elimine: boolean;
+};
+
+export type PerudoVue = {
+  desParJoueur: number;
+  calza: boolean;
+  numeroManche: number;
+  etape: PerudoCourse['etape'];
+  joueurs: JoueurPerudoVue[];
+  courantId: string | null;
+  annonce: AnnoncePerudoEtat | null;
+  historique: AnnoncePerudoEtat[];
+  revelation: RevelationPerudo | null;
+  elimines: string[];
+  totalDes: number;
+  gains: Record<string, number>;
+  premierId: string;
+  /** Vrai tant que la première manche n'a pas commencé : la télé montre les règles. */
+  regles: boolean;
+};
+
+export type IndiceJustOneVue = {
+  auteurId: string;
+  /** Texte : visible selon le rôle ; null si annulé sur la télé, ou secret non encore révélé. */
+  mot: string | null;
+  annule: boolean;
+};
+
+export type MancheJustOneVue = {
+  numero: number;
+  devineurId: string;
+  etape: 'indices' | 'verification' | 'revelation' | 'reponse' | 'finie';
+  /** Mot secret : indiceurs pendant indices/vérif ; tout le monde à la fin. */
+  mot: string | null;
+  indices: IndiceJustOneVue[];
+  propositionAnnulation: { auteurId: string; indexA: number; indexB: number } | null;
+  issue: 'trouve' | 'rate' | 'passe' | null;
+  gains: Record<string, number>;
+  /** Indice déjà proposé par le regardant. */
+  monIndice: string | null;
+  /** Vrai si le regardant est le devineur. */
+  jeSuisDevineur: boolean;
+  /** Vrai si le regardant doit encore proposer un indice. */
+  doitIndiquer: boolean;
+};
+
+export type JustOneVue = {
+  cycles: number;
+  hoteDevine: boolean;
+  dureeIndices: number;
+  gainDevineur: number;
+  gainIndice: number;
+  ordreDevineurs: string[];
+  indexDevineur: number;
+  nomHote: string;
+  courante: MancheJustOneVue | null;
+  bilan: Array<{ numero: number; devineurId: string; issue: 'trouve' | 'rate' | 'passe' | null; gains: Record<string, number> }>;
+  recap: boolean;
+  gains: Record<string, number>;
+  totalManches: number;
+};
+
 export type CourseVue = {
   active: boolean;
   phase: PhaseCourse;
@@ -526,6 +782,9 @@ export type CourseVue = {
   topten: TopTenVue | null;
   jeopardy: JeopardyVue | null;
   undercover: UndercoverVue | null;
+  codenames: CodenamesVue | null;
+  perudo: PerudoVue | null;
+  justone: JustOneVue | null;
   catalogue: CatalogueMiniJeux;
   pokerConfig: ConfigPoker;
   etape: 'lancer' | 'roue' | null;
@@ -534,6 +793,7 @@ export type CourseVue = {
   classement: string[] | null;
   dernierTour: boolean;
   ceremonie: CeremonieVue | null;
+  coupDePouceActif: boolean;
   gainBonus: number;
   optionsDe: OptionDe[];
   iconesCases: Record<TypeCase, string>;
@@ -662,6 +922,7 @@ export type CeremonieVue = {
   suivants: TropheeTire[];
   classementRevele: boolean;
   gagnantRevele: boolean;
+  cagnotteEnAttente: { joueurId: string; montant: number } | null;
 };
 
 export type TropheeVue = {
@@ -736,4 +997,6 @@ export type ConfigPartie = {
   codeHote: string;
   port: number;
   ipForcee: string | null;
+  /** Nom affiché de l'hôte quand il participe (Top Ten, Just One…). */
+  nomHote: string;
 };

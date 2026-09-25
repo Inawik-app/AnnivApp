@@ -14,6 +14,7 @@
     "test:e2e": "tsx tests/e2e.ts",
     "test:tv": "tsx tests/tv.ts",
     "simulation": "tsx scripts/simuler.ts",
+    "simulation:balayage": "tsx scripts/balayage-equilibrage.ts",
     "icones": "node scripts/decouper-icones.mjs"
   },
   "browserslist": [

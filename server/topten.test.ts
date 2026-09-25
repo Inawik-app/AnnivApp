@@ -3,7 +3,7 @@ import { randomInt } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lireConfigPartie, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { projeterCourse } from './vues';
@@ -34,6 +34,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: config,
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     ...partiel,
   };
 }
@@ -78,7 +82,7 @@ const numeros = { a: 2, b: 5, c: 7, d: 9 };
 
 describe('Top Ten', () => {
   it('lit la configuration prévue et refuse un thème incomplet', () => {
-    expect(config.nomHote).toBe('Yanis');
+    expect(lireConfigPartie(RACINE).nomHote).toBe('Yanis');
     expect(config.pointsParPaire).toBe(1);
     expect(config.bonusOrdreParfait).toBe(4);
     expect(config.bonusChiffresExacts).toEqual([0, 1, 2, 4, 6]);
@@ -224,7 +228,7 @@ describe('Top Ten', () => {
     expect(JSON.stringify(vuePremier)).not.toContain(`"${second}":`);
     const vueHote = projeterCourse(course, 'hote', null)?.topten?.courante;
     expect(vueHote?.monNumero).toBe(courante.numeros[REPONDANT_HOTE]);
-    expect(vueHote?.numeros).toEqual(courante.numeros);
+    expect(vueHote?.numeros).toBeNull();
     etat = jouer(etat, { type: 'validerOrdreTopTen', ordre: courante.repondants, devines: {} }, hote, ctx);
     expect(projeterCourse(etat.course!, 'tv', null)?.topten?.courante?.numeros).toEqual(courante.numeros);
   });

@@ -1,0 +1,231 @@
+.face-de {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  box-sizing: border-box;
+  background: var(--carton);
+  border: 4px solid var(--encre);
+  border-radius: 8px;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.face-de.taille-64 {
+  width: 64px;
+  height: 64px;
+}
+
+.face-de.taille-128 {
+  width: 128px;
+  height: 128px;
+}
+
+.face-de.taille-192 {
+  width: 192px;
+  height: 192px;
+}
+
+.face-de .pip {
+  position: absolute;
+  width: 16%;
+  height: 16%;
+  margin-left: -8%;
+  margin-top: -8%;
+  background: var(--encre);
+  border-radius: 50%;
+}
+
+.face-de.taille-64 .pip {
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+}
+
+.face-de.taille-128 .pip {
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  margin-top: -10px;
+}
+
+.face-de.taille-192 .pip {
+  width: 32px;
+  height: 32px;
+  margin-left: -16px;
+  margin-top: -16px;
+}
+
+.face-de .pip.tl { left: 28%; top: 28%; }
+.face-de .pip.tr { left: 72%; top: 28%; }
+.face-de .pip.ml { left: 28%; top: 50%; }
+.face-de .pip.mr { left: 72%; top: 50%; }
+.face-de .pip.bl { left: 28%; top: 72%; }
+.face-de .pip.br { left: 72%; top: 72%; }
+.face-de .pip.c { left: 50%; top: 50%; }
+
+.face-de.paco {
+  background: var(--or);
+}
+
+.face-de.paco .libelle-paco {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  font-family: var(--police-pixel);
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--encre);
+}
+
+.face-de.taille-128.paco .libelle-paco {
+  font-size: 24px;
+}
+
+.face-de.taille-192.paco .libelle-paco {
+  font-size: 32px;
+}
+
+.face-de.allumee {
+  box-shadow: 0 0 0 4px var(--or);
+  transform: scale(1.08);
+}
+
+.face-de.cachee {
+  background: var(--tapis);
+}
+
+.face-de.cachee .pip,
+.face-de.cachee .libelle-paco {
+  display: none;
+}
+
+.mains-perudo {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -4px;
+}
+
+.mains-perudo .face-de {
+  margin: 4px;
+}
+
+.annonce-perudo-ligne {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.annonce-perudo-ligne .nombre-annonce {
+  margin-right: 12px;
+  font-family: var(--police-chiffres);
+  font-size: 32px;
+  line-height: 1.4;
+  color: var(--encre);
+}
+
+.historique-perudo {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historique-perudo li {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.compteur-perudo {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.compteur-perudo button {
+  width: 56px;
+  min-height: 56px;
+  margin: 0 8px 0 0;
+  border: 4px solid var(--encre);
+  background: var(--carton);
+  color: var(--encre);
+  font-family: var(--police-chiffres);
+  font-size: 24px;
+}
+
+.compteur-perudo .valeur {
+  min-width: 48px;
+  font-family: var(--police-chiffres);
+  font-size: 32px;
+  text-align: center;
+  color: var(--encre);
+}
+
+.faces-annonce {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 8px -4px;
+}
+
+.faces-annonce button {
+  width: 56px;
+  height: 56px;
+  margin: 4px;
+  padding: 0;
+  border: 4px solid var(--encre);
+  background: transparent;
+}
+
+.faces-annonce button.choisie {
+  box-shadow: 0 0 0 4px var(--or);
+}
+
+.faces-annonce button:disabled {
+  opacity: 0.35;
+}
+
+.faces-annonce .face-de {
+  border-width: 2px;
+}
+
+.bouton-calza .bouton {
+  background: #e67e22;
+  color: #fff;
+}
+
+.bouton-calza .bouton:disabled {
+  opacity: 0.45;
+}
+
+.elimine-perudo {
+  margin: 0;
+  padding: 24px 16px;
+  border: 4px solid var(--encre);
+  background: #7a7a86;
+  color: #fff;
+  font-family: var(--police-pixel);
+  font-size: 32px;
+  text-align: center;
+}
+
+.regles-perudo {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.regle-perudo-ligne {
+  margin: 0 0 12px;
+  font-family: var(--police-texte);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.regle-perudo-ligne strong {
+  font-weight: 800;
+}

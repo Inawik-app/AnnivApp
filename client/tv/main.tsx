@@ -24,7 +24,11 @@ import { GrilleTv, PodiumMini, PokerTv, ReglesTv } from './mini-jeux';
 import { TopTenTv, dureeRevelationTopTen } from './topten';
 import { JeopardyTv } from './jeopardy';
 import { UndercoverTv } from './undercover';
+import { CodenamesTv } from './codenames';
+import { PerudoTv, dureeRevelationPerudo } from './perudo';
+import { JustOneTv, dureeRevelationJustOne } from './justone';
 import { REPONDANT_HOTE } from '../../shared/topten';
+import { JUSTONE_HOTE } from '../../shared/justone';
 import './tv.css';
 
 type Gain = { id: string; montant: number; cle: number };
@@ -75,7 +79,7 @@ function ajouterSolde(liste: JoueurPublic[], id: string, montant: number): Joueu
 
 function etatModules(course: CourseVue | null | undefined): Partial<CourseVue> {
   if (!course) return {};
-  return { ecranMini: course.ecranMini, topten: course.topten, jeopardy: course.jeopardy, undercover: course.undercover, resultatsSaisis: course.resultatsSaisis };
+  return { ecranMini: course.ecranMini, topten: course.topten, jeopardy: course.jeopardy, undercover: course.undercover, codenames: course.codenames, perudo: course.perudo, justone: course.justone, resultatsSaisis: course.resultatsSaisis };
 }
 
 function patchCourse(course: CourseVue | null, partiel: Partial<CourseVue>): CourseVue | null {
@@ -430,6 +434,33 @@ function EcranTv() {
       case 'undercover.fin':
         await tenir('mots', 'revelation', 1500);
         return;
+      case 'codenames.indice':
+        await tenir('indice', 'transition', 900);
+        return;
+      case 'codenames.carte':
+        await tenir('carte', 'revelation', 900);
+        return;
+      case 'codenames.fin':
+        await tenir('cle', 'revelation', 1500);
+        return;
+      case 'perudo.annonce':
+        await tenir('annonce', 'transition', 700);
+        return;
+      case 'perudo.revelation': {
+        const avecDes = recue.course?.perudo?.joueurs.filter((joueur) => (recue.course?.perudo?.revelation?.faces[joueur.id]?.length ?? 0) > 0).length ?? 0;
+        await segment('revelation', async () => {
+          poser();
+          await attendreAnime(dureeRevelationPerudo(avecDes, reduit));
+        });
+        return;
+      }
+      case 'justone.revelation':
+      case 'justone.fin':
+        await segment('revelation', async () => {
+          poser();
+          await attendreAnime(dureeRevelationJustOne(reduit));
+        });
+        return;
       case 'topten.revelation': {
         const cartes = recue.course?.topten?.courante?.repondants.length ?? 0;
         await segment('revelation', async () => {
@@ -549,7 +580,7 @@ function EcranTv() {
       });
       return;
     }
-    if (/^(jeopardy|undercover|topten)\./.test(evenement.type)) {
+    if (/^(jeopardy|undercover|topten|codenames|perudo|justone)\./.test(evenement.type)) {
       await jouerModule(evenement, recue);
       return;
     }
@@ -738,10 +769,14 @@ function EcranTv() {
   const topten = moduleAffiche('topten') && !!affichee?.topten;
   const jeopardy = moduleAffiche('jeopardy') && !!affichee?.jeopardy;
   const undercover = moduleAffiche('undercover') && !!affichee?.undercover;
-  const moduleVisible = topten || jeopardy || undercover;
+  const codenames = moduleAffiche('codenames') && !!affichee?.codenames;
+  const perudo = moduleAffiche('perudo') && !!affichee?.perudo;
+  const justone = moduleAffiche('justone') && !!affichee?.justone;
+  const moduleVisible = topten || jeopardy || undercover || codenames || perudo || justone;
   const pseudosTv = new Map((vue?.joueurs ?? []).map((joueur) => [joueur.id, joueur.pseudo]));
   const nomTv = (id: string) => pseudosTv.get(id) ?? 'Joueur';
   const nomTopTen = (id: string) => (id === REPONDANT_HOTE ? affichee?.topten?.nomHote ?? 'Hôte' : nomTv(id));
+  const nomJustOne = (id: string) => (id === JUSTONE_HOTE ? affichee?.justone?.nomHote ?? 'Hôte' : nomTv(id));
 
   return (
     <div class={`${reduit ? 'scene animations-reduites' : 'scene'}${ecran === 'plateau' ? ' scene-plateau' : ''}`} ref={scene}>
@@ -754,6 +789,11 @@ function EcranTv() {
       ) : null}
       {jeopardy && affichee?.jeopardy ? <JeopardyTv jeopardy={affichee.jeopardy} ordre={affichee.ordre} nom={nomTv} /> : null}
       {undercover && affichee?.undercover ? <UndercoverTv course={affichee} undercover={affichee.undercover} nom={nomTv} /> : null}
+      {codenames && affichee?.codenames ? <CodenamesTv course={affichee} codenames={affichee.codenames} nom={nomTv} /> : null}
+      {perudo && affichee?.perudo ? (
+        <PerudoTv perudo={affichee.perudo} joueurs={joueurs} nom={nomTv} vitesse={vitesseDemandee} reduit={reduit} />
+      ) : null}
+      {justone && affichee?.justone ? <JustOneTv justone={affichee.justone} nom={nomJustOne} /> : null}
       {spectacle?.type === 'podium' ? <PodiumMini lignes={spectacle.lignes} /> : null}
       {(grille || poker || regles || moduleVisible) && spectacle?.type === 'annonce' ? <p class="annonce-flottante">{spectacle.texte}</p> : null}
       <div class="contenu">

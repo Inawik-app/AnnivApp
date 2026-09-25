@@ -3,6 +3,8 @@
   "repartition": { "bonus": 11, "chance": 9, "cagnotte": 6, "gamble": 6, "malchance": 5 },
   "gainBonus": 5,
   "choixMiniJeu": "rotation",
+  "recompenseArrivee": [25, 15, 8, 0],
+  "coupDePouce": "aucun",
   "optionsDe": [
     { "id": "normal", "nom": "Dé normal", "faces": 6, "mise": 0, "icone": "de" },
     { "id": "booste", "nom": "Dé boosté", "faces": 7, "mise": 5, "icone": "de-dore" },

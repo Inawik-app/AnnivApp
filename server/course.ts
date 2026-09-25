@@ -22,14 +22,21 @@ import { trouverJoueur } from './libelles';
 import { type Alea, calculerClassement, genererDisposition, melanger } from './plateau';
 import type { CatalogueMiniJeux, ConfigPoker } from '../shared/mini-jeux';
 import type { ConfigTopTen } from '../shared/topten';
+import { REPONDANT_HOTE } from '../shared/topten';
 import type { ConfigJeopardy } from '../shared/jeopardy';
 import type { ConfigUndercover } from '../shared/undercover';
+import type { ConfigCodenames } from '../shared/codenames';
+import type { ConfigPerudo } from '../shared/perudo';
+import type { ConfigJustOne } from '../shared/justone';
 import { appliquerCeremonie, estActionCeremonie, refuserCeremonie } from './ceremonie';
 import { appliquerActivite, appliquerChoix, refuserActivite, refuserChoix } from './mini-jeux';
 import type { TropheeConfig } from '../shared/trophees';
 import { ACTIONS_TOPTEN, appliquerTopTen, oublierJoueurTopTen, refuserTopTen } from './topten';
 import { ACTIONS_JEOPARDY, appliquerJeopardy, oublierJoueurJeopardy, refuserJeopardy } from './jeopardy';
 import { ACTIONS_UNDERCOVER, appliquerUndercover, refuserUndercover, undercoverInitial } from './undercover';
+import { ACTIONS_CODENAMES, appliquerCodenames, oublierJoueurCodenames, refuserCodenames } from './codenames';
+import { ACTIONS_PERUDO, appliquerPerudo, refuserPerudo } from './perudo';
+import { ACTIONS_JUSTONE, appliquerJustOne, refuserJustOne } from './justone';
 
 export type ContexteCourse = {
   maintenant: number;
@@ -50,12 +57,18 @@ export type ContexteCourse = {
   topten: ConfigTopTen;
   jeopardy: ConfigJeopardy;
   undercover: ConfigUndercover;
+  codenames: ConfigCodenames;
+  perudo: ConfigPerudo;
+  justone: ConfigJustOne;
+  /** Nom affiché de l'hôte (Top Ten, Just One…). */
+  nomHote: string;
   dev: boolean;
   /** Partie simulée : le fil d'événements n'est pas conservé. */
   simulation?: boolean;
   /** Catalogue déjà lu, pour éviter de relire le disque à chaque cérémonie. */
   trophees?: TropheeConfig[];
   nombreCeremonie?: number;
+  cagnotteConsolation?: 'aucune' | 'dernier';
 };
 
 type Ajouter = (
@@ -90,6 +103,7 @@ const ACTIONS = new Set<Action['type']>([
   'passerJoueur',
   'terminerCourse',
   'ouvrirPodium',
+  'verserCagnotteConsolation',
   'tirerTrophees',
   'revelerTrophee',
   'revelerClassement',
@@ -98,7 +112,15 @@ const ACTIONS = new Set<Action['type']>([
 ]);
 
 export function estActionCourse(action: Action): boolean {
-  return ACTIONS.has(action.type) || ACTIONS_TOPTEN.has(action.type) || ACTIONS_JEOPARDY.has(action.type) || ACTIONS_UNDERCOVER.has(action.type);
+  return (
+    ACTIONS.has(action.type) ||
+    ACTIONS_TOPTEN.has(action.type) ||
+    ACTIONS_JEOPARDY.has(action.type) ||
+    ACTIONS_UNDERCOVER.has(action.type) ||
+    ACTIONS_CODENAMES.has(action.type) ||
+    ACTIONS_PERUDO.has(action.type) ||
+    ACTIONS_JUSTONE.has(action.type)
+  );
 }
 
 function pseudo(etat: EtatJeu, joueurId: string): string {
@@ -144,7 +166,51 @@ function reglesDepuis(config: ConfigPlateau): ReglesCourse {
     gainBonus: config.gainBonus,
     choixMiniJeu: config.choixMiniJeu,
     optionsDe: config.optionsDe.map((option) => ({ ...option })),
+    recompenseArrivee: [...config.recompenseArrivee],
+    coupDePouce: config.coupDePouce,
   };
+}
+
+function facesCoupDePouce(coup: ReglesCourse['coupDePouce']): number | null {
+  if (coup === 'de7') return 7;
+  if (coup === 'de8') return 8;
+  return null;
+}
+
+function miseEffective(course: Course, option: OptionDe): number {
+  const faces = facesCoupDePouce(course.regles.coupDePouce);
+  if (course.coupDePouceActif && faces !== null && option.faces === faces) return 0;
+  return option.mise;
+}
+
+function actualiserCoupDePouce(draft: EtatJeu): void {
+  const course = draft.course;
+  if (!course) return;
+  if (course.regles.coupDePouce === 'aucun' || course.etape?.genre !== 'lancer') {
+    course.coupDePouceActif = false;
+    return;
+  }
+  const id = joueurCourant(course);
+  if (!id) {
+    course.coupDePouceActif = false;
+    return;
+  }
+  const enCourse = draft.joueurs
+    .map((joueur) => joueur.id)
+    .filter((joueurId) => (course.positions[joueurId] ?? 0) < course.regles.longueur);
+  if (!enCourse.includes(id)) {
+    course.coupDePouceActif = false;
+    return;
+  }
+  const minimum = Math.min(...enCourse.map((joueurId) => soldeVisible(draft, joueurId)));
+  course.coupDePouceActif = soldeVisible(draft, id) === minimum;
+}
+
+function poserEtapeLancer(draft: EtatJeu): void {
+  const course = draft.course;
+  if (!course) return;
+  course.etape = { genre: 'lancer' };
+  actualiserCoupDePouce(draft);
 }
 
 function soldeVisible(etat: EtatJeu, joueurId: string): number {
@@ -199,6 +265,7 @@ function crediter(
   source = 'plateau',
 ): void {
   if (montant <= 0) return;
+  if (joueurId === 'hote' || joueurId === REPONDANT_HOTE) return;
   draft.transactions.push({
     id: ctx.id(),
     joueurId,
@@ -311,6 +378,7 @@ function figerClassement(draft: EtatJeu, ctx: ContexteCourse, ajouter: Ajouter):
   course.classement = calculerClassement(joueurs, ctx.alea);
   course.phase = 'terminee';
   course.etape = null;
+  course.coupDePouceActif = false;
   course.active = true;
   ajouter(draft, 'course.terminee', 'public', 'La course est terminée', { classement: course.classement });
 }
@@ -334,6 +402,7 @@ function finirTour(draft: EtatJeu, ctx: ContexteCourse, ajouter: Ajouter): void 
   }
   course.phase = 'finTour';
   course.etape = null;
+  course.coupDePouceActif = false;
 }
 
 function avancer(draft: EtatJeu, ctx: ContexteCourse, ajouter: Ajouter): void {
@@ -350,7 +419,7 @@ function avancer(draft: EtatJeu, ctx: ContexteCourse, ajouter: Ajouter): void {
     return;
   }
   course.indexCourant = index;
-  course.etape = { genre: 'lancer' };
+  poserEtapeLancer(draft);
 }
 
 function poser(course: Course, joueurId: string, delta: number): { depuis: number; vers: number; cases: number; arrive: boolean } {
@@ -574,6 +643,7 @@ function appliquerCase(draft: EtatJeu, ctx: ContexteCourse, ajouter: Ajouter, jo
   }
   if (type === 'gamble') {
     course.etape = { genre: 'roue' };
+    course.coupDePouceActif = false;
     ajouter(draft, 'roue.annonce', 'public', `${pseudo(draft, joueurId)} arrive sur la roue`, { joueurId });
   }
 }
@@ -667,9 +737,10 @@ export function oublierJoueurCourse(draft: EtatJeu, joueurId: string): void {
   if (course.classement) course.classement = course.classement.filter((id) => id !== joueurId);
   if (course.choisitId === joueurId) course.choisitId = course.ordre[0] ?? null;
   if (course.indexCourant >= course.ordre.length) course.indexCourant = Math.max(0, course.ordre.length - 1);
-  if (joueurCourant(course) === joueurId) course.etape = { genre: 'lancer' };
+  if (joueurCourant(course) === joueurId) poserEtapeLancer(draft);
   oublierJoueurTopTen(course, joueurId);
   oublierJoueurJeopardy(course, joueurId);
+  oublierJoueurCodenames(course, joueurId);
 }
 
 export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteCourse): string | null {
@@ -740,7 +811,7 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
       if ((course.positions[courant] ?? 0) >= course.regles.longueur) return 'Tu es déjà arrivé';
       const option = optionChoisie(course, action.option);
       if (!option) return "Ce dé n'existe pas";
-      if (option.mise > soldeVisible(etat, courant)) return "Tu n'as pas assez de GP visibles";
+      if (miseEffective(course, option) > soldeVisible(etat, courant)) return "Tu n'as pas assez de GP visibles";
       return null;
     }
     case 'miserRoue': {
@@ -772,6 +843,9 @@ export function refuserCourse(etat: EtatJeu, action: Action, origine: Origine, c
       if (ACTIONS_TOPTEN.has(action.type)) return refuserTopTen(etat, action, origine, ctx);
       if (ACTIONS_JEOPARDY.has(action.type)) return refuserJeopardy(etat, action, origine, ctx);
       if (ACTIONS_UNDERCOVER.has(action.type)) return refuserUndercover(etat, action, origine, ctx);
+      if (ACTIONS_CODENAMES.has(action.type)) return refuserCodenames(etat, action, origine, ctx);
+      if (ACTIONS_PERUDO.has(action.type)) return refuserPerudo(etat, action, origine);
+      if (ACTIONS_JUSTONE.has(action.type)) return refuserJustOne(etat, action, origine, ctx);
       const erreur = refuserActivite(etat, action, origine, ctx);
       return erreur === undefined ? null : erreur;
     }
@@ -784,6 +858,12 @@ function courseNeuve(draft: EtatJeu, ctx: ContexteCourse): Course {
   for (const joueur of draft.joueurs) positions[joueur.id] = 0;
   const themesJoues = draft.course?.topten?.themesJoues ?? [];
   const pairesJouees = draft.course?.undercover?.pairesJouees ?? [];
+  const motsSoiree = [
+    ...(draft.course?.motsSoiree ?? []),
+    ...(draft.course?.codenames?.motsJoues ?? []).filter(
+      (mot) => !(draft.course?.motsSoiree ?? []).some((deja) => deja === mot),
+    ),
+  ];
   return {
     active: true,
     disposition,
@@ -807,12 +887,25 @@ function courseNeuve(draft: EtatJeu, ctx: ContexteCourse): Course {
     poker: { actif: false, niveau: 0 },
     topten: themesJoues.length > 0 ? { captens: [], manches: [], themesJoues: [...themesJoues], recap: false } : null,
     undercover: pairesJouees.length > 0 ? undercoverInitial(ctx.undercover.manches, pairesJouees) : null,
+    codenames:
+      motsSoiree.length > 0
+        ? {
+            nbManches: ctx.codenames.manches,
+            motsJoues: [...motsSoiree],
+            preparation: { equipes: { rouge: [], bleu: [] }, espions: { rouge: null, bleu: null } },
+            manches: [],
+          }
+        : null,
+    perudo: null,
+    justone: null,
+    motsSoiree: [...motsSoiree],
     choisitId: null,
     carteCourante: null,
     dernierDe: null,
     classement: null,
     dernierTour: false,
     ceremonie: null,
+    coupDePouceActif: false,
     regles: reglesDepuis(ctx.plateau),
     historique: historiqueVide(),
   };
@@ -860,6 +953,7 @@ export function appliquerCourse(
       course.tour += 1;
       course.indexCourant = 0;
       course.etape = null;
+      course.coupDePouceActif = false;
       course.miniJeu = null;
       course.miniJeuId = null;
       course.ecranMini = null;
@@ -901,7 +995,8 @@ export function appliquerCourse(
       const id = joueurCourant(course);
       const option = optionChoisie(course, action.option);
       if (!id || !option) return;
-      const mise = option.mise;
+      const mise = miseEffective(course, option);
+      course.coupDePouceActif = false;
       debiter(draft, ctx, id, mise, 'mise', `Mise du tour ${course.tour}`, false);
       course.cagnotte += mise;
       const valeur = faceDe(ctx, option.faces, true);
@@ -968,6 +1063,9 @@ export function appliquerCourse(
       if (ACTIONS_TOPTEN.has(action.type)) appliquerTopTen(draft, action, ctx, ajouter);
       else if (ACTIONS_JEOPARDY.has(action.type)) appliquerJeopardy(draft, action, ctx, ajouter, origine);
       else if (ACTIONS_UNDERCOVER.has(action.type)) appliquerUndercover(draft, action, ctx, ajouter);
+      else if (ACTIONS_CODENAMES.has(action.type)) appliquerCodenames(draft, action, origine, ctx, ajouter);
+      else if (ACTIONS_PERUDO.has(action.type)) appliquerPerudo(draft, action, origine, ctx, ajouter);
+      else if (ACTIONS_JUSTONE.has(action.type)) appliquerJustOne(draft, action, origine, ctx, ajouter);
       else appliquerActivite(draft, action, ctx, ajouter);
       break;
   }

@@ -47,6 +47,17 @@ function normaliserCourse(valeur: unknown): Course | null {
   for (const option of course.regles.optionsDe) {
     if (typeof option.icone !== 'string' || option.icone === '') option.icone = ICONES_DE[option.id] ?? 'de';
   }
+  if (!Array.isArray(course.regles.recompenseArrivee) || course.regles.recompenseArrivee.length !== 4) {
+    course.regles.recompenseArrivee = [0, 0, 0, 0];
+  }
+  if (
+    course.regles.coupDePouce !== 'aucun' &&
+    course.regles.coupDePouce !== 'de7' &&
+    course.regles.coupDePouce !== 'de8'
+  ) {
+    course.regles.coupDePouce = 'aucun';
+  }
+  if (typeof course.coupDePouceActif !== 'boolean') course.coupDePouceActif = false;
   for (const lancer of course.historique.lancers) {
     if (typeof lancer.mise !== 'number') lancer.mise = 0;
     if (typeof lancer.faces !== 'number') lancer.faces = 6;
@@ -72,6 +83,7 @@ function normaliserCourse(valeur: unknown): Course | null {
   if (
     !course.ceremonie ||
     (course.ceremonie.etape !== 'podium' &&
+      course.ceremonie.etape !== 'cagnotte' &&
       course.ceremonie.etape !== 'trophees' &&
       course.ceremonie.etape !== 'classement' &&
       course.ceremonie.etape !== 'gagnant') ||
@@ -79,15 +91,25 @@ function normaliserCourse(valeur: unknown): Course | null {
     typeof course.ceremonie.reveles !== 'number'
   ) {
     course.ceremonie = null;
+  } else if (
+    !course.ceremonie.cagnotteEnAttente ||
+    typeof course.ceremonie.cagnotteEnAttente.joueurId !== 'string' ||
+    typeof course.ceremonie.cagnotteEnAttente.montant !== 'number'
+  ) {
+    course.ceremonie.cagnotteEnAttente = null;
   }
-  if (
-    !course.minuteur ||
+  if (!course.minuteur ||
     (course.minuteur.etat !== 'arrete' && course.minuteur.etat !== 'enCours' && course.minuteur.etat !== 'enPause')
   ) {
     course.minuteur = { etat: 'arrete', finA: null, resteMs: 0, libelle: '' };
   }
   if (!course.poker || typeof course.poker.actif !== 'boolean' || typeof course.poker.niveau !== 'number') {
     course.poker = { actif: false, niveau: 0 };
+  }
+  if (!Array.isArray(course.motsSoiree)) {
+    const legacy =
+      course.codenames && Array.isArray(course.codenames.motsJoues) ? course.codenames.motsJoues : [];
+    course.motsSoiree = [...legacy];
   }
   const topten = course.topten;
   if (
@@ -118,6 +140,19 @@ function normaliserCourse(valeur: unknown): Course | null {
     typeof undercover.recap !== 'boolean'
   ) {
     course.undercover = null;
+  }
+  const justone = course.justone;
+  if (
+    !justone ||
+    typeof justone.cycles !== 'number' ||
+    typeof justone.hoteDevine !== 'boolean' ||
+    !Array.isArray(justone.ordreDevineurs) ||
+    typeof justone.indexDevineur !== 'number' ||
+    !Array.isArray(justone.manches) ||
+    typeof justone.recap !== 'boolean' ||
+    !estObjet(justone.gains)
+  ) {
+    course.justone = null;
   }
   const choix = course.regles.choixMiniJeu as string;
   if (choix === 'premier' || choix !== 'dernierAuClassement') course.regles.choixMiniJeu = 'rotation';
@@ -198,11 +233,15 @@ export function configValide(brut: unknown): ConfigPartie {
   if (brut.ipForcee !== null && typeof brut.ipForcee !== 'string') {
     throw new Error('ipForcee doit être une adresse ou null');
   }
+  if (typeof brut.nomHote !== 'string' || !brut.nomHote.trim() || brut.nomHote.trim().length > 20) {
+    throw new Error('nomHote doit être un nom de 1 à 20 caractères dans config/partie.json');
+  }
   return {
     titre: brut.titre.trim(),
     nbJoueursMax: brut.nbJoueursMax,
     codeHote: brut.codeHote,
     port: brut.port,
     ipForcee: typeof brut.ipForcee === 'string' && brut.ipForcee.trim() ? brut.ipForcee.trim() : null,
+    nomHote: brut.nomHote.trim(),
   };
 }

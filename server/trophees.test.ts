@@ -48,6 +48,10 @@ function partie(): { etat: EtatJeu; ids: string[] } {
     topten: null,
     jeopardy: null,
     undercover: null,
+    codenames: null,
+    perudo: null,
+    justone: null,
+    motsSoiree: [],
     classement: null,
     dernierTour: false,
     ceremonie: null,
@@ -56,6 +60,8 @@ function partie(): { etat: EtatJeu; ids: string[] } {
       longueur: 38,
       gainBonus: 5,
       choixMiniJeu: 'rotation',
+      recompenseArrivee: [0, 0, 0, 0],
+      coupDePouce: 'aucun',
       optionsDe: [
         { id: 'normal', nom: 'Dé normal', faces: 6, mise: 0, icone: 'de' },
         { id: 'booste', nom: 'Dé boosté', faces: 7, mise: 5, icone: 'de-dore' },
@@ -220,6 +226,7 @@ describe('statistiques et trophées', () => {
     const [ines, noe, lina, leo] = ids as [string, string, string, string];
     etat.course!.regles.longueur = 38;
     etat.course!.arrivees = [ines, noe, lina, leo];
+    etat.course!.positions = { [ines]: 38, [noe]: 38, [lina]: 38, [leo]: 38 };
     etat.course!.historique.instantanes.push(
       photo(3, 8, [
         { id: ines, position: 5, rang: 4, gpVisibles: 1 },
@@ -268,6 +275,49 @@ describe('statistiques et trophées', () => {
     expect(departage.nom).toBe('Contre toutes attentes');
   });
 
+  it('donne le touriste au dernier du classement de course même sans tous arrivés', () => {
+    const { etat, ids } = partie();
+    const [ines, noe, lina, leo] = ids as [string, string, string, string];
+    etat.course!.arrivees = [ines];
+    etat.course!.positions = { [ines]: 38, [noe]: 25, [lina]: 18, [leo]: 10 };
+    expect(statistiques(etat)[leo]?.rangArrivee).toBe(4);
+    expect(parId(etat, 'touriste').gagnants).toEqual([leo]);
+    expect(parId(etat, 'touriste').attribuable).toBe(true);
+  });
+
+  it('n\'attribue pas une remontée d\'une seule place, mais bien à partir de 2', () => {
+    const { etat, ids } = partie();
+    const [ines, noe, lina, leo] = ids as [string, string, string, string];
+    etat.course!.arrivees = [ines, noe, lina, leo];
+    etat.course!.positions = { [ines]: 38, [noe]: 38, [lina]: 38, [leo]: 38 };
+    etat.course!.historique.instantanes.push(
+      photo(3, 20, [
+        { id: ines, position: 10, rang: 2, gpVisibles: 10 },
+        { id: noe, position: 20, rang: 1, gpVisibles: 20 },
+        { id: lina, position: 8, rang: 3, gpVisibles: 8 },
+        { id: leo, position: 5, rang: 4, gpVisibles: 5 },
+      ]),
+      photo(4, 0, [
+        { id: ines, position: 38, rang: 1, gpVisibles: 30 },
+        { id: noe, position: 38, rang: 2, gpVisibles: 20 },
+        { id: lina, position: 38, rang: 3, gpVisibles: 10 },
+        { id: leo, position: 38, rang: 4, gpVisibles: 5 },
+      ]),
+    );
+    expect(statistiques(etat)[ines]?.remontee).toBe(1);
+    expect(parId(etat, 'contre-attentes').attribuable).toBe(false);
+
+    etat.course!.historique.instantanes[0] = photo(3, 20, [
+      { id: ines, position: 5, rang: 3, gpVisibles: 5 },
+      { id: noe, position: 20, rang: 1, gpVisibles: 20 },
+      { id: lina, position: 15, rang: 2, gpVisibles: 10 },
+      { id: leo, position: 2, rang: 4, gpVisibles: 2 },
+    ]);
+    expect(statistiques(etat)[ines]?.remontee).toBe(2);
+    expect(parId(etat, 'contre-attentes').attribuable).toBe(true);
+    expect(parId(etat, 'contre-attentes').gagnants).toEqual([ines]);
+  });
+
   it('mesure les places gagnées au classement GP entre la mi-partie et la fin', () => {
     const { etat, ids } = partie();
     const [ines, noe, lina, leo] = ids as [string, string, string, string];
@@ -303,6 +353,7 @@ describe('statistiques et trophées', () => {
   it('charge un catalogue dont chaque critère est connu', () => {
     const lu = lireCatalogueTrophees(RACINE);
     expect(lu.nombreCeremonie).toBe(4);
+    expect(lu.cagnotteConsolation).toBe('aucune');
     expect(lu.trophees.map((trophee) => trophee.id)).toEqual([
       'malchanceux',
       'poissard',

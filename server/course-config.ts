@@ -118,6 +118,8 @@ export function lireConfigPlateau(racine: string): ConfigPlateau {
     const erreur = dispositionValide(disposition, longueur);
     if (erreur) throw new Error(erreur);
   }
+  const recompenseArrivee = lireRecompenseArrivee(brut.recompenseArrivee);
+  const coupDePouce = lireCoupDePouce(brut.coupDePouce);
   return {
     longueur,
     repartition: compte,
@@ -125,8 +127,29 @@ export function lireConfigPlateau(racine: string): ConfigPlateau {
     choixMiniJeu: choix,
     optionsDe,
     iconesCases,
+    recompenseArrivee,
+    coupDePouce,
     ...(disposition ? { disposition } : {}),
   };
+}
+
+function lireRecompenseArrivee(brut: unknown): number[] {
+  if (brut === undefined) return [0, 0, 0, 0];
+  if (!Array.isArray(brut) || brut.length !== 4) {
+    throw new Error('recompenseArrivee doit être une liste de 4 montants');
+  }
+  return brut.map((montant, index) => {
+    if (typeof montant !== 'number' || !Number.isInteger(montant) || montant < 0) {
+      throw new Error(`recompenseArrivee[${index}] invalide`);
+    }
+    return montant;
+  });
+}
+
+function lireCoupDePouce(brut: unknown): 'aucun' | 'de7' | 'de8' {
+  if (brut === undefined) return 'aucun';
+  if (brut === 'aucun' || brut === 'de7' || brut === 'de8') return brut;
+  throw new Error('coupDePouce doit être « aucun », « de7 » ou « de8 »');
 }
 
 function lireIconesCases(brut: unknown): Record<TypeCase, string> {

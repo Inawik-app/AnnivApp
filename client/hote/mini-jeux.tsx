@@ -5,6 +5,9 @@ import { IconeMiniJeu } from '../commun/icones';
 import { PanneauTopTen } from './topten';
 import { PanneauJeopardy } from './jeopardy';
 import { PanneauUndercover } from './undercover';
+import { PanneauCodenames } from './codenames';
+import { PanneauPerudo } from './perudo';
+import { PanneauJustOne } from './justone';
 import {
   baremeClassement,
   dureeNiveauMs,
@@ -18,7 +21,7 @@ import {
 } from '../../shared/mini-jeux';
 
 /** Modules arbitrés depuis leur propre panneau, sans saisie de résultats. */
-const ARBITRES = new Set(['topten', 'jeopardy', 'undercover']);
+const ARBITRES = new Set(['topten', 'jeopardy', 'undercover', 'codenames', 'perudo', 'justone']);
 
 function entier(valeur: string): number {
   const nombre = Number(valeur);
@@ -210,6 +213,21 @@ export function PanneauMiniJeux({
           ) : null}
           {jeu.module === 'undercover' && course.undercover ? (
             <PanneauUndercover undercover={course.undercover} pseudos={pseudos} envoi={envoi} agir={agir} />
+          ) : null}
+          {jeu.module === 'codenames' && course.codenames ? (
+            <PanneauCodenames
+              codenames={course.codenames}
+              ordre={course.ordre}
+              pseudos={pseudos}
+              envoi={envoi}
+              agir={agir}
+            />
+          ) : null}
+          {jeu.module === 'perudo' && course.perudo ? (
+            <PanneauPerudo perudo={course.perudo} pseudos={pseudos} envoi={envoi} agir={agir} />
+          ) : null}
+          {jeu.module === 'justone' && course.justone ? (
+            <PanneauJustOne justone={course.justone} pseudos={pseudos} envoi={envoi} agir={agir} />
           ) : null}
           {jeu.duree ? (
             <Bouton

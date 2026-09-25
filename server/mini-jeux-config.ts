@@ -4,12 +4,21 @@ import { validerCatalogue, validerPoker, type CatalogueMiniJeux, type ConfigPoke
 import { validerTopTen, type ConfigTopTen } from '../shared/topten';
 import { validerJeopardy, type ConfigJeopardy } from '../shared/jeopardy';
 import { validerUndercover, type ConfigUndercover } from '../shared/undercover';
+import { validerCodenames, type ConfigCodenames } from '../shared/codenames';
+import { validerPerudo, type ConfigPerudo } from '../shared/perudo';
+import { validerJustOne, type ConfigJustOne } from '../shared/justone';
+import { configValide } from './fusion';
+import type { ConfigPartie } from '../shared/types';
 
 const catalogues = new Map<string, CatalogueMiniJeux>();
 const pokers = new Map<string, ConfigPoker>();
 const toptens = new Map<string, ConfigTopTen>();
 const jeopardys = new Map<string, ConfigJeopardy>();
 const undercovers = new Map<string, ConfigUndercover>();
+const codenames = new Map<string, ConfigCodenames>();
+const perudos = new Map<string, ConfigPerudo>();
+const justones = new Map<string, ConfigJustOne>();
+const parties = new Map<string, ConfigPartie>();
 
 export function lireCatalogue(racine: string): CatalogueMiniJeux {
   const deja = catalogues.get(racine);
@@ -64,6 +73,33 @@ export function lireJeopardy(racine: string): ConfigJeopardy {
 
 export function lireUndercover(racine: string): ConfigUndercover {
   return lireFichier(undercovers, racine, 'undercover.json', validerUndercover);
+}
+
+export function lireCodenames(racine: string): ConfigCodenames {
+  return lireFichier(codenames, racine, 'codenames.json', validerCodenames);
+}
+
+export function lirePerudo(racine: string): ConfigPerudo {
+  return lireFichier(perudos, racine, 'perudo.json', validerPerudo);
+}
+
+export function lireJustOne(racine: string): ConfigJustOne {
+  return lireFichier(justones, racine, 'justone.json', validerJustOne);
+}
+
+export function lireConfigPartie(racine: string): ConfigPartie {
+  const deja = parties.get(racine);
+  if (deja) return deja;
+  let brut: unknown;
+  try {
+    brut = JSON.parse(fs.readFileSync(path.join(racine, 'config', 'partie.json'), 'utf8'));
+  } catch (erreur) {
+    const detail = erreur instanceof Error ? erreur.message : String(erreur);
+    throw new Error(`partie.json illisible : ${detail}`);
+  }
+  const config = configValide(brut);
+  parties.set(racine, config);
+  return config;
 }
 
 export function lireTopTen(racine: string): ConfigTopTen {

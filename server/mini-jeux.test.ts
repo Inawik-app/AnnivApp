@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
 import { reduire, type ContexteReduction } from './reducteur';
 import { solde } from '../shared/soldes';
@@ -39,6 +39,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     ...partiel,
   };
 }
@@ -118,14 +122,14 @@ describe('mini-jeux', () => {
     const catalogue = lireCatalogue(RACINE);
     expect(catalogue.baremes.classement).toEqual([10, 6, 3, 1]);
     expect(catalogue.baremes.equipes).toEqual({ gagnant: 8, perdant: 2 });
-    expect(catalogue.jeux.map((jeu) => [jeu.id, jeu.saisie, jeu.duree ?? null, jeu.module])).toEqual([
-      ['pong-gobelets', 'classement', null, 'aucun'],
-      ['mime-express', 'equipes', 60, 'aucun'],
-      ['memoire-express', 'classement', 30, 'aucun'],
-      ['poker', 'libre', null, 'poker'],
-      ['jeopardy', 'libre', null, 'jeopardy'],
-      ['top-ten', 'libre', null, 'topten'],
-      ['undercover', 'libre', null, 'undercover'],
+    expect(catalogue.jeux.map((jeu) => [jeu.id, jeu.saisie, jeu.duree ?? null, jeu.module, jeu.hoteParticipe])).toEqual([
+      ['poker', 'libre', null, 'poker', false],
+      ['jeopardy', 'libre', null, 'jeopardy', false],
+      ['top-ten', 'libre', null, 'topten', true],
+      ['undercover', 'libre', null, 'undercover', false],
+      ['codenames', 'libre', null, 'codenames', false],
+      ['perudo', 'libre', null, 'perudo', false],
+      ['just-one', 'libre', null, 'justone', true],
     ]);
     const poker = lirePoker(RACINE);
     expect(poker.jetonsOfferts).toBe(20);
@@ -140,11 +144,14 @@ describe('mini-jeux', () => {
     expect(poker.regles.join(' ')).toMatch(/1 pour 1/);
     expect(modulePret('jeopardy')).toBe(true);
     expect(modulePret('undercover')).toBe(true);
+    expect(modulePret('codenames')).toBe(true);
+    expect(modulePret('perudo')).toBe(true);
     expect(modulePret('inconnu')).toBe(false);
     expect(ecranPour('inconnu')).toBe('regles');
     expect(ecranPour('aucun')).toBe('regles');
     expect(ecranPour('jeopardy')).toBe('jeopardy');
     expect(ecranPour('poker')).toBe('poker');
+    expect(ecranPour('codenames')).toBe('codenames');
   });
 
   it('donne le reste du tapis de l\'hôte au joueur le moins riche, le plus tôt en cas d\'égalité', () => {
@@ -165,8 +172,18 @@ describe('mini-jeux', () => {
 
   it('enregistre un classement avec ex aequo et refuse un montant négatif', () => {
     const catalogue = lireCatalogue(RACINE);
-    const libre = { ...catalogue.jeux[0]!, id: 'libre-test', nom: 'Libre', saisie: 'libre' as const, module: 'aucun' };
-    const ctx = contexte({ catalogue: { ...catalogue, jeux: [...catalogue.jeux, libre] } });
+    const libre = { ...catalogue.jeux[0]!, id: 'libre-test', nom: 'Libre', saisie: 'libre' as const, module: 'aucun' as const, resume: 'Test', icone: 'de', regles: ['a', 'b', 'c'] };
+    const physique = {
+      ...catalogue.jeux[0]!,
+      id: 'classement-test',
+      nom: 'Classement test',
+      saisie: 'classement' as const,
+      module: 'aucun' as const,
+      resume: 'Test',
+      icone: 'de',
+      regles: ['a', 'b', 'c'],
+    };
+    const ctx = contexte({ catalogue: { ...catalogue, jeux: [...catalogue.jeux, libre, physique] } });
     let etat = partie(ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'libre-test' }, hote, ctx);
     expect(etat.course?.ecranMini).toBe('regles');
@@ -186,7 +203,7 @@ describe('mini-jeux', () => {
     );
     expect(refuse.ok).toBe(false);
     etat = partie(ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'classement-test' }, hote, ctx);
     const joueurs = etat.joueurs;
     const premier = joueurs[0];
     const deuxieme = joueurs[1];
@@ -218,7 +235,7 @@ describe('mini-jeux', () => {
     expect(montants.get(troisieme.id)).toBe(3);
     expect(montants.get(quatrieme.id)).toBe(1);
     expect(etat.evenements.some((evenement) => evenement.type === 'minijeu.podium')).toBe(true);
-    expect(etat.course?.joues).toContain('pong-gobelets');
+    expect(etat.course?.joues).toContain('classement-test');
   });
 
   it('enchaîne les niveaux de blinds puis convertit les tapis', () => {

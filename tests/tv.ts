@@ -76,7 +76,9 @@ async function verifierTextes(page: Page): Promise<void> {
         if (rect.width < 1 || rect.height < 1) continue;
         const taille = Number.parseFloat(style.fontSize);
         const dansCombi = combinaisons instanceof HTMLElement && combinaisons.contains(el);
-        const min = dansCombi ? 28 : el.classList.contains('numero-case') ? 24 : 36;
+        const motCarte = el.classList.contains('mot-tv') || el.closest('.mot-tv');
+        const surFace = el.classList.contains('libelle-paco') || el.closest('.face-de');
+        const min = dansCombi ? 28 : el.classList.contains('numero-case') ? 24 : surFace ? 16 : motCarte ? 32 : 36;
         if (taille + 0.1 < min) return Math.round(taille) + 'px < ' + min + ' : ' + texte.trim().slice(0, 48);
       }
       return '';
@@ -211,7 +213,7 @@ async function verifierRendu(page: Page): Promise<void> {
           }
         }
       }
-      const parents = document.querySelectorAll('.plateau-scene, .ecran-poker, .poker-gauche, .accueil, .podium, .ecran-topten, .topten-cartes, .topten-rangees, .ecran-jeopardy, .jeopardy-grille, .ecran-undercover, .undercover-ordre, .undercover-mots');
+      const parents = document.querySelectorAll('.plateau-scene, .ecran-poker, .poker-gauche, .accueil, .podium, .ecran-topten, .topten-cartes, .topten-rangees, .ecran-jeopardy, .jeopardy-grille, .ecran-undercover, .undercover-ordre, .undercover-mots, .ecran-codenames, .codenames-grille, .ecran-perudo, .perudo-corps');
       for (let p = 0; p < parents.length; p += 1) {
         const parent = parents[p];
         if (!(parent instanceof HTMLElement) || !montre(parent)) continue;
@@ -481,7 +483,7 @@ async function verifierIcones(page: Page, mode: 'plateau' | 'grille'): Promise<v
         if (manque) return manque;
       }
       if (mode === 'grille') {
-        if (document.querySelectorAll('.tuile-mini [data-icone]').length < 7) return 'grille sans icônes';
+        if (document.querySelectorAll('.tuile-mini [data-icone]').length < 6) return 'grille sans icônes';
         const manque = visibles('.tuile-mini [data-icone]');
         if (manque) return manque;
       }
@@ -643,7 +645,7 @@ async function capturesDesEtRoue(browser: Browser, captures: string): Promise<vo
     await agirHote({ type: 'demarrerCourse' });
     if (serveur.etat().course?.ordre[0] !== ines.joueurId) throw new Error('Inès devrait lancer en premier');
     await agirHote({ type: 'nouveauTour' });
-    await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'poker' });
     await agirHote({ type: 'passerAuxDeplacements' });
 
     await page.goto(`${serveur.url}/tv?debug=1&vitesse=2`, { waitUntil: 'domcontentloaded' });
@@ -781,7 +783,7 @@ async function capturesFinale(browser: Browser, captures: string): Promise<void>
     await agirHote({ type: 'demarrerCourse' });
     if (serveur.etat().course?.ordre[0] !== ines.joueurId) throw new Error('Inès devrait passer en premier');
     await agirHote({ type: 'nouveauTour' });
-    await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'poker' });
     await agirHote({ type: 'passerAuxDeplacements' });
     await page.goto(`${serveur.url}/tv?debug=1&vitesse=2`, { waitUntil: 'domcontentloaded' });
     await page.locator('[data-connecte="1"]').waitFor({ timeout: 20000 });
@@ -943,7 +945,7 @@ async function main(): Promise<void> {
     const choix = await texteEntete(page);
     if (!choix.includes('Inès') || choix.includes('Un joueur')) throw new Error(`En-tête du choix : ${choix}`);
     await page.screenshot({ path: path.join(captures, '05-minijeu.png') });
-    await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'poker' });
     await agirHote({ type: 'passerAuxDeplacements' });
     await page.getByText('À Inès de jouer').waitFor({ timeout: 20000 });
     await page.getByText('choisit son dé').waitFor({ timeout: 20000 });
@@ -1000,7 +1002,7 @@ async function main(): Promise<void> {
     await agirHote({ type: 'passerJoueur' });
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
     await agirHote({ type: 'nouveauTour' });
-    await agirHote({ type: 'choisirMiniJeu', id: 'pong-gobelets' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'poker' });
     await agirHote({ type: 'passerAuxDeplacements' });
     const arrivee = (async () => {
       await page.waitForFunction(() => window.__etapeCourante?.etape === 'arrivee', undefined, { timeout: 20000 });
@@ -1065,22 +1067,24 @@ async function main(): Promise<void> {
     await verifierZone(page, 'grille');
     await verifierTextes(page);
     await verifierRendu(page);
-    await agirHote({ type: 'choisirMiniJeu', id: 'mime-express' });
+    await agirHote({ type: 'choisirMiniJeu', id: 'poker' });
     await agirHote({ type: 'afficherGrille' });
-    await page.waitForSelector('[data-ecran="regles"]', { timeout: 20000 });
+    await page.waitForSelector('[data-ecran="poker"]', { timeout: 20000 });
+    await page.screenshot({ path: path.join(captures, '10-poker.png') });
+    await page.screenshot({ path: path.join(captures, '11-poker-combinaisons.png') });
     await page.screenshot({ path: path.join(captures, '07-regles.png') });
     await page.screenshot({ path: path.join(captures, '14-regles-pixel.png') });
-    await verifierZone(page, 'regles');
+    await verifierZone(page, 'poker');
+    await verifierCombinaisons(page);
     await verifierTextes(page);
     await verifierRendu(page);
-    await agirHote({ type: 'demarrerMinuteur', duree: 8, libelle: 'Mime express' });
+    await agirHote({ type: 'demarrerMinuteur', duree: 8, libelle: 'Poker' });
     await page.waitForSelector('[data-alerte="1"]', { timeout: 20000 });
     await page.screenshot({ path: path.join(captures, '08-minuteur.png') });
     await verifierTextes(page);
     await verifierRendu(page);
-    const autres = joueurs
-      .filter((joueur) => joueur.joueurId !== ines.joueurId && joueur.joueurId !== noe.joueurId)
-      .map((joueur) => joueur.joueurId);
+    const tapis: Record<string, number> = {};
+    for (const joueur of joueurs) tapis[joueur.joueurId] = 5;
     const podium = (async () => {
       await page.waitForSelector('[data-ecran="podium"]', { timeout: 20000 });
       await verifierZone(page, 'podium');
@@ -1088,33 +1092,9 @@ async function main(): Promise<void> {
       await verifierRendu(page);
       await page.screenshot({ path: path.join(captures, '09-podium.png') });
     })();
-    await agirHote({
-      type: 'validerResultats',
-      saisie: {
-        mode: 'equipes',
-        equipeA: [ines.joueurId, noe.joueurId],
-        equipeB: autres,
-        gagnante: 'A',
-      },
-    });
+    await agirHote({ type: 'validerPoker', tapis, tapisHote: 0 });
     await podium;
     await attendreFile();
-    await agirHote({ type: 'passerAuxDeplacements' });
-    for (let essai = 0; essai < 6; essai += 1) {
-      if (serveur.etat().course?.phase !== 'deplacements') break;
-      await agirHote({ type: 'passerJoueur' });
-      await attendreFile();
-    }
-    await agirHote({ type: 'nouveauTour' });
-    await attendreFile();
-    await agirHote({ type: 'choisirMiniJeu', id: 'poker' });
-    await page.waitForSelector('[data-ecran="poker"]', { timeout: 20000 });
-    await page.screenshot({ path: path.join(captures, '10-poker.png') });
-    await page.screenshot({ path: path.join(captures, '11-poker-combinaisons.png') });
-    await verifierZone(page, 'poker');
-    await verifierCombinaisons(page);
-    await verifierTextes(page);
-    await verifierRendu(page);
     const suiteChrono = await page.evaluate(() => window.__chronologieAnimations ?? []);
     for (let index = 0; index < suiteChrono.length - 1; index += 1) {
       const courant = suiteChrono[index];
@@ -1360,6 +1340,158 @@ async function main(): Promise<void> {
     const motsFin = await texteZone('undercover');
     if (!motsFin.includes(mancheUc.paire.civils) || !motsFin.includes(mancheUc.paire.undercover)) throw new Error('Les deux mots ne sont pas révélés');
     console.log('OK     Undercover : ordre de parole, civil révélé, undercover révélé, mots cachés jusqu\'à la fin');
+
+    await tourSuivant();
+    await agirHote({ type: 'choisirMiniJeu', id: 'codenames' });
+    await page.waitForSelector('[data-ecran="codenames"][data-etape="intro"]', { timeout: 20000 });
+    await verifierModule(page, 'codenames');
+    await agirHote({ type: 'equipesHasardCodenames' });
+    const prep = serveur.etat().course?.codenames?.preparation;
+    if (!prep) throw new Error('Préparation Codenames absente');
+    for (const equipe of ['rouge', 'bleu'] as const) {
+      const premier = prep.equipes[equipe][0];
+      if (!premier) throw new Error(`Équipe ${equipe} incomplète`);
+      await agirHote({ type: 'designerEspionCodenames', equipe, joueurId: premier });
+    }
+    await agirHote({ type: 'lancerGrilleCodenames' });
+    await page.waitForSelector('[data-ecran="codenames"][data-etape="indice"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'codenames');
+    const motsDansCartes = await page.evaluate(() => {
+      const cartes = Array.from(document.querySelectorAll('.carte-tv'));
+      if (cartes.length !== 25) return `grille ${cartes.length}`;
+      for (const carte of cartes) {
+        if (!(carte instanceof HTMLElement)) continue;
+        const mot = carte.querySelector('.mot-tv');
+        if (!(mot instanceof HTMLElement)) return 'mot absent';
+        const cadre = carte.getBoundingClientRect();
+        const boite = mot.getBoundingClientRect();
+        if (boite.width > cadre.width + 1 || boite.height > cadre.height + 1) {
+          return `déborde : ${(mot.textContent ?? '').trim()}`;
+        }
+        if (boite.left < cadre.left - 1 || boite.right > cadre.right + 1 || boite.top < cadre.top - 1 || boite.bottom > cadre.bottom + 1) {
+          return `hors carte : ${(mot.textContent ?? '').trim()}`;
+        }
+      }
+      return '';
+    });
+    if (motsDansCartes) throw new Error(`Codenames : ${motsDansCartes}`);
+    await page.screenshot({ path: path.join(captures, '40-codenames-grille.png') });
+    const mancheCn = serveur.etat().course?.codenames?.manches[0];
+    if (!mancheCn) throw new Error('Manche Codenames absente');
+    const espionCn = mancheCn.espions[mancheCn.equipeCourante];
+    const espionPage = joueurs.find((joueur) => joueur.joueurId === espionCn);
+    if (!espionPage) throw new Error('Espion Codenames introuvable');
+    const indice = await agir(espionPage, { type: 'proposerIndiceCodenames', mot: 'Zzza', nombre: 1 });
+    if (!indice.ok) throw new Error(indice.erreur);
+    await agirHote({ type: 'validerIndiceCodenames' });
+    await page.waitForSelector('[data-ecran="codenames"][data-etape="choix"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'codenames');
+    if (!(await texteZone('codenames')).includes('Zzza')) throw new Error("L'indice manque à la télé");
+    await page.screenshot({ path: path.join(captures, '41-codenames-indice.png') });
+    const allie = mancheCn.cartes.findIndex((carte) => carte.couleur === mancheCn.equipeCourante);
+    await agirHote({ type: 'retournerMotCodenames', index: allie });
+    await page.waitForSelector(`[data-ecran="codenames"] [data-index="${allie}"][data-revelee="1"]`, { timeout: 20000 });
+    await attendreFile();
+    await page.screenshot({ path: path.join(captures, '42-codenames-carte.png') });
+    const assassin = serveur.etat().course?.codenames?.manches[0]?.cartes.findIndex((carte) => carte.couleur === 'assassin' && !carte.revelee) ?? -1;
+    if (assassin < 0) throw new Error('Assassin Codenames introuvable');
+    // Remettre en mode choix si le tour a basculé
+    let couranteCn = serveur.etat().course?.codenames?.manches[0];
+    if (couranteCn?.etape === 'indice') {
+      const espion2 = couranteCn.espions[couranteCn.equipeCourante];
+      const pageEspion2 = joueurs.find((joueur) => joueur.joueurId === espion2);
+      if (!pageEspion2) throw new Error('Espion suivant introuvable');
+      const reprise = await agir(pageEspion2, { type: 'proposerIndiceCodenames', mot: 'Zzzb', nombre: 1 });
+      if (!reprise.ok) throw new Error(reprise.erreur);
+      await agirHote({ type: 'validerIndiceCodenames' });
+    }
+    await agirHote({ type: 'retournerMotCodenames', index: assassin });
+    await page.waitForSelector('[data-ecran="codenames"][data-etape="finie"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'codenames');
+    if ((await page.locator('[data-ecran="codenames"] [data-couleur="assassin"]').count()) < 1) {
+      throw new Error('L\'assassin n\'apparaît pas');
+    }
+    await page.screenshot({ path: path.join(captures, '43-codenames-assassin.png') });
+    if ((await page.locator('.codenames-grille[data-cle="1"]').count()) !== 1) throw new Error('La clé finale manque');
+    await page.screenshot({ path: path.join(captures, '44-codenames-cle.png') });
+    console.log('OK     Codenames : grille, indice, carte, assassin, clé finale');
+
+    await tourSuivant();
+    await agirHote({ type: 'choisirMiniJeu', id: 'perudo' });
+    await page.waitForSelector('[data-ecran="perudo"][data-etape="regles"]', { timeout: 20000 });
+    await verifierModule(page, 'perudo');
+    await page.screenshot({ path: path.join(captures, '45-perudo-regles.png') });
+    for (const joueur of joueurs) {
+      await agirHote({ type: 'lancerDesPerudo', joueurId: joueur.joueurId });
+    }
+    await page.waitForSelector('[data-ecran="perudo"][data-etape="encheres"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'perudo');
+    const perudoEtat = () => serveur.etat().course?.perudo;
+    const ouvreurId = perudoEtat()?.joueurs[perudoEtat()?.indexCourant ?? 0]?.id;
+    const ouvreur = joueurs.find((joueur) => joueur.joueurId === ouvreurId);
+    if (!ouvreur) throw new Error('Ouvreur Perudo introuvable');
+    const annoncePerudo = await agir(ouvreur, { type: 'annoncerPerudo', nombre: 3, valeur: 5 });
+    if (!annoncePerudo.ok) throw new Error(annoncePerudo.erreur);
+    await page.waitForSelector('.perudo-annonce-geante', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'perudo');
+    await page.screenshot({ path: path.join(captures, '46-perudo-annonce.png') });
+    const douteurId = perudoEtat()?.joueurs[perudoEtat()?.indexCourant ?? 0]?.id;
+    const douteur = joueurs.find((joueur) => joueur.joueurId === douteurId);
+    if (!douteur) throw new Error('Douteur Perudo introuvable');
+    const dudo = await agir(douteur, { type: 'dudoPerudo' });
+    if (!dudo.ok) throw new Error(dudo.erreur);
+    await page.waitForSelector('[data-ecran="perudo"][data-etape="revelation"]', { timeout: 20000 });
+    await page.waitForSelector('[data-ecran="perudo"][data-revelation="compte"], [data-ecran="perudo"][data-revelation="verdict"]', {
+      timeout: 30000,
+    });
+    await page.screenshot({ path: path.join(captures, '47-perudo-revelation.png') });
+    await page.waitForSelector('.perudo-verdict', { timeout: 30000 });
+    await attendreFile();
+    await verifierModule(page, 'perudo');
+    await page.screenshot({ path: path.join(captures, '48-perudo-verdict.png') });
+    console.log('OK     Perudo : règles, annonce, révélation, verdict');
+
+    await tourSuivant();
+    await agirHote({ type: 'choisirMiniJeu', id: 'just-one' });
+    await page.waitForSelector('[data-ecran="justone"][data-etape="attente"]', { timeout: 20000 });
+    await verifierModule(page, 'justone');
+    await page.screenshot({ path: path.join(captures, '49-justone-attente.png') });
+    await agirHote({ type: 'lancerMancheJustOne' });
+    await page.waitForSelector('[data-ecran="justone"][data-etape="indices"]', { timeout: 20000 });
+    const mancheJo = () => serveur.etat().course?.justone?.manches.at(-1);
+    const couranteJo = mancheJo();
+    if (!couranteJo) throw new Error('Manche Just One absente');
+    for (const [rang, id] of (serveur.etat().course?.ordre ?? [])
+      .filter((joueurId) => joueurId !== couranteJo.devineurId)
+      .entries()) {
+      const pageJoueur = joueurs.find((joueur) => joueur.joueurId === id);
+      if (!pageJoueur) throw new Error('Indiceur Just One introuvable');
+      // Deux « Soleil » pour forcer une carte barrée à l'écran.
+      const mots = ['Soleil', 'Soleil', 'Pluie', 'Vent'];
+      const envoi = await agir(pageJoueur, { type: 'proposerIndiceJustOne', mot: mots[rang]! });
+      if (!envoi.ok) throw new Error(envoi.erreur);
+    }
+    if (couranteJo.devineurId !== 'hote') {
+      const hoteIndice = await agir(hote, { type: 'proposerIndiceJustOne', mot: 'Orage' });
+      if (!hoteIndice.ok) throw new Error(hoteIndice.erreur);
+    }
+    await page.waitForSelector('[data-ecran="justone"][data-etape="verification"]', { timeout: 20000 });
+    await agirHote({ type: 'revelerIndicesJustOne' });
+    await page.waitForSelector('[data-ecran="justone"][data-etape="revelation"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'justone');
+    await page.screenshot({ path: path.join(captures, '50-justone-indices-barres.png') });
+    await agirHote({ type: 'jugerJustOne', issue: 'trouve' });
+    await page.waitForSelector('[data-ecran="justone"][data-etape="finie"]', { timeout: 20000 });
+    await attendreFile();
+    await verifierModule(page, 'justone');
+    await page.screenshot({ path: path.join(captures, '51-justone-mot-revele.png') });
+    console.log('OK     Just One : attente, indices barrés, mot révélé');
 
     await capturesDesEtRoue(browser, captures);
     await capturesFinale(browser, captures);

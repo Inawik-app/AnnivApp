@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { INTERVALLE_SAUVEGARDE_MS, LIMITE_ANNULATIONS } from '../shared/constantes';
 import type { Action, EtatJeu, Origine, ReponseAction, TypeCase } from '../shared/types';
 import { lireCartesChance, lireCartesMalchance, lireCatalogueTrophees, lireConfigPlateau, lireRoue } from './course-config';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireCodenames, lireJeopardy, lireJustOne, lireConfigPartie, lirePerudo, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
 import { libelleAction } from './libelles';
 import { creerPersistance, type Persistance } from './persistance';
 import { reduire, type Effet } from './reducteur';
@@ -23,6 +23,14 @@ type Instantane = {
   desForces: number[];
   cartesForcees: string[];
   roueForcees: string[];
+};
+
+/** Surcharges en mémoire pour la simulation / le balayage (ne touche pas aux fichiers). */
+export type SurchargesSimulation = {
+  recompenseArrivee?: number[];
+  coupDePouce?: 'aucun' | 'de7' | 'de8';
+  cagnotteConsolation?: 'aucune' | 'dernier';
+  montantTrophees?: number;
 };
 
 export type OptionsStore = {
@@ -46,6 +54,15 @@ export type OptionsStore = {
   disposition?: TypeCase[];
   /** Partie jouée en mémoire : pas de pile d'annulation, pas d'écriture disque. */
   simulation?: boolean;
+  /** Leviers d'équilibrage appliqués après lecture des JSON. */
+  surcharges?: SurchargesSimulation;
+  /**
+   * Simulation seulement : réduit les dés Perudo pour accélérer
+   * (le classement final reste tiré, les GP de barème inchangés).
+   */
+  perudoDesSimulation?: number;
+  /** Simulation seulement : nombre de cycles Just One (défaut config). */
+  justoneCyclesSimulation?: number;
 };
 
 export type Store = {
@@ -81,7 +98,26 @@ export function creerStore(options: OptionsStore): Store {
   const topten = lireTopTen(racine);
   const jeopardy = lireJeopardy(racine);
   const undercover = lireUndercover(racine);
+  const codenames = lireCodenames(racine);
+  const perudo = lirePerudo(racine);
+  if (options.simulation && typeof options.perudoDesSimulation === 'number' && options.perudoDesSimulation >= 1) {
+    perudo.desParJoueur = Math.floor(options.perudoDesSimulation);
+  }
+  const justone = lireJustOne(racine);
+  if (options.simulation && typeof options.justoneCyclesSimulation === 'number' && options.justoneCyclesSimulation >= 1) {
+    justone.cycles = Math.floor(options.justoneCyclesSimulation);
+  }
+  const nomHote = lireConfigPartie(racine).nomHote;
   const trophees = lireCatalogueTrophees(racine);
+  const surcharges = options.surcharges;
+  if (surcharges?.recompenseArrivee) {
+    plateau.recompenseArrivee = [...surcharges.recompenseArrivee];
+  }
+  if (surcharges?.coupDePouce) plateau.coupDePouce = surcharges.coupDePouce;
+  if (surcharges?.cagnotteConsolation) trophees.cagnotteConsolation = surcharges.cagnotteConsolation;
+  if (typeof surcharges?.montantTrophees === 'number') {
+    for (const trophee of trophees.trophees) trophee.montant = surcharges.montantTrophees;
+  }
   const simulation = options.simulation === true;
   const alea = options.alea ?? ((max: number) => randomInt(0, Math.max(1, max)));
   const desForces = options.test ? [...(options.desForces ?? [])] : [];
@@ -257,8 +293,13 @@ export function creerStore(options: OptionsStore): Store {
         topten,
         jeopardy,
         undercover,
+        codenames,
+        perudo,
+        justone,
+        nomHote,
         trophees: trophees.trophees,
         nombreCeremonie: trophees.nombreCeremonie,
+        cagnotteConsolation: trophees.cagnotteConsolation,
         simulation,
       });
       if (!resultat.ok) {

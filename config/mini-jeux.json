@@ -5,53 +5,6 @@
   },
   "jeux": [
     {
-      "id": "pong-gobelets",
-      "nom": "Pong gobelets",
-      "resume": "Le premier qui vide ses gobelets gagne.",
-      "icone": "ping-pong",
-      "regles": [
-        "Chacun a sa rangée de gobelets.",
-        "Lance la balle pour en faire tomber un.",
-        "Un gobelet tombé est retiré.",
-        "Le premier qui vide sa rangée est premier."
-      ],
-      "materiel": "Gobelets et une balle de ping-pong",
-      "saisie": "classement",
-      "module": "aucun"
-    },
-    {
-      "id": "mime-express",
-      "nom": "Mime express",
-      "resume": "Une équipe mime, l'autre devine.",
-      "icone": "masques",
-      "regles": [
-        "Deux équipes : un mime et des devineurs.",
-        "Le mime ne parle pas et ne montre pas les lettres.",
-        "L'équipe qui trouve le plus de mots gagne.",
-        "Le chrono dure 60 secondes."
-      ],
-      "materiel": "Une liste de mots",
-      "duree": 60,
-      "saisie": "equipes",
-      "module": "aucun"
-    },
-    {
-      "id": "memoire-express",
-      "nom": "Mémoire express",
-      "resume": "Retenir une suite, puis la restituer.",
-      "icone": "perso-cerveau",
-      "regles": [
-        "Une suite d'objets est montrée une seule fois.",
-        "Chacun la répète dans l'ordre.",
-        "On a 30 secondes pour répondre.",
-        "Le plus fidèle est premier."
-      ],
-      "materiel": "Objets ou cartes à montrer",
-      "duree": 30,
-      "saisie": "classement",
-      "module": "aucun"
-    },
-    {
       "id": "poker",
       "nom": "Poker",
       "resume": "Vrais jetons, l'application compte et chronomètre.",
@@ -63,7 +16,8 @@
         "À la fin, chaque jeton vaut 1 GP."
       ],
       "saisie": "libre",
-      "module": "poker"
+      "module": "poker",
+      "hoteParticipe": false
     },
     {
       "id": "jeopardy",
@@ -77,7 +31,8 @@
         "Une bonne réponse rapporte la valeur de la case."
       ],
       "saisie": "libre",
-      "module": "jeopardy"
+      "module": "jeopardy",
+      "hoteParticipe": false
     },
     {
       "id": "top-ten",
@@ -91,7 +46,8 @@
         "Chaque paire dans le bon ordre rapporte 1 GP au Cap'Ten."
       ],
       "saisie": "libre",
-      "module": "topten"
+      "module": "topten",
+      "hoteParticipe": true
     },
     {
       "id": "undercover",
@@ -105,7 +61,53 @@
         "Démasqué, l'undercover peut encore deviner le mot."
       ],
       "saisie": "libre",
-      "module": "undercover"
+      "module": "undercover",
+      "hoteParticipe": false
+    },
+    {
+      "id": "codenames",
+      "nom": "Codenames",
+      "resume": "Deux équipes, un espion, un agent, des mots à faire deviner.",
+      "icone": "enveloppe",
+      "regles": [
+        "Deux équipes de deux : un espion et un agent.",
+        "L'espion donne un indice d'un seul mot et un nombre.",
+        "L'agent retourne des cartes jusqu'à se tromper ou finir.",
+        "L'assassin fait perdre la manche tout de suite."
+      ],
+      "saisie": "libre",
+      "module": "codenames",
+      "hoteParticipe": false
+    },
+    {
+      "id": "perudo",
+      "nom": "Perudo",
+      "resume": "Dés secrets, annonces, Dudo et Calza.",
+      "icone": "de",
+      "regles": [
+        "Chacun lance ses dés en secret sur son téléphone.",
+        "On annonce à tour de rôle un nombre de dés sur toute la table.",
+        "Les 1 (Pacos) sont des jokers.",
+        "Dudo doute de l'annonce ; Calza parie sur le compte exact."
+      ],
+      "saisie": "libre",
+      "module": "perudo",
+      "hoteParticipe": false
+    },
+    {
+      "id": "just-one",
+      "nom": "Just One",
+      "resume": "Un mot secret, des indices en un mot, sans doublon.",
+      "icone": "enveloppe",
+      "regles": [
+        "Un joueur doit faire trouver un mot secret.",
+        "Les autres écrivent un indice d'un seul mot.",
+        "Les indices identiques s'annulent et restent cachés.",
+        "Le devineur lit les indices restants et propose le mot."
+      ],
+      "saisie": "libre",
+      "module": "justone",
+      "hoteParticipe": true
     }
   ]
 }

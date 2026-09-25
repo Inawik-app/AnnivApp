@@ -5,7 +5,17 @@ import path from 'node:path';
 import { io, type Socket } from 'socket.io-client';
 import { solde } from '../shared/soldes';
 import type { ConfigJeopardy } from '../shared/jeopardy';
-import type { Action, EtatJeu, MancheUndercover, ReponseAction, TypeCase, VueClient } from '../shared/types';
+import type {
+  Action,
+  EtatJeu,
+  MancheCodenames,
+  MancheJustOne,
+  MancheUndercover,
+  PerudoCourse,
+  ReponseAction,
+  TypeCase,
+  VueClient,
+} from '../shared/types';
 import { demarrerServeur, type ConfigTest, type ServeurJeu } from '../server/demarrer';
 
 export const CODE_HOTE = 'change-moi';
@@ -239,6 +249,72 @@ export function fuitesUndercover(vue: VueClient, joueurId: string | null, manche
   if (courante.paire !== null) fuites.push('paire');
   if (!manche.elimines.includes(manche.undercoverId) && courante.undercoverId !== null) fuites.push('undercover désigné');
   for (const entree of courante.elimines) if (!manche.elimines.includes(entree.id)) fuites.push(`rôle de ${entree.id}`);
+  return fuites;
+}
+
+/** Clé et couleurs non révélées : réservées hôte + espions. */
+export function fuitesCodenames(vue: VueClient, joueurId: string | null, manche: MancheCodenames, role: 'tv' | 'joueur' | 'hote'): string[] {
+  const courante = vue.course?.codenames?.courante;
+  if (!courante || manche.etape === 'finie') return [];
+  const fuites: string[] = [];
+  const monEquipe = joueurId
+    ? (manche.equipes.rouge.includes(joueurId) ? 'rouge' as const : manche.equipes.bleu.includes(joueurId) ? 'bleu' as const : null)
+    : null;
+  const estEspion = monEquipe !== null && manche.espions[monEquipe] === joueurId;
+  const voitCle = role === 'hote' || estEspion;
+  for (const carte of courante.cartes) {
+    const source = manche.cartes[carte.index];
+    if (!source) continue;
+    if (!voitCle && !source.revelee && carte.couleur !== null) {
+      fuites.push(`couleur ${carte.index}`);
+    }
+  }
+  return fuites;
+}
+
+/** Faces d'un joueur : soi + hôte jusqu'à révélation. */
+export function fuitesPerudo(vue: VueClient, joueurId: string | null, jeu: PerudoCourse, role: 'tv' | 'joueur' | 'hote'): string[] {
+  const vueJeu = vue.course?.perudo;
+  if (!vueJeu) return [];
+  const revele = jeu.etape === 'revelation' || jeu.etape === 'terminee';
+  if (revele) return [];
+  const fuites: string[] = [];
+  for (const joueur of vueJeu.joueurs) {
+    if (joueur.faces === null) continue;
+    const autorise = role === 'hote' || (role === 'joueur' && joueurId === joueur.id);
+    if (!autorise) fuites.push(`dés de ${joueur.id}`);
+  }
+  return fuites;
+}
+
+/** Mot secret : indiceurs seulement avant la fin ; télé et devineur jamais avant `finie`. */
+export function fuitesJustOne(
+  vue: VueClient,
+  joueurId: string | null,
+  manche: MancheJustOne,
+  role: 'tv' | 'joueur' | 'hote',
+): string[] {
+  const courante = vue.course?.justone?.courante;
+  if (!courante || manche.etape === 'finie') return [];
+  const fuites: string[] = [];
+  const moi = role === 'hote' ? 'hote' : joueurId;
+  const jeSuisDevineur = moi === manche.devineurId;
+  const estIndiceur = !!moi && moi !== manche.devineurId;
+  if (courante.mot !== null) {
+    if (role === 'tv' || jeSuisDevineur) fuites.push('mot secret');
+    if (role === 'joueur' && !estIndiceur && !jeSuisDevineur) fuites.push('mot secret');
+  }
+  if (manche.etape === 'indices' || manche.etape === 'verification') {
+    for (const indice of courante.indices) {
+      if (indice.mot === null) continue;
+      if (role === 'tv' || jeSuisDevineur) fuites.push(`indice de ${indice.auteurId}`);
+    }
+  }
+  if ((manche.etape === 'revelation' || manche.etape === 'reponse') && role === 'tv') {
+    for (const indice of courante.indices) {
+      if (indice.annule && indice.mot !== null) fuites.push(`texte annulé ${indice.auteurId}`);
+    }
+  }
   return fuites;
 }
 

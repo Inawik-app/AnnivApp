@@ -20,6 +20,7 @@ type Ajouter = (
 
 const ACTIONS = new Set<Action['type']>([
   'ouvrirPodium',
+  'verserCagnotteConsolation',
   'tirerTrophees',
   'revelerTrophee',
   'revelerClassement',
@@ -39,10 +40,38 @@ function gainsMasques(etat: EtatJeu): number {
   return etat.transactions.filter((transaction) => transaction.masquee).length;
 }
 
-function catalogueActif(ctx: ContexteCourse): { nombre: number; trophees: TropheeConfig[] } {
-  if (ctx.trophees) return { nombre: ctx.nombreCeremonie ?? 4, trophees: ctx.trophees };
+function catalogueActif(ctx: ContexteCourse): {
+  nombre: number;
+  trophees: TropheeConfig[];
+  cagnotteConsolation: 'aucune' | 'dernier';
+} {
+  if (ctx.trophees) {
+    return {
+      nombre: ctx.nombreCeremonie ?? 4,
+      trophees: ctx.trophees,
+      cagnotteConsolation: ctx.cagnotteConsolation ?? 'aucune',
+    };
+  }
   const lu = lireCatalogueTrophees(RACINE);
-  return { nombre: ctx.nombreCeremonie ?? lu.nombreCeremonie, trophees: lu.trophees };
+  return {
+    nombre: ctx.nombreCeremonie ?? lu.nombreCeremonie,
+    trophees: lu.trophees,
+    cagnotteConsolation: ctx.cagnotteConsolation ?? lu.cagnotteConsolation,
+  };
+}
+
+function beneficiaireConsolation(etat: EtatJeu): string | null {
+  if (etat.joueurs.length === 0) return null;
+  let retenu = 0;
+  for (let index = 1; index < etat.joueurs.length; index += 1) {
+    const courant = etat.joueurs[index];
+    const meilleur = etat.joueurs[retenu];
+    if (!courant || !meilleur) continue;
+    if (solde(etat.transactions, courant.id, 'visibles') < solde(etat.transactions, meilleur.id, 'visibles')) {
+      retenu = index;
+    }
+  }
+  return etat.joueurs[retenu]?.id ?? null;
 }
 
 export function refuserCeremonie(etat: EtatJeu, action: Action, origine: Origine): string | null | undefined {
@@ -58,6 +87,10 @@ export function refuserCeremonie(etat: EtatJeu, action: Action, origine: Origine
       if (masques > 0 && action.forcer !== true) return messageGainsMasques(masques);
       return null;
     }
+    case 'verserCagnotteConsolation':
+      if (!ceremonie || ceremonie.etape !== 'cagnotte') return "Ce n'est pas le moment de la cagnotte";
+      if (!ceremonie.cagnotteEnAttente || course.cagnotte <= 0) return 'Aucune cagnotte à verser';
+      return null;
     case 'tirerTrophees':
       if (!ceremonie || ceremonie.etape !== 'podium') return "Affiche d'abord le podium";
       return null;
@@ -128,16 +161,58 @@ export function appliquerCeremonie(draft: EtatJeu, action: Action, ctx: Contexte
   if (!course) return true;
   switch (action.type) {
     case 'ouvrirPodium': {
+      const ordre = [...(course.classement ?? [])];
+      const recompenses = ordre.map((joueurId, index) => {
+        const montant = course.regles.recompenseArrivee[index] ?? 0;
+        if (montant > 0) crediter(draft, ctx, ajouter, joueurId, montant, 'Arrivée', 'arrivee');
+        return { joueurId, montant };
+      });
+      const catalogue = catalogueActif(ctx);
+      const montantCagnotte = course.cagnotte;
+      const beneficiaire =
+        catalogue.cagnotteConsolation === 'dernier' && montantCagnotte > 0
+          ? beneficiaireConsolation(draft)
+          : null;
+      const attendreCagnotte = beneficiaire !== null;
       course.ceremonie = {
         masqueesIgnorees: gainsMasques(draft) > 0,
-        etape: 'podium',
+        etape: attendreCagnotte ? 'cagnotte' : 'podium',
         tirage: [],
         reveles: 0,
         classementRevele: false,
         gagnantRevele: false,
+        cagnotteEnAttente: attendreCagnotte
+          ? { joueurId: beneficiaire!, montant: montantCagnotte }
+          : null,
       };
       ajouter(draft, 'ceremonie.podium', 'public', 'Podium de la course', {
-        ordre: [...(course.classement ?? [])],
+        ordre,
+        recompenses,
+      });
+      if (attendreCagnotte && course.ceremonie.cagnotteEnAttente) {
+        ajouter(draft, 'ceremonie.cagnotte', 'public', 'Cagnotte de consolation', {
+          joueurId: course.ceremonie.cagnotteEnAttente.joueurId,
+          montant: course.ceremonie.cagnotteEnAttente.montant,
+          versee: false,
+        });
+      }
+      return true;
+    }
+    case 'verserCagnotteConsolation': {
+      const ceremonie = course.ceremonie;
+      const attente = ceremonie?.cagnotteEnAttente;
+      if (!ceremonie || !attente) return true;
+      const montant = course.cagnotte;
+      if (montant > 0) {
+        crediter(draft, ctx, ajouter, attente.joueurId, montant, 'Cagnotte de consolation', 'cagnotte-consolation');
+        course.cagnotte = 0;
+      }
+      ceremonie.cagnotteEnAttente = null;
+      ceremonie.etape = 'podium';
+      ajouter(draft, 'ceremonie.cagnotte', 'public', `${pseudo(draft, attente.joueurId)} reçoit la cagnotte`, {
+        joueurId: attente.joueurId,
+        montant,
+        versee: true,
       });
       return true;
     }
@@ -196,6 +271,10 @@ export function appliquerCeremonie(draft: EtatJeu, action: Action, ctx: Contexte
     default:
       return false;
   }
+}
+
+function pseudo(draft: EtatJeu, joueurId: string): string {
+  return draft.joueurs.find((joueur) => joueur.id === joueurId)?.pseudo ?? 'Un joueur';
 }
 
 export function projeterTirage(ceremonie: Ceremonie, cible: 'tv' | 'joueur' | 'hote'): {

@@ -13,7 +13,6 @@ export type ThemeTopTen = {
 };
 
 export type ConfigTopTen = {
-  nomHote: string;
   pointsParPaire: number;
   bonusOrdreParfait: number;
   /** Bonus total pour 0, 1, 2… numéros devinés exactement. */
@@ -100,7 +99,6 @@ export function validerTopTen(brut: unknown): ConfigTopTen {
     throw new Error(`topten.json : ${message}`);
   }
   if (!estObjet(brut)) echec('le fichier est illisible');
-  if (!texte(brut.nomHote) || brut.nomHote.trim().length > 20) echec("nomHote doit être un nom de 1 à 20 caractères");
   if (!entierPositif(brut.pointsParPaire)) echec('pointsParPaire doit être un entier positif ou nul');
   if (!entierPositif(brut.bonusOrdreParfait)) echec('bonusOrdreParfait doit être un entier positif ou nul');
   if (!Array.isArray(brut.bonusChiffresExacts) || brut.bonusChiffresExacts.length < 1) {
@@ -122,7 +120,6 @@ export function validerTopTen(brut: unknown): ConfigTopTen {
     return { intitule, bas: entree.bas.trim(), haut: entree.haut.trim() };
   });
   return {
-    nomHote: brut.nomHote.trim(),
     pointsParPaire: brut.pointsParPaire,
     bonusOrdreParfait: brut.bonusOrdreParfait,
     bonusChiffresExacts,

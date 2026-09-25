@@ -58,6 +58,11 @@ function CeremonieHote({
   const restants = ceremonie.suivants;
   return (
     <div class="pile" data-ceremonie-hote={ceremonie.etape}>
+      {ceremonie.etape === 'cagnotte' ? (
+        <Bouton disabled={envoi} onClick={() => agir({ type: 'verserCagnotteConsolation' })}>
+          Verser la cagnotte
+        </Bouton>
+      ) : null}
       {ceremonie.etape === 'podium' ? (
         <Bouton disabled={envoi} onClick={() => agir({ type: 'tirerTrophees' })}>
           Tirer les trophées

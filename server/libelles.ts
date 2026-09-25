@@ -94,6 +94,34 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return action.trouve ? 'Mot trouvé' : 'Mot raté';
     case 'recapUndercover':
       return "Récapitulatif de l'Undercover";
+    case 'affecterCodenames':
+      return 'Équipe Codenames';
+    case 'equipesHasardCodenames':
+      return 'Équipes au hasard';
+    case 'designerEspionCodenames':
+      return 'Espion Codenames';
+    case 'lancerGrilleCodenames':
+      return 'Grille Codenames';
+    case 'proposerIndiceCodenames':
+      return 'Indice proposé';
+    case 'validerIndiceCodenames':
+      return 'Indice validé';
+    case 'refuserIndiceCodenames':
+      return 'Indice refusé';
+    case 'retournerMotCodenames':
+      return 'Carte retournée';
+    case 'finirTourCodenames':
+      return 'Fin du tour Codenames';
+    case 'lancerDesPerudo':
+      return 'Lancer de Perudo';
+    case 'annoncerPerudo':
+      return 'Annonce Perudo';
+    case 'dudoPerudo':
+      return 'Dudo !';
+    case 'calzaPerudo':
+      return 'Calza !';
+    case 'mancheSuivantePerudo':
+      return 'Manche suivante de Perudo';
     case 'passerAuxDeplacements':
       return 'Déplacements';
     case 'lancerDe':
@@ -108,6 +136,8 @@ export function libelleAction(action: Action, etat: EtatJeu): string {
       return 'Fin de la course';
     case 'ouvrirPodium':
       return 'Podium de la course';
+    case 'verserCagnotteConsolation':
+      return 'Cagnotte de consolation';
     case 'tirerTrophees':
       return 'Tirage des trophées';
     case 'revelerTrophee':

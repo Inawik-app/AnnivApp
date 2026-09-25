@@ -5,7 +5,8 @@ import { libelleRang } from '../commun/spectacle';
 import './finale.css';
 
 export type SceneFinale =
-  | { genre: 'podium'; ordre: string[] }
+  | { genre: 'podium'; ordre: string[]; recompenses: Record<string, number> }
+  | { genre: 'cagnotte'; joueurId: string; montant: number; versee: boolean }
   | { genre: 'trophee'; trophee: TropheeTire; phase: 'titre' | 'suspense' | 'gagnants' }
   | { genre: 'classement'; lignes: Array<{ id: string; gp: number }>; visibles: number }
   | { genre: 'gagnant'; ids: string[]; texte: string; revele: boolean };
@@ -22,6 +23,18 @@ function lireTexte(valeur: unknown): string | null {
 function lireIds(valeur: unknown): string[] {
   if (!Array.isArray(valeur)) return [];
   return valeur.filter((id): id is string => typeof id === 'string');
+}
+
+function lireRecompenses(valeur: unknown): Record<string, number> {
+  if (!Array.isArray(valeur)) return {};
+  const resultat: Record<string, number> = {};
+  for (const entree of valeur) {
+    if (!entree || typeof entree !== 'object') continue;
+    const ligne = entree as { joueurId?: unknown; montant?: unknown };
+    if (typeof ligne.joueurId !== 'string' || typeof ligne.montant !== 'number') continue;
+    resultat[ligne.joueurId] = ligne.montant;
+  }
+  return resultat;
 }
 
 function tropheeDepuis(donnees: Record<string, unknown>): TropheeTire | null {
@@ -46,7 +59,23 @@ export async function jouerCeremonie(
 ): Promise<boolean> {
   const court = deps.reduit ? 80 : 0;
   if (evenement.type === 'ceremonie.podium') {
-    deps.setScene({ genre: 'podium', ordre: lireIds(evenement.donnees.ordre) });
+    deps.setScene({
+      genre: 'podium',
+      ordre: lireIds(evenement.donnees.ordre),
+      recompenses: lireRecompenses(evenement.donnees.recompenses),
+    });
+    return true;
+  }
+  if (evenement.type === 'ceremonie.cagnotte') {
+    const joueurId = lireTexte(evenement.donnees.joueurId);
+    const montant = typeof evenement.donnees.montant === 'number' ? evenement.donnees.montant : 0;
+    if (!joueurId) return true;
+    deps.setScene({
+      genre: 'cagnotte',
+      joueurId,
+      montant,
+      versee: evenement.donnees.versee === true,
+    });
     return true;
   }
   if (evenement.type === 'trophee.revele') {
@@ -89,12 +118,21 @@ export async function jouerCeremonie(
   return false;
 }
 
-function FicheJoueur({ joueur, rang }: { joueur: JoueurPublic; rang?: string }) {
+function FicheJoueur({
+  joueur,
+  rang,
+  recompense,
+}: {
+  joueur: JoueurPublic;
+  rang?: string;
+  recompense?: number;
+}) {
   return (
     <div class="finale-fiche">
       <Avatar avatar={joueur.avatar} couleur={joueur.couleur} pseudo={joueur.pseudo} taille={128} />
       <p class="finale-nom">{joueur.pseudo}</p>
       {rang ? <p class="finale-rang">{rang}</p> : null}
+      {recompense && recompense > 0 ? <p class="finale-rang">+{recompense} GP</p> : null}
     </div>
   );
 }
@@ -118,7 +156,15 @@ export function sceneDepuis(course: CourseVue | null, joueurs: JoueurPublic[]): 
   }
   const dernier = ceremonie.reveles[ceremonie.reveles.length - 1];
   if (dernier) return { genre: 'trophee', trophee: dernier, phase: 'gagnants' };
-  return { genre: 'podium', ordre: course.classement ? [...course.classement] : [] };
+  if (ceremonie.etape === 'cagnotte' && ceremonie.cagnotteEnAttente) {
+    return {
+      genre: 'cagnotte',
+      joueurId: ceremonie.cagnotteEnAttente.joueurId,
+      montant: ceremonie.cagnotteEnAttente.montant,
+      versee: false,
+    };
+  }
+  return { genre: 'podium', ordre: course.classement ? [...course.classement] : [], recompenses: {} };
 }
 
 export function FinaleTv({
@@ -141,9 +187,27 @@ export function FinaleTv({
           {scene.ordre.map((id, index) => {
             const joueur = joueurDe(id);
             if (!joueur) return null;
-            return <FicheJoueur key={id} joueur={joueur} rang={libelleRang(index + 1)} />;
+            return (
+              <FicheJoueur
+                key={id}
+                joueur={joueur}
+                rang={libelleRang(index + 1)}
+                recompense={scene.recompenses[id]}
+              />
+            );
           })}
         </div>
+      </section>
+    );
+  }
+
+  if (scene.genre === 'cagnotte') {
+    const joueur = joueurDe(scene.joueurId);
+    return (
+      <section class="finale" data-ecran="finale" data-ceremonie="cagnotte" data-versee={scene.versee ? '1' : '0'}>
+        <h2 class="finale-titre">{scene.versee ? 'Cagnotte versée' : 'Cagnotte de consolation'}</h2>
+        {joueur ? <FicheJoueur joueur={joueur} /> : null}
+        <CompteurRouleaux valeur={scene.montant} taille={96} duree={reduit ? 80 : 700} />
       </section>
     );
   }

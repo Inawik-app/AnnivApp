@@ -10,9 +10,11 @@ import {
   type GainMiniJeu,
 } from '../shared/mini-jeux';
 import { solde } from '../shared/soldes';
+import { REPONDANT_HOTE } from '../shared/topten';
 import type { Action, EtatJeu, Joueur, Minuteur, Origine, Visibilite } from '../shared/types';
 import type { ContexteCourse } from './course';
 import { trouverJoueur } from './libelles';
+import { justoneInitial } from './justone';
 
 type Ajouter = (
   draft: EtatJeu,
@@ -66,6 +68,7 @@ export function crediter(
   source: string,
 ): void {
   if (montant <= 0) return;
+  if (joueurId === 'hote' || joueurId === REPONDANT_HOTE) return;
   draft.transactions.push({
     id: ctx.id(),
     joueurId,
@@ -165,6 +168,37 @@ export function appliquerChoix(
       recap: false,
     };
   }
+  if (jeu.module === 'codenames') {
+    const mots = [...(course.motsSoiree ?? course.codenames?.motsJoues ?? [])];
+    course.motsSoiree = mots;
+    course.codenames = {
+      nbManches: ctx.codenames.manches,
+      motsJoues: [...mots],
+      preparation: { equipes: { rouge: [], bleu: [] }, espions: { rouge: null, bleu: null } },
+      manches: [],
+    };
+  }
+  if (jeu.module === 'perudo') {
+    const config = ctx.perudo;
+    const premierId = course.ordre[ctx.alea(Math.max(1, course.ordre.length))] ?? course.ordre[0] ?? '';
+    course.perudo = {
+      desParJoueur: config.desParJoueur,
+      calzaAutorise: config.calza,
+      numeroManche: 1,
+      joueurs: course.ordre.map((id) => ({ id, desRestants: config.desParJoueur, faces: [], aLance: false })),
+      indexCourant: Math.max(0, course.ordre.indexOf(premierId)),
+      etape: 'lancers',
+      annonce: null,
+      historique: [],
+      revelation: null,
+      elimines: [],
+      premierId,
+      gains: {},
+    };
+  }
+  if (jeu.module === 'justone') {
+    course.justone = justoneInitial(course.ordre, ctx.justone);
+  }
   if (!course.joues.includes(jeu.id)) course.joues.push(jeu.id);
   ajouter(draft, 'minijeu.choisi', 'public', `Mini-jeu : ${jeu.nom}`, {
     nom: jeu.nom,
@@ -223,6 +257,9 @@ export function refuserActivite(etat: EtatJeu, action: Action, origine: Origine,
       if (jeu.module === 'topten') return 'Le Top Ten se joue manche par manche depuis son panneau';
       if (jeu.module === 'jeopardy') return 'Le Jeopardy se joue case par case depuis son panneau';
       if (jeu.module === 'undercover') return "L'Undercover se joue manche par manche depuis son panneau";
+      if (jeu.module === 'codenames') return 'Le Codenames se joue depuis son panneau';
+      if (jeu.module === 'perudo') return 'Le Perudo se joue depuis son panneau';
+      if (jeu.module === 'justone') return 'Le Just One se joue depuis son panneau';
       if (action.saisie.mode !== jeu.saisie) return 'Cette saisie ne correspond pas au mini-jeu';
       return refuserSaisie(etat, action);
     }

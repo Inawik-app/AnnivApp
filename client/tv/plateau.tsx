@@ -466,6 +466,9 @@ export function PlateauTv({
       {course.dernierTour && course.phase !== 'terminee' ? (
         <p class="bandeau-dernier-tour" data-bandeau="dernier-tour">Dernier tour !</p>
       ) : null}
+      {course.coupDePouceActif ? (
+        <p class="bandeau-dernier-tour" data-bandeau="coup-de-pouce">Coup de pouce !</p>
+      ) : null}
       <div class="colonne-fiches" data-zone="fiches">
         {ordre.map((id) => {
           const joueur = joueurs.find((candidat) => candidat.id === id);

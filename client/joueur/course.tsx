@@ -7,6 +7,9 @@ import { libelleRang } from '../commun/spectacle';
 import { TopTenJoueur } from '../commun/topten';
 import { JeopardyJoueur } from '../commun/jeopardy';
 import { UndercoverJoueur } from '../commun/undercover';
+import { CodenamesJoueur } from '../commun/codenames';
+import { PerudoJoueur } from '../commun/perudo';
+import { JustOneJoueur } from '../commun/justone';
 import '../commun/course.css';
 
 type Moi = NonNullable<VueJoueur['moi']>;
@@ -185,6 +188,15 @@ export function CourseJoueur({
         <JeopardyJoueur jeopardy={course.jeopardy} ordre={course.ordre} nom={nom} envoyer={envoyer} />
       ) : null}
       {course.phase === 'miniJeu' && course.undercover ? <UndercoverJoueur undercover={course.undercover} nom={nom} /> : null}
+      {course.phase === 'miniJeu' && course.codenames ? (
+        <CodenamesJoueur codenames={course.codenames} nom={nom} occupe={occupe} envoyer={envoyer} />
+      ) : null}
+      {course.phase === 'miniJeu' && course.perudo ? (
+        <PerudoJoueur perudo={course.perudo} moiId={moi.id} nom={nom} occupe={occupe} envoyer={envoyer} />
+      ) : null}
+      {course.phase === 'miniJeu' && course.justone ? (
+        <JustOneJoueur justone={course.justone} moiId={moi.id} pseudos={pseudos} occupe={occupe} envoyer={envoyer} />
+      ) : null}
       {course.dernierDe?.joueurId === moi.id ? <p>Tu as fait {course.dernierDe.valeur}.</p> : null}
       {!aMoiDeLancer && !aMoiLaRoue && rangPassage >= 0 ? (
         <div>

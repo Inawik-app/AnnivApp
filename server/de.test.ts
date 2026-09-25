@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { esperanceDe, tirerDeUniforme } from '../shared/de';
 import { lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
-import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireUndercover } from './mini-jeux-config';
+import { lireCatalogue, lireJeopardy, lirePoker, lireTopTen, lireCodenames, lirePerudo, lireUndercover, lireJustOne } from './mini-jeux-config';
 import { etatInitial } from './etat-initial';
 import { reduire, type ContexteReduction } from './reducteur';
 import { solde } from '../shared/soldes';
@@ -31,6 +31,10 @@ function contexte(partiel: Partial<ContexteReduction> = {}): ContexteReduction {
     topten: lireTopTen(RACINE),
     jeopardy: lireJeopardy(RACINE),
     undercover: lireUndercover(RACINE),
+    codenames: lireCodenames(RACINE),
+    perudo: lirePerudo(RACINE),
+    justone: lireJustOne(RACINE),
+    nomHote: 'Yanis',
     ...partiel,
   };
 }
@@ -92,7 +96,7 @@ describe('dés à 6, 7 et 8 faces', () => {
     etat = jouer(etat, { type: 'ajouterGP', joueurId: premier, montant: 4, libelle: 'Départ' }, hote, ctx);
     etat = jouer(etat, { type: 'ajouterGP', joueurId: second, montant: 30, libelle: 'Départ' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
-    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'pong-gobelets' }, hote, ctx);
+    etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
     const refuse = reduire(etat, { type: 'lancerDe', option: 'super' }, { role: 'joueur', joueurId: premier }, ctx);
     expect(refuse.ok).toBe(false);
