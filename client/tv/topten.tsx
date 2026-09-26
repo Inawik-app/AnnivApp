@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CourseVue, MancheTopTenVue, TopTenVue } from '../../shared/types';
 import { texteTheme } from '../../shared/topten';
 import { Piece } from '../commun/composants';
+import { Icone } from '../commun/icones';
 import { sons } from '../commun/sons';
 import './topten.css';
 
@@ -96,7 +97,9 @@ function Tete({ manche, topten, nom }: { manche: MancheTopTenVue; topten: TopTen
       <p class="topten-manche">
         Manche {manche.numero} sur {topten.captens.length}
       </p>
-      <p class="topten-capten">Cap'Ten : {nom(manche.captenId)}</p>
+      <p class="topten-capten">
+        <Icone nom="casquette-capitaine" taille={64} /> Cap'Ten : {nom(manche.captenId)}
+      </p>
     </div>
   );
 }

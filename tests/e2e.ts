@@ -715,7 +715,7 @@ async function annulerPuisRejouer(monde: Monde, nom: string, refaire: () => Prom
 
 async function ceremonie(monde: Monde): Promise<void> {
   const classement = monde.serveur.etat().course?.classement ?? [];
-  const recompensesAttendues = [25, 15, 8, 0];
+  const recompensesAttendues = [60, 35, 15, 0];
   await annulerPuisRejouer(monde, 'le podium', async () => {
     await jouer(monde, monde.hote, { type: 'ouvrirPodium' }, 'Podium');
     const gains = monde.serveur.etat().transactions.filter((transaction) => transaction.source === 'arrivee');
@@ -732,15 +732,15 @@ async function ceremonie(monde: Monde): Promise<void> {
     if (!Array.isArray(recompensesTv) || recompensesTv.length !== 4) {
       throw new Error("Les récompenses d'arrivée doivent être dans l'événement podium de la télé");
     }
-    if (!JSON.stringify(recompensesTv).includes('"montant":25')) {
-      throw new Error('La télé devrait recevoir +25 GP sur le podium');
+    if (!JSON.stringify(recompensesTv).includes('"montant":60')) {
+      throw new Error('La télé devrait recevoir +60 GP sur le podium');
     }
   });
   if (monde.tv.vue?.course?.ceremonie?.etape !== 'podium') throw new Error('La télé devrait être au podium');
   if (monde.serveur.etat().transactions.filter((transaction) => transaction.source === 'arrivee').length !== 3) {
     throw new Error("Les récompenses d'arrivée doivent être présentes après le podium");
   }
-  console.log("OK     Récompenses d'arrivée 25/15/8 versées, affichées sur la télé, et annulables");
+  console.log("OK     Récompenses d'arrivée 60/35/15 versées, affichées sur la télé, et annulables");
   await annulerPuisRejouer(monde, 'le tirage des trophées', async () => {
     await jouer(monde, monde.hote, { type: 'tirerTrophees' }, 'Tirage des trophées');
   });
@@ -860,7 +860,10 @@ async function main(): Promise<void> {
       await jouer(monde as Monde, ines, { type: 'lancerDe', option: 'booste' }, 'Lancer d\'Inès sur un bonus');
     });
     if (monde.serveur.etat().course?.positions[ines.joueurId] !== 1) throw new Error('Inès devrait être sur la case bonus');
-    if (monde.serveur.etat().course?.cagnotte !== 5) throw new Error('La mise devrait être dans la cagnotte');
+    const miseBooste = monde.serveur.etat().course?.regles.optionsDe.find((option) => option.id === 'booste')?.mise;
+    if (monde.serveur.etat().course?.cagnotte !== miseBooste) {
+      throw new Error(`La mise (${miseBooste} GP) devrait être dans la cagnotte`);
+    }
 
     await jouer(monde, noe, { type: 'lancerDe', option: 'normal' }, 'Lancer de Noé sur une chance');
     const carte = monde.serveur.etat().course?.carteCourante?.carte;

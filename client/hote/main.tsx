@@ -62,6 +62,7 @@ function messageAction(action: Action, vue: VueHote): string {
   if (action.type === 'choisirEcranTv') {
     if (action.ecran === 'scores') return 'La télé affiche les scores';
     if (action.ecran === 'plateau') return 'La télé affiche le plateau';
+    if (action.ecran === 'presentation') return 'Présentation lancée';
     return "La télé affiche l'accueil";
   }
   if (action.type === 'demarrerCourse') return 'La course commence';
@@ -160,7 +161,7 @@ function PageHote() {
   if (!pret) {
     return (
       <main class="page fond-encre">
-        <h1>GP Party — Hôte</h1>
+        <h1>GP exploiteur — Hôte</h1>
         {erreur ? <p class="erreur">{erreur}</p> : null}
         <form class="pile" onSubmit={validerCode}>
           <label>
@@ -178,7 +179,7 @@ function PageHote() {
   if (!vue) {
     return (
       <main class="page fond-encre">
-        <h1>GP Party — Hôte</h1>
+        <h1>GP exploiteur — Hôte</h1>
         {erreur ? <p class="erreur">{erreur}</p> : null}
         <p>{connecte ? 'Connexion…' : 'Hors ligne'}</p>
         <VoileConnexion visible={!connecte} />
@@ -220,6 +221,9 @@ function PageHote() {
         </label>
       </Tuile>
       <div class="rangee" style={{ marginTop: '12px' }}>
+        <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'presentation' })}>
+          Lancer la présentation
+        </Bouton>
         <Bouton variante="secondaire" disabled={envoi} onClick={() => agir({ type: 'choisirEcranTv', ecran: 'accueil' })}>
           Afficher l'accueil sur la télé
         </Bouton>

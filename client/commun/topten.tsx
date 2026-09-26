@@ -2,6 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import { NUMERO_MAX, NUMERO_MIN, REPONDANT_HOTE, texteTheme } from '../../shared/topten';
 import type { Action, MancheTopTenVue, TopTenVue } from '../../shared/types';
 import { Bouton } from './composants';
+import { Icone } from './icones';
 import { SecretAuDoigt } from './secret';
 import './topten.css';
 
@@ -238,7 +239,10 @@ export function TopTenJoueur({
   return (
     <div class="pile topten-telephone" data-topten-manche={manche.numero}>
       <h3>
-        Manche {manche.numero} sur {topten.captens.length} · Cap'Ten : {capten ? 'toi' : nom(manche.captenId)}
+        Manche {manche.numero} sur {topten.captens.length} ·{' '}
+        <span class="capten-ligne">
+          <Icone nom="casquette-capitaine" taille={64} /> Cap'Ten : {capten ? 'toi' : nom(manche.captenId)}
+        </span>
       </h3>
       <p class="theme-topten">{manche.theme.intitule}</p>
       <p>{texteTheme(manche.theme)}</p>

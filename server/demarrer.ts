@@ -146,6 +146,7 @@ export async function demarrerServeur(options: OptionsDemarrage): Promise<Serveu
   const store = creerStore({
     dossierData: options.dossierData,
     titre: partie.titre,
+    sousTitre: partie.sousTitre,
     nbJoueursMax: partie.nbJoueursMax,
     dev,
     test: modeTest,

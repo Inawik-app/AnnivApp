@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { JUSTONE_HOTE } from '../../shared/justone';
 import type { Action, JustOneVue, MancheJustOneVue } from '../../shared/types';
 import { Bouton } from './composants';
+import { Icone } from './icones';
 import './justone.css';
 
 export function nomJustOne(justone: JustOneVue, pseudos: Map<string, string>): (id: string) => string {
@@ -88,7 +89,7 @@ export function ListeIndices({
               onClick={() => basculer(index)}
             >
               <span class="justone-auteur">{nom(indice.auteurId)}</span>
-              <span class="justone-mot">{indice.annule ? '—' : indice.mot ?? '…'}</span>
+              {indice.annule ? <Icone nom="croix" taille={64} /> : <span class="justone-mot">{indice.mot ?? '…'}</span>}
             </button>
           </li>
         );

@@ -1,3 +1,4 @@
+import { setAutoFreeze } from 'immer';
 import { describe, expect, it } from 'vitest';
 import { etatInitial } from './etat-initial';
 import { lireCartesChance, lireCartesMalchance, lireConfigPlateau, lireRoue } from './course-config';
@@ -13,6 +14,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+setAutoFreeze(false);
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hote: Origine = { role: 'hote' };
@@ -152,11 +155,11 @@ describe('plateau', () => {
     const ctx = contexte({ alea: (max) => Math.max(0, max - 1), tirerDe: () => 1 });
     let etat = partie(ctx, ['Mira', 'Noé']);
     const mira = etat.joueurs[0]!.id;
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: mira, montant: 4, libelle: 'Bonus' }, hote, ctx);
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
+    expect(solde(etat.transactions, mira, 'visibles')).toBe(0);
     const trop = reduire(etat, { type: 'lancerDe', option: 'super' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(trop.ok).toBe(false);
     const pauvre = reduire(etat, { type: 'lancerDe', option: 'booste' }, { role: 'joueur', joueurId: mira }, ctx);
@@ -188,10 +191,13 @@ describe('plateau', () => {
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
     etat = jouer(etat, { type: 'passerAuxDeplacements' }, hote, ctx);
+    const miseBooste = plateau.optionsDe.find((option) => option.id === 'booste')?.mise ?? 0;
+    // Pot préalable pour exercer floor(cagnotte / 2) avec un reste non nul (mise seule = 1 → gain 0).
+    if (etat.course) etat.course.cagnotte = 5 - miseBooste;
     etat = jouer(etat, { type: 'lancerDe', option: 'booste' }, { role: 'joueur', joueurId: mira }, ctx);
     expect(etat.course?.positions[mira]).toBe(1);
     expect(etat.course?.cagnotte).toBe(3);
-    expect(solde(etat.transactions, mira, 'visibles')).toBe(20 - 5 + 2);
+    expect(solde(etat.transactions, mira, 'visibles')).toBe(20 - miseBooste + 2);
   });
 
   it('une carte qui déplace ne déclenche pas la case d\'arrivée', () => {

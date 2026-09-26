@@ -486,7 +486,9 @@ export function vueTv(
     idDemarrage,
     partie: {
       titre: etat.partie.titre,
+      sousTitre: etat.partie.sousTitre,
       ecranTv: etat.partie.ecranTv,
+      presentationId: etat.partie.presentationId,
       animationsReduites: etat.partie.animationsReduites,
       diagnosticTvAffiche: etat.partie.diagnosticTvAffiche,
     },
@@ -515,6 +517,7 @@ export function vueJoueur(
     idDemarrage,
     partie: {
       titre: etat.partie.titre,
+      ecranTv: etat.partie.ecranTv,
       inscriptionsVerrouillees: etat.partie.inscriptionsVerrouillees,
       animationsReduites: etat.partie.animationsReduites,
     },
@@ -559,8 +562,10 @@ export function vueHote(
     dev,
     partie: {
       titre: etat.partie.titre,
+      sousTitre: etat.partie.sousTitre,
       inscriptionsVerrouillees: etat.partie.inscriptionsVerrouillees,
       ecranTv: etat.partie.ecranTv,
+      presentationId: etat.partie.presentationId,
       animationsReduites: etat.partie.animationsReduites,
       diagnosticTvAffiche: etat.partie.diagnosticTvAffiche,
     },

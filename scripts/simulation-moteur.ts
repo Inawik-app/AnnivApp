@@ -255,18 +255,24 @@ function agir(session: Session, action: Action, origine: Origine = HOTE): void {
   if (cagnotte > session.cagnotteMaxPartie) session.cagnotteMaxPartie = cagnotte;
 }
 
+function miseOption(session: Session, id: string): number {
+  return course(session).regles.optionsDe.find((option) => option.id === id)?.mise ?? 0;
+}
+
 function optionDe(session: Session, scenario: ScenarioId, disponible: number): string {
   const actuelle = course(session);
   if (actuelle.coupDePouceActif) {
     if (actuelle.regles.coupDePouce === 'de8') return 'super';
     if (actuelle.regles.coupDePouce === 'de7') return 'booste';
   }
-  const plusForte = disponible >= 10 ? 'super' : disponible >= 5 ? 'booste' : 'normal';
+  const coutBooste = miseOption(session, 'booste');
+  const coutSuper = miseOption(session, 'super');
+  const plusForte = disponible >= coutSuper ? 'super' : disponible >= coutBooste ? 'booste' : 'normal';
   if (scenario === 'prudent') return 'normal';
   if (scenario === 'fort') return plusForte;
   const tirage = session.gen.reel();
   const voulu = tirage < 0.3 ? 'normal' : tirage < 0.8 ? 'booste' : 'super';
-  const mise = voulu === 'super' ? 10 : voulu === 'booste' ? 5 : 0;
+  const mise = voulu === 'super' ? coutSuper : voulu === 'booste' ? coutBooste : 0;
   if (mise <= disponible) return voulu;
   return plusForte;
 }

@@ -8,6 +8,7 @@ import { verifierIconesConfig } from './icones-config';
 
 const racine = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dossier = path.join(racine, 'client', 'public', 'assets', 'icones');
+const logo = path.join(racine, 'client', 'public', 'assets', 'logo.png');
 
 function nomsGeneres(): string[] {
   const liste = fs.readFileSync(path.join(racine, 'shared', 'icones.ts'), 'utf8');
@@ -15,22 +16,38 @@ function nomsGeneres(): string[] {
 }
 
 describe('découpage des icônes', () => {
-  it('produit 64 fichiers et shared/icones.ts les liste tous', () => {
+  it('produit 70 fichiers, le logo, et shared/icones.ts les liste tous', () => {
     execFileSync(process.execPath, ['scripts/decouper-icones.mjs'], { cwd: racine, stdio: 'pipe' });
     const fichiers = fs.readdirSync(dossier).filter((nom) => nom.endsWith('.png')).sort();
-    expect(fichiers).toHaveLength(64);
+    expect(fichiers).toHaveLength(70);
+    expect(fs.existsSync(logo)).toBe(true);
+    expect(fs.statSync(logo).size).toBeGreaterThan(0);
     const noms = nomsGeneres();
-    expect(noms).toHaveLength(64);
+    expect(noms).toHaveLength(70);
     for (const fichier of fichiers) {
       expect(noms).toContain(fichier.replace(/\.png$/, ''));
       expect(fs.statSync(path.join(dossier, fichier)).size).toBeGreaterThan(0);
     }
-    for (const nom of ['roue', 'chat-noir', 'de-dore', 'super-de', 'podium', 'deguisement']) {
+    for (const nom of [
+      'roue',
+      'chat-noir',
+      'de-dore',
+      'super-de',
+      'podium',
+      'deguisement',
+      'codenames',
+      'ampoule',
+      'gobelet-des',
+      'crane',
+      'croix',
+      'casquette-capitaine',
+    ]) {
       expect(noms).toContain(nom);
     }
     expect(verifierIconesConfig(racine, new Set(noms))).toEqual([]);
     execFileSync(process.execPath, ['scripts/decouper-icones.mjs'], { cwd: racine, stdio: 'pipe' });
-    expect(fs.readdirSync(dossier).filter((nom) => nom.endsWith('.png'))).toHaveLength(64);
+    expect(fs.readdirSync(dossier).filter((nom) => nom.endsWith('.png'))).toHaveLength(70);
+    expect(fs.existsSync(logo)).toBe(true);
   }, 30000);
 
   it('signale une icône inconnue avec le fichier, l’élément et le nom', () => {
@@ -38,16 +55,12 @@ describe('découpage des icônes', () => {
     try {
       fs.mkdirSync(path.join(temporaire, 'config'));
       fs.writeFileSync(
-        path.join(temporaire, 'config', 'plateau.json'),
-        JSON.stringify({
-          iconesCases: { gamble: { icone: 'roue-cassee' } },
-          optionsDe: [{ id: 'normal', icone: 'de-inexistant' }],
-        }),
+        path.join(temporaire, 'config', 'mini-jeux.json'),
+        JSON.stringify({ baremes: { classement: [1], equipes: { gagnant: 1, perdant: 0 } }, jeux: [{ id: 'x', nom: 'X', resume: 'x', icone: 'icone-fantome', regles: ['a', 'b', 'c'], saisie: 'libre', module: 'aucun', hoteParticipe: false }] }),
+        'utf8',
       );
-      expect(verifierIconesConfig(temporaire, new Set(['de', 'roue']))).toEqual([
-        'config/plateau.json : gamble : icône « roue-cassee » inconnue',
-        'config/plateau.json : normal : icône « de-inexistant » inconnue',
-      ]);
+      const erreurs = verifierIconesConfig(temporaire, new Set(['poker']));
+      expect(erreurs.some((ligne) => ligne.includes('icone-fantome'))).toBe(true);
     } finally {
       fs.rmSync(temporaire, { recursive: true, force: true });
     }

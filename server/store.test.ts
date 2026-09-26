@@ -116,7 +116,7 @@ describe('fusion et réseau', () => {
         etat: {
           schema: 1,
           version: 3,
-          partie: { titre: 'GP Party', inscriptionsVerrouillees: false, ecranTv: 'accueil', animationsReduites: false },
+          partie: { titre: 'GP Party', sousTitre: '', inscriptionsVerrouillees: false, ecranTv: 'accueil', presentationId: 0, animationsReduites: false, diagnosticTvAffiche: false },
           joueurs: [],
           transactions: [],
           evenements: [{ id: 4, type: 'x', visibilite: 'public', libelle: 'a', donnees: {}, horodatage: 1 }],

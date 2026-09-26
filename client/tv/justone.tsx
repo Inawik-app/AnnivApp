@@ -1,4 +1,5 @@
 import type { JustOneVue } from '../../shared/types';
+import { Icone } from '../commun/icones';
 import './justone.css';
 
 export function dureeRevelationJustOne(reduit: boolean): number {
@@ -63,7 +64,7 @@ export function JustOneTv({
         {manche.indices.map((indice, index) => (
           <div key={index} class={`justone-carte-tv${indice.annule ? ' annulee' : ''}`}>
             <span class="justone-auteur-tv">{nom(indice.auteurId)}</span>
-            <span class="justone-mot-tv">{indice.annule ? '' : indice.mot ?? ''}</span>
+            {indice.annule ? <Icone nom="croix" taille={64} /> : <span class="justone-mot-tv">{indice.mot ?? ''}</span>}
           </div>
         ))}
       </div>

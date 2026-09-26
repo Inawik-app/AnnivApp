@@ -68,7 +68,7 @@
       "id": "codenames",
       "nom": "Codenames",
       "resume": "Deux équipes, un espion, un agent, des mots à faire deviner.",
-      "icone": "enveloppe",
+      "icone": "codenames",
       "regles": [
         "Deux équipes de deux : un espion et un agent.",
         "L'espion donne un indice d'un seul mot et un nombre.",
@@ -83,7 +83,7 @@
       "id": "perudo",
       "nom": "Perudo",
       "resume": "Dés secrets, annonces, Dudo et Calza.",
-      "icone": "de",
+      "icone": "gobelet-des",
       "regles": [
         "Chacun lance ses dés en secret sur son téléphone.",
         "On annonce à tour de rôle un nombre de dés sur toute la table.",
@@ -98,7 +98,7 @@
       "id": "just-one",
       "nom": "Just One",
       "resume": "Un mot secret, des indices en un mot, sans doublon.",
-      "icone": "enveloppe",
+      "icone": "ampoule",
       "regles": [
         "Un joueur doit faire trouver un mot secret.",
         "Les autres écrivent un indice d'un seul mot.",

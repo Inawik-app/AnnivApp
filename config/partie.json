@@ -1,5 +1,6 @@
 {
-  "titre": "GP Party",
+  "titre": "GP exploiteur",
+  "sousTitre": "",
   "nbJoueursMax": 4,
   "codeHote": "change-moi",
   "port": 3000,

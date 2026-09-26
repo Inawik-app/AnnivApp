@@ -65,6 +65,12 @@ export const TAILLES_ICONES = {
   'ecrevisse': 64,
   'podium': 64,
   'deguisement': 64,
+  'codenames': 64,
+  'ampoule': 64,
+  'gobelet-des': 64,
+  'crane': 64,
+  'croix': 64,
+  'casquette-capitaine': 64,
 } as const;
 
 export type NomIcone = keyof typeof TAILLES_ICONES;

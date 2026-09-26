@@ -16,8 +16,8 @@ const ICONES_DE: Record<string, string> = { normal: 'de', booste: 'de-dore', sup
 
 const OPTIONS_DEFAUT = [
   { id: 'normal', nom: 'Dé normal', faces: 6, mise: 0, icone: 'de' },
-  { id: 'booste', nom: 'Dé boosté', faces: 7, mise: 5, icone: 'de-dore' },
-  { id: 'super', nom: 'Super dé', faces: 8, mise: 10, icone: 'super-de' },
+  { id: 'booste', nom: 'Dé boosté', faces: 7, mise: 1, icone: 'de-dore' },
+  { id: 'super', nom: 'Super dé', faces: 8, mise: 2, icone: 'super-de' },
 ];
 
 function normaliserCourse(valeur: unknown): Course | null {
@@ -160,8 +160,8 @@ function normaliserCourse(valeur: unknown): Course | null {
   return course;
 }
 
-export function fusionnerEtat(titre: string, brut: Record<string, unknown>): EtatJeu {
-  const defaut = etatInitial(titre);
+export function fusionnerEtat(titre: string, brut: Record<string, unknown>, sousTitre = ''): EtatJeu {
+  const defaut = etatInitial(titre, sousTitre);
   if (!estObjet(brut.partie) || !Array.isArray(brut.joueurs) || !Array.isArray(brut.transactions)) {
     throw new Error('forme inattendue');
   }
@@ -175,9 +175,16 @@ export function fusionnerEtat(titre: string, brut: Record<string, unknown>): Eta
       ...defaut.partie,
       ...partieBrute,
       titre: typeof partieBrute.titre === 'string' ? partieBrute.titre : defaut.partie.titre,
+      sousTitre: typeof partieBrute.sousTitre === 'string' ? partieBrute.sousTitre : defaut.partie.sousTitre,
       inscriptionsVerrouillees: partieBrute.inscriptionsVerrouillees === true,
       ecranTv:
-        partieBrute.ecranTv === 'scores' || partieBrute.ecranTv === 'plateau' ? partieBrute.ecranTv : 'accueil',
+        partieBrute.ecranTv === 'scores' ||
+        partieBrute.ecranTv === 'plateau' ||
+        partieBrute.ecranTv === 'presentation'
+          ? partieBrute.ecranTv
+          : 'accueil',
+      presentationId:
+        typeof partieBrute.presentationId === 'number' ? Math.max(0, Math.floor(partieBrute.presentationId)) : 0,
       animationsReduites: partieBrute.animationsReduites === true,
       diagnosticTvAffiche: partieBrute.diagnosticTvAffiche === true,
     },
@@ -196,12 +203,12 @@ export function fusionnerEtat(titre: string, brut: Record<string, unknown>): Eta
   return etat;
 }
 
-export function lireDonnees(texte: string, titre: string): DonneesPersistees {
+export function lireDonnees(texte: string, titre: string, sousTitre = ''): DonneesPersistees {
   const brut: unknown = JSON.parse(texte);
   if (!estObjet(brut)) throw new Error('JSON invalide');
   const enveloppe = estObjet(brut.etat);
   const etatBrut = enveloppe ? (brut.etat as Record<string, unknown>) : brut;
-  const etat = fusionnerEtat(titre, etatBrut);
+  const etat = fusionnerEtat(titre, etatBrut, sousTitre);
   const jetons: Record<string, string> = {};
   if (enveloppe && estObjet(brut.jetons)) {
     for (const [joueurId, jeton] of Object.entries(brut.jetons)) {
@@ -218,8 +225,8 @@ export function lireDonnees(texte: string, titre: string): DonneesPersistees {
   };
 }
 
-export function donneesInitiales(titre: string): DonneesPersistees {
-  return { etat: etatInitial(titre), jetons: {}, prochainIdEvenement: 1 };
+export function donneesInitiales(titre: string, sousTitre = ''): DonneesPersistees {
+  return { etat: etatInitial(titre, sousTitre), jetons: {}, prochainIdEvenement: 1 };
 }
 
 export function configValide(brut: unknown): ConfigPartie {
@@ -238,6 +245,7 @@ export function configValide(brut: unknown): ConfigPartie {
   }
   return {
     titre: brut.titre.trim(),
+    sousTitre: typeof brut.sousTitre === 'string' ? brut.sousTitre.trim() : '',
     nbJoueursMax: brut.nbJoueursMax,
     codeHote: brut.codeHote,
     port: brut.port,

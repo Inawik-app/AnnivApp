@@ -1,0 +1,255 @@
+.presentation {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  color: #fff4dc;
+}
+
+.presentation-fond {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: url('/assets/fond-plateau.jpg') center center / cover no-repeat;
+  opacity: 0.12;
+  transform: scale(1.02);
+  transition: opacity 0.4s linear;
+}
+
+.presentation.phase-impact .presentation-fond,
+.presentation.phase-reflet .presentation-fond,
+.presentation.phase-sousTitre .presentation-fond,
+.presentation.phase-repos .presentation-fond,
+.presentation-reduite .presentation-fond {
+  opacity: 0.45;
+}
+
+.presentation-etoiles,
+.presentation-pieces,
+.presentation-centre,
+.presentation-flash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.presentation-etoiles {
+  pointer-events: none;
+  opacity: 1;
+}
+
+.presentation.phase-pieces .presentation-etoiles,
+.presentation.phase-impact .presentation-etoiles,
+.presentation.phase-reflet .presentation-etoiles,
+.presentation.phase-sousTitre .presentation-etoiles,
+.presentation.phase-repos .presentation-etoiles,
+.presentation-reduite .presentation-etoiles {
+  opacity: 0;
+}
+
+.presentation-etoile {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  background: #fff4dc;
+  opacity: 0.2;
+  animation: etoile-scintille 0.8s steps(2, end) infinite;
+}
+
+.presentation-pieces {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.presentation.phase-pieces .presentation-pieces {
+  opacity: 1;
+}
+
+.presentation-piece {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -32px;
+  margin-top: -32px;
+  opacity: 0;
+}
+
+.presentation.phase-pieces .presentation-piece {
+  animation: piece-converge 1.5s steps(12, end) forwards;
+}
+
+@keyframes piece-converge {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(720deg);
+  }
+}
+
+.presentation-centre {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.presentation-logo-bloc {
+  position: relative;
+  opacity: 0;
+  transform: translateY(-40%) scale(0.7);
+}
+
+.presentation.phase-impact .presentation-logo-bloc {
+  opacity: 1;
+  animation: logo-tombe 0.7s steps(8, end) forwards;
+}
+
+.presentation.phase-reflet .presentation-logo-bloc,
+.presentation.phase-sousTitre .presentation-logo-bloc,
+.presentation.phase-repos .presentation-logo-bloc {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.presentation.phase-repos .presentation-logo-bloc {
+  animation: logo-flotte 1.6s steps(2, end) infinite;
+}
+
+.presentation-reduite .presentation-logo-bloc {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: logo-fondu 0.5s linear forwards;
+}
+
+.logo-gp,
+.presentation-logo {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.presentation-reflet {
+  position: absolute;
+  left: -40%;
+  top: -20%;
+  width: 40%;
+  height: 140%;
+  background: rgba(255, 255, 255, 0.55);
+  opacity: 0;
+  -webkit-transform: rotate(18deg);
+  transform: rotate(18deg);
+  -webkit-mask-image: url('/assets/logo.png');
+  mask-image: url('/assets/logo.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  pointer-events: none;
+}
+
+.presentation.phase-reflet .presentation-reflet {
+  opacity: 1;
+  animation: reflet-balayage 1.1s steps(14, end) forwards;
+}
+
+.presentation-sous-titre {
+  margin-top: 36px;
+  min-height: 48px;
+  font-family: 'DotGothic16', sans-serif;
+  font-size: 48px;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 2px 0 #1c1633;
+  opacity: 0;
+}
+
+.presentation.phase-sousTitre .presentation-sous-titre,
+.presentation.phase-repos .presentation-sous-titre {
+  opacity: 1;
+}
+
+.presentation-flash {
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.presentation.avec-flash .presentation-flash {
+  opacity: 1;
+}
+
+@keyframes etoile-scintille {
+  0% { opacity: 0.15; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.15; }
+}
+
+@keyframes logo-tombe {
+  0% {
+    opacity: 0;
+    transform: translateY(-40%) scale(0.7);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes logo-flotte {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes logo-fondu {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes reflet-balayage {
+  0% {
+    opacity: 0;
+    transform: translateX(0) rotate(18deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(280%) rotate(18deg);
+  }
+}
+
+.accueil-logo {
+  margin-bottom: 12px;
+}

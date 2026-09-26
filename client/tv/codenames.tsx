@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { libelleEquipe, libelleNombre } from '../../shared/codenames';
 import type { CarteCodenamesVue, CodenamesVue, CourseVue, MancheCodenamesVue } from '../../shared/types';
+import { Icone } from '../commun/icones';
 import './codenames.css';
 
 function Section({ etape, children }: { etape: string; children: ComponentChildren }) {
@@ -18,17 +19,7 @@ function Section({ etape, children }: { etape: string; children: ComponentChildr
 }
 
 function Crane() {
-  return (
-    <svg class="crane-tv" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
-      <rect x="16" y="8" width="32" height="28" fill="#fff4dc" />
-      <rect x="20" y="36" width="24" height="12" fill="#fff4dc" />
-      <rect x="20" y="16" width="8" height="8" fill="#111" />
-      <rect x="36" y="16" width="8" height="8" fill="#111" />
-      <rect x="28" y="28" width="8" height="8" fill="#111" />
-      <rect x="24" y="48" width="4" height="8" fill="#fff4dc" />
-      <rect x="36" y="48" width="4" height="8" fill="#fff4dc" />
-    </svg>
-  );
+  return <Icone nom="crane" taille={64} />;
 }
 
 function classeMot(mot: string): string {

@@ -9,18 +9,10 @@ function classeCouleur(carte: CarteCodenamesVue): string {
   return `couleur-${carte.couleur}`;
 }
 
+import { Icone } from './icones';
+
 function Crane() {
-  return (
-    <svg class="crane-assassin" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
-      <rect x="8" y="4" width="16" height="14" fill="#fff4dc" />
-      <rect x="10" y="18" width="12" height="6" fill="#fff4dc" />
-      <rect x="10" y="8" width="4" height="4" fill="#111" />
-      <rect x="18" y="8" width="4" height="4" fill="#111" />
-      <rect x="14" y="14" width="4" height="4" fill="#111" />
-      <rect x="12" y="24" width="2" height="4" fill="#fff4dc" />
-      <rect x="18" y="24" width="2" height="4" fill="#fff4dc" />
-    </svg>
-  );
+  return <Icone nom="crane" taille={64} />;
 }
 
 export function CarteCodenames({

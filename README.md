@@ -1,4 +1,4 @@
-# GP Party
+# GP exploiteur
 
 Soirée d'anniversaire en local : une télé, des téléphones, un PC hôte. Cette version pose le socle (serveur, temps réel, scores, sauvegarde). Le plateau et les mini-jeux ne sont pas encore là.
 
@@ -60,7 +60,7 @@ Ouvre `http://IP-DU-PC:3000/tv` sur la télé, et `http://IP-DU-PC:3000/diag.htm
 - Profil réseau Windows en « Privé ». À la première alerte du pare-feu, autorise Node.js sur les réseaux privés. Sinon, dans PowerShell administrateur :
 
 ```powershell
-New-NetFirewallRule -DisplayName "GP Party" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "GP exploiteur" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private
 ```
 
 - Mise en veille du PC désactivée, Windows Update suspendu, PC sur secteur, de préférence en Ethernet.

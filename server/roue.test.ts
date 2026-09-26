@@ -163,13 +163,16 @@ describe('roue', () => {
     const braquage = contexte({ alea: (max) => (max <= 0 ? 0 : max - 1), tirerDe: () => 1, tirerRoue: () => 'braquage' });
     etat = pret(braquage, [40, 30]);
     poser(etat, ['depart', 'gamble', 'bonus', 'arrivee']);
+    const miseBooste = lireConfigPlateau(RACINE).optionsDe.find((option) => option.id === 'booste')?.mise ?? 0;
+    // Pot à 5 après la mise du dé boosté, pour exercer le quart de cagnotte du braquage.
+    etat.course!.cagnotte = 5 - miseBooste;
     const braqueur = etat.course!.ordre[0]!;
     etat = jouer(etat, { type: 'lancerDe', option: 'booste' }, joueur(etat), braquage);
     expect(etat.course?.cagnotte).toBe(5);
     etat = jouer(etat, { type: 'miserRoue', montant: 10 }, joueur(etat), braquage);
     expect(etat.course?.positions[braqueur]).toBe(1);
     expect(etat.course?.cagnotte).toBe(4);
-    expect(argent(etat.transactions, braqueur)).toBe(36);
+    expect(argent(etat.transactions, braqueur)).toBe(40 - miseBooste - 10 + 11);
     const effet = etat.course?.historique.effets.find((entree) => entree.roue?.option === 'braquage');
     expect(effet?.roue).toMatchObject({ mise: 10, rendu: 11 });
     expect(effet?.gpGagnes).toBe(11);

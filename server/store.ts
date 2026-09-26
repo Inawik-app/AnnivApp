@@ -31,11 +31,14 @@ export type SurchargesSimulation = {
   coupDePouce?: 'aucun' | 'de7' | 'de8';
   cagnotteConsolation?: 'aucune' | 'dernier';
   montantTrophees?: number;
+  /** Coûts de mise du dé boosté et du super dé (les autres options inchangées). */
+  misesDe?: { booste: number; super: number };
 };
 
 export type OptionsStore = {
   dossierData: string;
   titre: string;
+  sousTitre?: string;
   nbJoueursMax: number;
   dev: boolean;
   maintenant?: () => number;
@@ -118,6 +121,12 @@ export function creerStore(options: OptionsStore): Store {
   if (typeof surcharges?.montantTrophees === 'number') {
     for (const trophee of trophees.trophees) trophee.montant = surcharges.montantTrophees;
   }
+  if (surcharges?.misesDe) {
+    for (const option of plateau.optionsDe) {
+      if (option.id === 'booste') option.mise = surcharges.misesDe.booste;
+      if (option.id === 'super') option.mise = surcharges.misesDe.super;
+    }
+  }
   const simulation = options.simulation === true;
   const alea = options.alea ?? ((max: number) => randomInt(0, Math.max(1, max)));
   const desForces = options.test ? [...(options.desForces ?? [])] : [];
@@ -137,6 +146,15 @@ export function creerStore(options: OptionsStore): Store {
   });
   const persistance: Persistance = charge.persistance;
   let etat = charge.donnees.etat;
+  etat = {
+    ...etat,
+    partie: {
+      ...etat.partie,
+      titre: options.titre,
+      sousTitre: options.sousTitre ?? etat.partie.sousTitre ?? '',
+      presentationId: typeof etat.partie.presentationId === 'number' ? etat.partie.presentationId : 0,
+    },
+  };
   let jetons: Record<string, string> = { ...charge.donnees.jetons };
   let prochainIdEvenement = charge.donnees.prochainIdEvenement;
   const suivis = new Map<string, string>();

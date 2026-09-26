@@ -36,7 +36,7 @@ export type Evenement = {
   horodatage: number;
 };
 
-export type EcranTv = 'accueil' | 'scores' | 'plateau';
+export type EcranTv = 'accueil' | 'scores' | 'plateau' | 'presentation';
 
 export type TypeCase = 'depart' | 'bonus' | 'chance' | 'malchance' | 'cagnotte' | 'gamble' | 'arrivee';
 
@@ -430,8 +430,11 @@ export type ConfigPlateau = {
 
 export type Partie = {
   titre: string;
+  sousTitre: string;
   inscriptionsVerrouillees: boolean;
   ecranTv: EcranTv;
+  /** Incrémenté à chaque lancement de la présentation (rejouable). */
+  presentationId: number;
   animationsReduites: boolean;
   diagnosticTvAffiche: boolean;
 };
@@ -806,7 +809,9 @@ export type VueTv = {
   idDemarrage: string;
   partie: {
     titre: string;
+    sousTitre: string;
     ecranTv: EcranTv;
+    presentationId: number;
     animationsReduites: boolean;
     diagnosticTvAffiche: boolean;
   };
@@ -825,6 +830,7 @@ export type VueJoueur = {
   idDemarrage: string;
   partie: {
     titre: string;
+    ecranTv: EcranTv;
     inscriptionsVerrouillees: boolean;
     animationsReduites: boolean;
   };
@@ -993,6 +999,8 @@ export interface EvenementsServeur {
 
 export type ConfigPartie = {
   titre: string;
+  /** Sous-titre de la présentation télé ; vide = rien. */
+  sousTitre: string;
   nbJoueursMax: number;
   codeHote: string;
   port: number;

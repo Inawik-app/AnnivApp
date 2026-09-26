@@ -818,6 +818,12 @@ async function capturesFinale(browser: Browser, captures: string): Promise<void>
     const trophee = await page.locator('[data-ceremonie="trophee"]').innerText();
     if (!trophee.includes('Le touriste') || !trophee.includes('Lina')) throw new Error(`Trophée inattendu : ${trophee}`);
     await page.screenshot({ path: path.join(captures, '37-trophee.png') });
+    while (
+      (serveur.etat().course?.ceremonie?.reveles ?? 0) < (serveur.etat().course?.ceremonie?.tirage.length ?? 0)
+    ) {
+      await agirHote({ type: 'revelerTrophee' });
+      await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
+    }
     await agirHote({ type: 'revelerClassement' });
     await page.locator('[data-ceremonie="classement"][data-complet="1"]').waitFor({ timeout: 20000 });
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
@@ -894,6 +900,59 @@ async function main(): Promise<void> {
     await page.waitForFunction(() => window.__fileVide === true, undefined, { timeout: 20000 });
     await verifierRendu(page);
     await page.screenshot({ path: path.join(captures, '15-accueil.png') });
+    await page.goto(`${serveur.url}/tv?debug=1&vitesse=4`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-connecte="1"]').waitFor({ timeout: 20000 });
+    await agirHote({ type: 'choisirEcranTv', ecran: 'presentation' });
+    await page.locator('[data-ecran="presentation"]').waitFor({ timeout: 20000 });
+    await page.waitForFunction(() => document.querySelector('[data-ecran="presentation"][data-phase="etoiles"]'), undefined, {
+      timeout: 10000,
+    });
+    await page.screenshot({ path: path.join(captures, '52-presentation-etoiles.png') });
+    await page.waitForFunction(() => document.querySelector('[data-ecran="presentation"][data-phase="impact"]'), undefined, {
+      timeout: 15000,
+    });
+    await page.screenshot({ path: path.join(captures, '53-presentation-impact.png') });
+    await page.waitForFunction(() => document.querySelector('[data-ecran="presentation"][data-phase="reflet"]'), undefined, {
+      timeout: 15000,
+    });
+    await page.screenshot({ path: path.join(captures, '54-presentation-reflet.png') });
+    await page.waitForFunction(() => document.querySelector('[data-ecran="presentation"][data-phase="repos"]'), undefined, {
+      timeout: 20000,
+    });
+    await page.screenshot({ path: path.join(captures, '55-presentation-repos.png') });
+    const logoHorsMarge = await page.evaluate(() => {
+      const logo = document.querySelector('.presentation-logo, .logo-gp') as HTMLElement | null;
+      if (!logo) return 'Logo de présentation absent';
+      const boite = logo.getBoundingClientRect();
+      const marge = 1920 * 0.05;
+      if (boite.left < marge - 1 || boite.right > 1920 - marge + 1 || boite.top < 1080 * 0.05 - 1 || boite.bottom > 1080 - 1080 * 0.05 + 1) {
+        return `Logo hors marges : ${JSON.stringify(boite)}`;
+      }
+      return null;
+    });
+    if (logoHorsMarge) throw new Error(logoHorsMarge);
+    const repliPresentation = await page.locator('[data-repli="1"]').count();
+    if (repliPresentation > 0) throw new Error(`Icône en repli pendant la présentation : ${repliPresentation}`);
+    console.log('OK     Présentation télé (étoiles, impact, reflet, repos)');
+    await agirHote({ type: 'choisirEcranTv', ecran: 'accueil' });
+    await page.locator('[data-ecran="accueil"]').waitFor({ timeout: 20000 });
+    await page.locator('.accueil-logo, .logo-gp').first().waitFor({ timeout: 10000 });
+    await page.screenshot({ path: path.join(captures, '56-accueil-logo.png') });
+    const logoAccueilHors = await page.evaluate(() => {
+      const logo = document.querySelector('.accueil-logo, .accueil .logo-gp') as HTMLElement | null;
+      if (!logo) return 'Logo d\'accueil absent';
+      const boite = logo.getBoundingClientRect();
+      const marge = 1920 * 0.05;
+      if (boite.left < marge - 1 || boite.right > 1920 - marge + 1 || boite.top < 1080 * 0.05 - 1 || boite.bottom > 1080 - 1080 * 0.05 + 1) {
+        return `Logo d'accueil hors marges : ${JSON.stringify(boite)}`;
+      }
+      return null;
+    });
+    if (logoAccueilHors) throw new Error(logoAccueilHors);
+    console.log('OK     Accueil avec logo');
+    await page.goto(`${serveur.url}/tv?debug=1&vitesse=2`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-connecte="1"]').waitFor({ timeout: 20000 });
+    await page.locator('[data-ecran="accueil"]').waitFor({ timeout: 20000 });
     await agirHote({ type: 'choisirEcranTv', ecran: 'scores' });
     await page.locator('[data-ecran="scores"]').waitFor({ timeout: 20000 });
     await verifierRendu(page);

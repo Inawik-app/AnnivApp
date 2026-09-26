@@ -332,25 +332,25 @@ describe('cérémonie', () => {
     const { etat, ctx, ids } = courseTerminee(['Inès', 'Noé', 'Lina', 'Léo']);
     const course = etat.course;
     if (!course) throw new Error('course');
-    course.regles.recompenseArrivee = [25, 15, 8, 0];
+    course.regles.recompenseArrivee = [60, 35, 15, 0];
     const avant = etat.transactions.length;
     const ouvert = jouer(etat, { type: 'ouvrirPodium' }, HOTE, ctx);
     const gains = ouvert.transactions.slice(avant).filter((transaction) => transaction.source === 'arrivee');
     expect(gains).toHaveLength(3);
     expect(gains.map((transaction) => ({ id: transaction.joueurId, montant: transaction.montant }))).toEqual([
-      { id: ids[0], montant: 25 },
-      { id: ids[1], montant: 15 },
-      { id: ids[2], montant: 8 },
+      { id: ids[0], montant: 60 },
+      { id: ids[1], montant: 35 },
+      { id: ids[2], montant: 15 },
     ]);
     const podium = ouvert.evenements.find((evenement) => evenement.type === 'ceremonie.podium');
     expect(podium?.donnees.recompenses).toEqual([
-      { joueurId: ids[0], montant: 25 },
-      { joueurId: ids[1], montant: 15 },
-      { joueurId: ids[2], montant: 8 },
+      { joueurId: ids[0], montant: 60 },
+      { joueurId: ids[1], montant: 35 },
+      { joueurId: ids[2], montant: 15 },
       { joueurId: ids[3], montant: 0 },
     ]);
     const tv = vueTv(ouvert, PRESENCE, 0, 'x', '');
-    expect(JSON.stringify(tv)).toContain('"montant":25');
+    expect(JSON.stringify(tv)).toContain('"montant":60');
   });
 
   it('verse la cagnotte de consolation au joueur le plus pauvre', () => {

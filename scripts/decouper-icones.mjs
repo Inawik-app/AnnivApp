@@ -46,8 +46,20 @@ const PLANCHES = [
       'fleche-montante', 'couronne-flammes', 'manette-cassee', 'ecrevisse', 'podium', 'deguisement',
     ],
   },
+  {
+    fichier: path.join(racine, 'docs', 'ressources', 'planche-4.png'),
+    colonnes: 3,
+    rangees: 2,
+    noms: [
+      'codenames', 'ampoule', 'gobelet-des',
+      'crane', 'croix', 'casquette-capitaine',
+    ],
+  },
 ];
 
+const LOGO_SOURCE = path.join(racine, 'docs', 'ressources', 'logo.png');
+const LOGO_CIBLE = path.join(racine, 'client', 'public', 'assets', 'logo.png');
+const NOMBRE_ICONES = 70;
 const GLYPHES = {
   a: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
   b: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
@@ -454,6 +466,37 @@ function plancheDeControle(sprites) {
   ecrireFichier(plancheControle, PNG.sync.write(image));
 }
 
+function borneOpaque(image) {
+  let minX = image.width;
+  let minY = image.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      if ((image.data[index(image.width, x, y) + 3] ?? 0) === 0) continue;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) echec('Le logo est entièrement transparent après nettoyage');
+  return { minX, minY, maxX, maxY };
+}
+
+export function traiterLogo() {
+  if (!fs.existsSync(LOGO_SOURCE)) echec(`Logo introuvable : ${LOGO_SOURCE}`);
+  const source = PNG.sync.read(fs.readFileSync(LOGO_SOURCE));
+  const nettoye = preparerPlanche(source);
+  const borne = borneOpaque(nettoye);
+  let sprite = extraire(nettoye, borne.minX, borne.minY, borne.maxX, borne.maxY);
+  const facteur = facteurPixel(sprite);
+  if (facteur >= 2) sprite = reduire(sprite, facteur);
+  fs.mkdirSync(path.dirname(LOGO_CIBLE), { recursive: true });
+  ecrireFichier(LOGO_CIBLE, PNG.sync.write(sprite));
+  return { largeur: sprite.width, hauteur: sprite.height, facteur };
+}
+
 export function decouperIcones() {
   fs.mkdirSync(dossierIcones, { recursive: true });
   const sprites = [];
@@ -463,7 +506,7 @@ export function decouperIcones() {
     sprites.push(...resultat.sprites);
     replis.push(...resultat.replis);
   }
-  if (sprites.length !== 64) echec(`${sprites.length} icônes au lieu de 64`);
+  if (sprites.length !== NOMBRE_ICONES) echec(`${sprites.length} icônes au lieu de ${NOMBRE_ICONES}`);
   const noms = new Set(sprites.map((sprite) => sprite.nom));
   if (noms.size !== sprites.length) echec('Deux icônes portent le même nom');
   for (const entree of fs.readdirSync(dossierIcones)) {
@@ -476,9 +519,11 @@ export function decouperIcones() {
   }
   ecrireListe(sprites);
   plancheDeControle(sprites);
+  const logo = traiterLogo();
   if (replis.length > 0) {
     console.warn(`Facteur de pixel introuvable (tolérance 10 %) : réduction au plus proche vers 64×64 pour ${replis.join(', ')}`);
   }
+  console.log(`Logo ${logo.largeur}×${logo.hauteur} (facteur ${logo.facteur || 'aucun'}) → assets/logo.png`);
   return sprites.map((entree) => entree.nom);
 }
 

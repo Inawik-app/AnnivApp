@@ -257,17 +257,20 @@ describe('cartes', () => {
   });
 
   it('touche la part de cagnotte même sans case dans cette direction', () => {
+    const miseBooste = lireConfigPlateau(RACINE).optionsDe.find((option) => option.id === 'booste')?.mise ?? 0;
     const or = socle([30, 30], 'raccourci-dore');
     or.ctx.tirerDe = () => 1;
     poser(or.etat, ['depart', 'chance', 'bonus', 'bonus', 'arrivee']);
+    or.etat.course!.cagnotte = 5 - miseBooste;
     const mira = or.etat.course!.ordre[0]!;
     const apres = lancer(or.etat, or.ctx, 'booste');
     expect(apres.course?.positions[mira]).toBe(1);
     expect(apres.course?.cagnotte).toBe(4);
-    expect(argent(apres.transactions, mira)).toBe(26);
+    expect(argent(apres.transactions, mira)).toBe(30 - miseBooste + 1);
 
     const retour = socle([30, 30], 'retour-aux-sources', 4);
     poser(retour.etat, ['depart', 'cagnotte', 'bonus', 'bonus', 'chance', 'arrivee']);
+    retour.etat.course!.cagnotte = 5 - miseBooste;
     const id = retour.etat.course!.ordre[0]!;
     const sources = lancer(retour.etat, retour.ctx, 'booste');
     expect(sources.course?.positions[id]).toBe(1);
@@ -279,8 +282,8 @@ describe('cartes', () => {
     const joueur = faux.etat.course!.ordre[0]!;
     const recul = lancer(faux.etat, faux.ctx, 'booste');
     expect(recul.course?.positions[joueur]).toBe(1);
-    expect(recul.course?.cagnotte).toBe(5);
-    expect(argent(recul.transactions, joueur)).toBe(25);
+    expect(recul.course?.cagnotte).toBe(miseBooste);
+    expect(argent(recul.transactions, joueur)).toBe(30 - miseBooste);
   });
 
   it('laisse les gages sans GP', () => {

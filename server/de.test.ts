@@ -53,8 +53,8 @@ describe('dés à 6, 7 et 8 faces', () => {
   it('donne une face équiprobable, et enregistre (faces + 1) / 2', () => {
     expect(config.optionsDe.map((option) => [option.id, option.faces, option.mise])).toEqual([
       ['normal', 6, 0],
-      ['booste', 7, 5],
-      ['super', 8, 10],
+      ['booste', 7, 1],
+      ['super', 8, 2],
     ]);
     for (const faces of [6, 7, 8]) {
       expect(esperanceDe(faces)).toBe((faces + 1) / 2);
@@ -93,7 +93,7 @@ describe('dés à 6, 7 et 8 faces', () => {
     etat = jouer(etat, { type: 'demarrerCourse' }, hote, ctx);
     const premier = etat.course?.ordre[0] ?? mira;
     const second = etat.course?.ordre[1] ?? noe;
-    etat = jouer(etat, { type: 'ajouterGP', joueurId: premier, montant: 4, libelle: 'Départ' }, hote, ctx);
+    etat = jouer(etat, { type: 'ajouterGP', joueurId: premier, montant: 1, libelle: 'Départ' }, hote, ctx);
     etat = jouer(etat, { type: 'ajouterGP', joueurId: second, montant: 30, libelle: 'Départ' }, hote, ctx);
     etat = jouer(etat, { type: 'nouveauTour' }, hote, ctx);
     etat = jouer(etat, { type: 'choisirMiniJeu', id: 'poker' }, hote, ctx);
@@ -101,16 +101,16 @@ describe('dés à 6, 7 et 8 faces', () => {
     const refuse = reduire(etat, { type: 'lancerDe', option: 'super' }, { role: 'joueur', joueurId: premier }, ctx);
     expect(refuse.ok).toBe(false);
     etat = jouer(etat, { type: 'lancerDe', option: 'normal' }, { role: 'joueur', joueurId: premier }, ctx);
-    expect(solde(etat.transactions, premier, 'visibles')).toBe(6);
+    expect(solde(etat.transactions, premier, 'visibles')).toBe(3);
     etat = jouer(etat, { type: 'lancerDe', option: 'super' }, { role: 'joueur', joueurId: second }, ctx);
-    expect(etat.course?.cagnotte).toBeGreaterThanOrEqual(10);
+    expect(etat.course?.cagnotte).toBeGreaterThanOrEqual(2);
     const chance = etat.course?.historique.lancers.find((lancer) => lancer.usage === 'chance');
     expect(chance?.mise).toBe(0);
     expect(chance?.faces).toBe(6);
     expect(chance?.esperance).toBeCloseTo(3.5, 10);
     expect(chance?.valeur).toBe(1);
     const deplacement = etat.course?.historique.lancers.filter((lancer) => lancer.usage === 'deplacement') ?? [];
-    expect(deplacement.map((lancer) => lancer.mise)).toEqual([0, 10]);
+    expect(deplacement.map((lancer) => lancer.mise)).toEqual([0, 2]);
     expect(deplacement.map((lancer) => lancer.faces)).toEqual([6, 8]);
     expect(deplacement.map((lancer) => lancer.valeur)).toEqual([1, 2]);
     expect(deplacement[0]?.esperance).toBeCloseTo(3.5, 10);

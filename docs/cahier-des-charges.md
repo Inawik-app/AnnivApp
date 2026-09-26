@@ -76,8 +76,8 @@ L'ordre est tiré au sort une seule fois, au démarrage de la course, côté ser
 2. **Mini-jeu** : les joueurs s'affrontent, les GP sont attribués.
 3. **Déplacements**, dans l'ordre de passage. Quand c'est son tour, le joueur choisit un dé, puis lance.
    - Dé normal : 1 à 6, gratuit.
-   - Dé boosté : 1 à 7, 5 GP.
-   - Super dé : 1 à 8, 10 GP.
+   - Dé boosté : 1 à 7, 1 GP.
+   - Super dé : 1 à 8, 2 GP.
    - Le choix et le lancer forment une seule action. Elle débite la mise, l'ajoute à la cagnotte, tire le dé uniformément, déplace le pion et applique l'effet de la case. Une seule annulation remet tout en place.
    - Une option trop chère pour le solde visible est refusée.
    - L'hôte peut lancer à la place d'un joueur absent, avec le dé normal par défaut.
@@ -149,7 +149,7 @@ Dès qu'un joueur atteint l'arrivée, le tour en cours va jusqu'au bout : les au
 
 La cérémonie, pilotée par l'hôte et annulable étape par étape :
 
-1. **Fin de la course** : la télé affiche le podium, dans l'ordre d'arrivée. Des GP d'arrivée sont versés alors selon `recompenseArrivee` dans `config/plateau.json` (retenu : 25 / 15 / 8 / 0 pour le 1er au 4e, source `arrivee`), et affichés sur le podium.
+1. **Fin de la course** : la télé affiche le podium, dans l'ordre d'arrivée. Des GP d'arrivée sont versés alors selon `recompenseArrivee` dans `config/plateau.json` (retenu : 60 / 35 / 15 / 0 pour le 1er au 4e, source `arrivee`), et affichés sur le podium.
 2. **Trophées de rattrapage** : le serveur en tire 4 parmi ceux qui sont attribuables (`nombreCeremonie` dans `config/trophees.json`). S'il y en a moins, ils sont tous décernés. L'hôte voit la liste à l'avance. La télé révèle chaque trophée à son tour : le nom, un moment de suspense, puis les gagnants. En cas d'égalité, tous le reçoivent. La remontée depuis la dernière place jusqu'à l'arrivée s'appelle Remontada légendaire et rapporte un bonus.
 3. **Classement final** : les joueurs du dernier au deuxième, avec leur total.
 4. **Gagnant** : il apparaît en grand et remporte le bon de 20 €.

@@ -6,7 +6,7 @@ import './commun/composants.css';
 function Choix() {
   return (
     <main class="page">
-      <h1>GP Party</h1>
+      <h1>GP exploiteur</h1>
       <span class="socle-pixel socle-lien">
         <a class="lien-choix" href="/tv">
           Télé

@@ -172,9 +172,10 @@ function PageJoueur() {
 
   return (
     <main class={reduit ? 'page animations-reduites' : 'page'}>
-      <h1>{vue?.partie.titre ?? 'GP Party'}</h1>
+      <h1>{vue?.partie.titre ?? 'GP exploiteur'}</h1>
       <p>{connecte ? 'Connecté' : 'Hors ligne'}</p>
       {erreur ? <p class="erreur">{erreur}</p> : null}
+      {vue?.partie.ecranTv === 'presentation' ? <p class="regarde-tv">Regarde la télé !</p> : null}
       {moi ? (
         <Tuile className="tuile-joueur">
           <Avatar avatar={moi.avatar} couleur={moi.couleur} pseudo={moi.pseudo} taille={160} />

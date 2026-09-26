@@ -120,7 +120,14 @@ function refuser(etat: EtatJeu, action: Action, origine: Origine, ctx: ContexteR
       }
       return null;
     case 'choisirEcranTv':
-      if (action.ecran !== 'accueil' && action.ecran !== 'scores' && action.ecran !== 'plateau') return 'Écran inconnu';
+      if (
+        action.ecran !== 'accueil' &&
+        action.ecran !== 'scores' &&
+        action.ecran !== 'plateau' &&
+        action.ecran !== 'presentation'
+      ) {
+        return 'Écran inconnu';
+      }
       return null;
     case 'ajouterJoueursFictifs': {
       if (!ctx.dev) return 'Action indisponible';
@@ -328,13 +335,17 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
       }
       case 'choisirEcranTv': {
         draft.partie.ecranTv = action.ecran;
-        const libelle =
-          action.ecran === 'scores'
-            ? 'La télé affiche les scores'
-            : action.ecran === 'plateau'
-              ? 'La télé affiche le plateau'
-              : "La télé affiche l'accueil";
-        ajouterEvenement(draft, 'ecran', 'public', libelle, { ecran: action.ecran });
+        let libelle = "La télé affiche l'accueil";
+        if (action.ecran === 'scores') libelle = 'La télé affiche les scores';
+        else if (action.ecran === 'plateau') libelle = 'La télé affiche le plateau';
+        else if (action.ecran === 'presentation') {
+          draft.partie.presentationId += 1;
+          libelle = 'Présentation lancée';
+        }
+        ajouterEvenement(draft, 'ecran', 'public', libelle, {
+          ecran: action.ecran,
+          presentationId: draft.partie.presentationId,
+        });
         break;
       }
       case 'basculerAnimationsReduites': {
@@ -359,14 +370,17 @@ export function reduire(etat: EtatJeu, action: Action, origine: Origine, ctx: Co
       }
       case 'reinitialiserPartie': {
         const titre = draft.partie.titre;
+        const sousTitre = draft.partie.sousTitre;
         draft.joueurs = [];
         draft.transactions = [];
         draft.demandesReprise = [];
         draft.evenements = [];
         draft.partie = {
           titre,
+          sousTitre,
           inscriptionsVerrouillees: false,
           ecranTv: 'accueil',
+          presentationId: 0,
           animationsReduites: false,
           diagnosticTvAffiche: false,
         };

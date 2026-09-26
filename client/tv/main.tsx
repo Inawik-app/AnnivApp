@@ -27,6 +27,7 @@ import { UndercoverTv } from './undercover';
 import { CodenamesTv } from './codenames';
 import { PerudoTv, dureeRevelationPerudo } from './perudo';
 import { JustOneTv, dureeRevelationJustOne } from './justone';
+import { PresentationTv, LogoGp } from './presentation';
 import { REPONDANT_HOTE } from '../../shared/topten';
 import { JUSTONE_HOTE } from '../../shared/justone';
 import './tv.css';
@@ -816,6 +817,13 @@ function EcranTv() {
                 aLance={lanceId !== null && lanceId === courseAffichee.joueurCourantId}
               />
             ) : null
+          ) : ecran === 'presentation' ? (
+            <PresentationTv
+              presentationId={vue?.partie.presentationId ?? 0}
+              sousTitre={vue?.partie.sousTitre ?? ''}
+              reduit={reduit}
+              vitesse={vitesseDemandee}
+            />
           ) : ecran === 'scores' ? (
             <section class="podium" data-ecran="scores" data-panneau="principal">
               {joueurs.length === 0 ? <p class="texte-tv">Aucun joueur pour l'instant</p> : null}
@@ -839,7 +847,7 @@ function EcranTv() {
                   <img class="qr" src="/qr/joueur.svg" alt="QR code vers la page joueur" />
                 </Tuile>
                 <div>
-                  <h1 class="titre-tv">{vue?.partie.titre ?? 'GP Party'}</h1>
+                  <LogoGp classe="accueil-logo" plafond={280} alt={vue?.partie.titre ?? 'GP exploiteur'} />
                   <p class="texte-tv">Scanne pour rejoindre</p>
                   <p class="texte-tv" style={{ marginTop: '16px' }}>
                     {vue?.urlJoueur ?? ''}
